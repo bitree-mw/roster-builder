@@ -1,0 +1,72 @@
+/*
+ * Malawi Airlines operations design tokens.
+ * Every colour in the application is defined here. Templates and JavaScript use classes, never colour values.
+ * Fonts use locally installed faces with system fallbacks; no web fonts are fetched at runtime.
+ */
+@theme {
+    --font-sans: "Public Sans", "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+    --font-display: "Public Sans", "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+    --font-mono: "JetBrains Mono", "Cascadia Mono", "SFMono-Regular", Consolas, "Liberation Mono", ui-monospace, monospace;
+
+    /* Structure: chart-grey canvas, white cards, navy ink. */
+    --color-canvas: #e9eef1;
+    --color-surface: #ffffff;
+    --color-surface-muted: #f4f8fb;
+    --color-surface-sunken: #e0e9f2;
+    --color-ink: #16233a;
+    --color-ink-strong: #010d23;
+    --color-muted: #56677a;
+    --color-subtle: #75808e;
+    --color-line: #cad4dc;
+    --color-line-strong: #9aa8b5;
+
+    /* Brand: navy console with the Malawi Airlines tail green and wordmark red. */
+    --color-brand: #16233a;
+    --color-brand-hover: #010d23;
+    --color-brand-soft: #e5eff7;
+    --color-brand-contrast: #ffffff;
+    --color-tail: #3f9b4f;
+    --color-tail-soft: #e4f3e6;
+    --color-wordmark: #c8312a;
+
+    /* Flight strip buff (ATC paper strip). */
+    --color-strip: #f5ebcf;
+    --color-strip-line: #e2d3a8;
+
+    /* Operational states. */
+    --color-success: #2e7d4f;
+    --color-success-soft: #e2f1e7;
+    --color-warning: #9a5b00;
+    --color-warning-accent: #b86e00;
+    --color-warning-soft: #fdf0d9;
+    --color-danger: #b3261e;
+    --color-danger-soft: #fbe9e7;
+    --color-info: #1a648c;
+    --color-info-soft: #e1f0f9;
+    --color-neutral: #5b6673;
+    --color-neutral-soft: #eceff2;
+    --color-sim: #5b4b9a;
+    --color-standby: #1f7a7a;
+}
+
+:root {
+    /* Aircraft type roster palettes (semantic key stored on aircraft_types.palette). */
+    --palette-forest: #2b6e43;
+    --palette-forest-bg: #e3f1e7;
+    --palette-gold: #855b00;
+    --palette-gold-bg: #fbefcf;
+    --palette-sky: #2a6f97;
+    --palette-sky-bg: #e1eff8;
+    --palette-plum: #8c2f6b;
+    --palette-plum-bg: #f6e4ef;
+    --palette-coral: #a5432c;
+    --palette-coral-bg: #fbe8e1;
+
+    --focus-ring: #2a6f97;
+    --dialog-shade: rgb(22 35 58 / 0.55);
+    --lift-shadow: 0 2px 0 rgb(22 35 58 / 0.15);
+    --hero-grid: rgb(255 255 255 / 0.06);
+    --hero-ink-muted: #b6c3d6;
+    --hero-panel: rgb(255 255 255 / 0.06);
+    --hero-panel-line: rgb(255 255 255 / 0.16);
+}

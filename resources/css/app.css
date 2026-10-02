@@ -1,0 +1,5 @@
+@import "tailwindcss";
+@import "./common/tokens.css";
+@import "./common/components.css";
+@source "../views/**/*.blade.php";
+@source "../js/**/*.js";

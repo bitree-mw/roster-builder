@@ -1,0 +1,908 @@
+<!DOCTYPE html>
+
+<html lang="en"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/><meta content="web_standard" name="shell-type"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&amp;family=Public+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config={darkMode:"class",theme:{extend:{colors:{"primary":"#010d23","on-secondary-fixed":"#001e2f","secondary-container":"#92d0fd","on-surface-variant":"#45474d","secondary-fixed":"#c8e6ff","on-secondary":"#ffffff","on-tertiary-fixed":"#3c002a","surface-tint":"#525f78","surface-container-highest":"#dae4ec","surface-variant":"#dae4ec","outline":"#75777e","outline-variant":"#c5c6ce","surface-bright":"#f5faff","primary-fixed-dim":"#bac7e5","on-secondary-container":"#045a81","on-primary":"#ffffff","tertiary-container":"#490034","background":"#f5faff","inverse-primary":"#bac7e5","surface":"#f5faff","inverse-surface":"#283238","on-tertiary-container":"#ce66a5","on-background":"#131d23","surface-container-low":"#ebf5fd","on-tertiary-fixed-variant":"#7c215e","on-error":"#ffffff","inverse-on-surface":"#e8f2fa","on-tertiary":"#ffffff","error":"#ba1a1a","on-surface":"#131d23","on-primary-fixed-variant":"#3a4760","surface-container-lowest":"#ffffff","on-primary-container":"#7e8aa6","on-error-container":"#93000a","primary-container":"#16233a","tertiary-fixed":"#ffd8ea","surface-container-high":"#e0e9f2","on-secondary-fixed-variant":"#004c6e","secondary-fixed-dim":"#8fcefa","tertiary-fixed-dim":"#ffaeda","primary-fixed":"#d7e2ff","secondary":"#1a648c","tertiary":"#220017","on-primary-fixed":"#0e1b32","surface-container":"#e5eff7","surface-dim":"#d1dbe3","error-container":"#ffdad6"},borderRadius:{"DEFAULT":"0.125rem","lg":"0.25rem","xl":"0.5rem","full":"0.75rem"},spacing:{"margin":"0.75rem","space-lg":"1rem","gutter-tablet":"0.75rem","space-md":"0.75rem","space-xl":"1.5rem","gutter":"0.5rem","margin-tablet":"1.25rem","margin-desktop":"1.75rem","space-sm":"0.375rem","space-xs":"0.25rem","gutter-desktop":"1rem"},fontFamily:{"data-md":["JetBrains Mono"],"headline-md":["Public Sans"],"body-sm":["Public Sans"],"title-sm":["Public Sans"],"headline-lg":["Public Sans"],"data-lg":["JetBrains Mono"],"body-md":["Public Sans"],"label-caps":["JetBrains Mono"],"data-sm":["JetBrains Mono"],"body-lg":["Public Sans"],"headline-sm":["Public Sans"],"title-md":["Public Sans"]},fontSize:{"data-md":["13px",{"lineHeight":"16px","fontWeight":"600"}],"headline-md":["22px",{"lineHeight":"28px","letterSpacing":"-0.01em","fontWeight":"700"}],"body-sm":["11px",{"lineHeight":"14px","fontWeight":"400"}],"title-sm":["13px",{"lineHeight":"18px","fontWeight":"600"}],"headline-lg":["28px",{"lineHeight":"34px","letterSpacing":"-0.02em","fontWeight":"700"}],"data-lg":["16px",{"lineHeight":"20px","letterSpacing":"-0.02em","fontWeight":"700"}],"body-md":["13px",{"lineHeight":"18px","fontWeight":"400"}],"label-caps":["10px",{"lineHeight":"12px","letterSpacing":"0.06em","fontWeight":"700"}],"data-sm":["11px",{"lineHeight":"14px","fontWeight":"500"}],"body-lg":["15px",{"lineHeight":"20px","fontWeight":"400"}],"headline-sm":["18px",{"lineHeight":"24px","fontWeight":"600"}],"title-md":["15px",{"lineHeight":"20px","fontWeight":"700"}]}}}}</script></head><body class="bg-surface font-body-md text-on-surface antialiased"><header class="fixed top-0 left-0 right-0 z-50 bg-surface-container-lowest border-b border-outline-variant"><div class="h-28 w-full px-gutter-desktop mx-auto flex flex-col justify-between"><div class="flex items-center justify-between pt-space-xs gap-gutter-desktop"><div class="flex items-center gap-space-md min-w-[280px]"><div class="p-space-xs bg-surface-container-lowest rounded-lg border border-outline-variant flex items-center justify-center"><img alt="Malawi Airlines logo on a rounded white tile with a stylized green aircraft tail fin, red sunburst, and crisp lettering.. Brand logo" class="h-8 w-auto object-contain" src="https://lh3.googleusercontent.com/aida/AEtjO1U1HydFoWUM1Mcw2dz-hybbVsl1R7ugRXk7rnNmvu1n53tTlMmQF21Ayy9fEXgE34qiyQZQD90EOcr8eJ9MrmGj-fB0bLJz1sQAapoNRKfE2aqzAMq4NmRgEzK_dYVDqazQhXprq05qR4sL_6BcPAPBRzTFKlXznb_HbXsM0-NZCJUuJvkPKvEdH5avZAcRqmQt3SDEVcPr9SjdG5v-ThqgBth81oc5Rhun_hvLaVrATqA-JxvYuY4F2m4"/></div><div class="flex flex-col"><span class="font-title-md text-title-md text-primary leading-tight tracking-tight uppercase">Malawi Airlines Roster Builder</span><span class="font-label-caps text-label-caps text-on-surface-variant">OPERATIONAL DISPATCH WORKSTATION · ICAO / SUBPART FTL COMPLIANT</span></div></div><div class="flex items-center gap-space-md"><div class="flex items-center gap-space-xs"><button class="inline-flex items-center gap-space-xs px-space-md py-space-sm bg-primary-container text-on-primary rounded font-label-caps text-label-caps uppercase hover:bg-primary transition-colors" type="button"><span class="material-symbols-outlined text-[16px]">bolt</span>Build Roster</button><button class="inline-flex items-center px-space-md py-space-sm bg-surface-container-lowest border border-outline-variant text-on-surface rounded font-label-caps text-label-caps uppercase hover:bg-surface-container-high transition-colors" type="button">Reset Sample Data</button></div><div class="h-6 w-[1px] bg-outline-variant"></div><div class="flex items-center gap-space-xs bg-surface-container px-space-sm py-space-xs rounded border border-outline-variant"><button class="p-space-xs text-on-surface-variant hover:text-on-surface flex items-center justify-center" type="button"><span class="material-symbols-outlined text-[14px]">chevron_left</span></button><span class="font-data-md text-data-md text-on-surface px-space-xs">October 2026</span><button class="p-space-xs text-on-surface-variant hover:text-on-surface flex items-center justify-center" type="button"><span class="material-symbols-outlined text-[14px]">chevron_right</span></button></div><div class="flex items-center bg-surface-container rounded border border-outline-variant p-[2px]"><button class="px-space-xs py-space-xs font-label-caps text-label-caps text-on-surface bg-surface-container-lowest rounded shadow-sm" type="button">Whole month</button><button class="px-space-xs py-space-xs font-label-caps text-label-caps text-on-surface-variant hover:text-on-surface" type="button">1-14 Oct</button><button class="px-space-xs py-space-xs font-label-caps text-label-caps text-on-surface-variant hover:text-on-surface" type="button">15-31 Oct</button></div><div class="flex items-center bg-surface-container rounded border border-outline-variant p-[2px]"><button class="px-space-xs py-space-xs font-label-caps text-label-caps text-on-surface bg-surface-container-lowest rounded shadow-sm" type="button">GMT</button><button class="px-space-xs py-space-xs font-label-caps text-label-caps text-on-surface-variant hover:text-on-surface" type="button">Local (GMT+2)</button></div></div><div class="flex items-center gap-space-md justify-end min-w-[280px]"><div class="flex items-center gap-space-xs text-secondary font-data-sm text-data-sm bg-secondary-fixed/30 px-space-sm py-space-xs rounded border border-secondary/20"><span class="w-2 h-2 rounded-full bg-secondary inline-block animate-pulse"></span><span>Active Sync: C9 Lilongwe Base</span></div><div class="flex items-center gap-space-xs bg-surface-container-low px-space-sm py-space-xs rounded border border-outline-variant"><div class="text-right"><span class="block font-title-sm text-title-sm text-on-surface leading-tight">Capt. D. Phiri</span><span class="block font-label-caps text-label-caps text-on-surface-variant">Head of Ops</span></div><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div></div></div></div><nav class="flex items-center gap-space-lg border-t border-outline-variant overflow-x-auto" data-active-classes="border-b-2 border-primary text-primary font-bold"><a aria-current="page" class="flex items-center gap-space-xs py-space-sm transition-colors whitespace-nowrap border-b-2 border-primary text-primary font-bold" data-path="roster" href="#"><span>Roster</span><span class="px-space-xs py-[1px] bg-secondary-fixed text-on-secondary-fixed rounded font-data-sm text-data-sm">815/815</span></a><a class="py-space-sm font-title-sm text-title-sm text-on-surface-variant hover:text-on-surface border-b-2 border-transparent transition-colors whitespace-nowrap" data-path="print-and-email" href="#">Print and email</a><a class="flex items-center gap-space-xs py-space-sm font-title-sm text-title-sm text-on-surface-variant hover:text-on-surface border-b-2 border-transparent transition-colors whitespace-nowrap" data-path="flights-and-routes" href="#"><span>Flights and routes</span><span class="px-space-xs py-[1px] bg-surface-container-high text-on-surface-variant rounded font-data-sm text-data-sm">5 lines</span></a><a class="flex items-center gap-space-xs py-space-sm font-title-sm text-title-sm text-on-surface-variant hover:text-on-surface border-b-2 border-transparent transition-colors whitespace-nowrap" data-path="aircraft" href="#"><span>Aircraft</span><span class="px-space-xs py-[1px] bg-surface-container-high text-on-surface-variant rounded font-data-sm text-data-sm">3 fleet</span></a><a class="flex items-center gap-space-xs py-space-sm font-title-sm text-title-sm text-on-surface-variant hover:text-on-surface border-b-2 border-transparent transition-colors whitespace-nowrap" data-path="crew" href="#"><span>Crew</span><span class="px-space-xs py-[1px] bg-surface-container-high text-on-surface-variant rounded font-data-sm text-data-sm">48 active</span></a><a class="flex items-center gap-space-xs py-space-sm font-title-sm text-title-sm text-on-surface-variant hover:text-on-surface border-b-2 border-transparent transition-colors whitespace-nowrap" data-path="rules-and-legality" href="#"><span>Rules &amp; Legality</span><span class="px-space-xs py-[1px] bg-surface-container-high text-on-surface-variant rounded font-data-sm text-data-sm">Subpart FTL</span></a><a class="py-space-sm font-title-sm text-title-sm text-on-surface-variant hover:text-on-surface border-b-2 border-transparent transition-colors whitespace-nowrap" data-path="import-and-backup" href="#">Import and backup</a></nav></div></header><main class="w-full pt-28 bg-surface-container"><div class="flex flex-col w-full">
+<div class="w-full px-gutter-desktop py-space-sm bg-surface-container-low border-b border-outline-variant">
+<div class="flex flex-wrap items-center justify-between gap-space-md">
+<!-- Crew Profile Selector & View Mode Switcher -->
+<div class="flex items-center gap-space-md flex-wrap">
+<div class="flex items-center bg-surface-container-lowest rounded border border-outline-variant p-[2px]">
+<button class="px-space-md py-space-xs font-label-caps text-label-caps text-on-surface-variant hover:text-on-surface" type="button">Grid Matrix</button>
+<button class="px-space-md py-space-xs font-label-caps text-label-caps text-on-surface-variant hover:text-on-surface" type="button">Individual</button>
+<button class="px-space-md py-space-xs font-label-caps text-label-caps text-on-primary bg-primary rounded shadow-sm flex items-center gap-space-xs" type="button">
+<span class="material-symbols-outlined text-[13px]">calendar_month</span>Calendar View
+          </button>
+</div>
+<div class="h-6 w-[1px] bg-outline-variant hidden sm:block"></div>
+<div class="relative min-w-[340px]">
+<label class="sr-only">Selected Crew Member</label>
+<div class="flex items-center justify-between px-space-md py-space-xs bg-surface-container-lowest border border-outline-variant rounded hover:border-primary transition-colors cursor-pointer">
+<div class="flex items-center gap-space-sm">
+<span class="w-2.5 h-2.5 rounded-full bg-secondary"></span>
+<div class="flex flex-col text-left">
+<span class="font-title-sm text-title-sm text-primary tracking-tight">Capt. Chikondi Chirwa</span>
+<span class="font-label-caps text-label-caps text-on-surface-variant">CPT · DASH 8-Q400 · LLW BASE · MAL-0418</span>
+</div>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant text-[18px]">arrow_drop_down</span>
+</div>
+</div>
+<!-- Duty Category Filter Segment -->
+<div class="flex items-center bg-surface-container-lowest rounded border border-outline-variant p-[2px] overflow-x-auto">
+<button class="px-space-sm py-space-xs font-label-caps text-label-caps bg-primary text-on-primary rounded whitespace-nowrap" type="button">All Duties</button>
+<button class="px-space-sm py-space-xs font-label-caps text-label-caps text-on-surface-variant hover:text-on-surface whitespace-nowrap" type="button">Flights Only</button>
+<button class="px-space-sm py-space-xs font-label-caps text-label-caps text-on-surface-variant hover:text-on-surface whitespace-nowrap" type="button">Standby &amp; Reserve</button>
+<button class="px-space-sm py-space-xs font-label-caps text-label-caps text-on-surface-variant hover:text-on-surface whitespace-nowrap" type="button">Sim &amp; Training</button>
+<button class="px-space-sm py-space-xs font-label-caps text-label-caps text-on-surface-variant hover:text-on-surface whitespace-nowrap" type="button">Leaves &amp; Rest</button>
+</div>
+</div>
+<!-- Quick Date Jump & Status Badges -->
+<div class="flex items-center gap-space-md">
+<div class="flex items-center gap-space-xs">
+<button class="px-space-sm py-space-xs font-label-caps text-label-caps bg-surface-container-lowest border border-outline-variant rounded text-on-surface hover:bg-surface-container" type="button">Today</button>
+<div class="flex items-center bg-surface-container-lowest rounded border border-outline-variant">
+<button class="p-space-xs text-on-surface-variant hover:text-on-surface" type="button"><span class="material-symbols-outlined text-[16px]">chevron_left</span></button>
+<span class="font-data-md text-data-md text-primary px-space-sm">October 2026</span>
+<button class="p-space-xs text-on-surface-variant hover:text-on-surface" type="button"><span class="material-symbols-outlined text-[16px]">chevron_right</span></button>
+</div>
+</div>
+<div class="hidden xl:flex items-center gap-space-xs font-data-sm text-data-sm text-secondary bg-secondary-fixed/40 px-space-sm py-space-xs rounded border border-secondary/30">
+<span class="material-symbols-outlined text-[15px]">verified_user</span>
+<span>SUBPART FTL LEGAL</span>
+</div>
+</div>
+</div>
+<!-- Operational KPI Strip -->
+<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-space-sm mt-space-sm pt-space-xs border-t border-outline-variant/60">
+<div class="bg-surface-container-lowest px-space-sm py-[5px] rounded border border-outline-variant flex items-center justify-between">
+<span class="font-label-caps text-label-caps text-on-surface-variant">DUTY DAYS</span>
+<span class="font-data-md text-data-md text-primary">18 Days</span>
+</div>
+<div class="bg-surface-container-lowest px-space-sm py-[5px] rounded border border-outline-variant flex items-center justify-between">
+<span class="font-label-caps text-label-caps text-on-surface-variant">BLOCK TIME</span>
+<span class="font-data-md text-data-md text-secondary">41h 20m</span>
+</div>
+<div class="bg-surface-container-lowest px-space-sm py-[5px] rounded border border-outline-variant flex items-center justify-between">
+<span class="font-label-caps text-label-caps text-on-surface-variant">REST DAYS</span>
+<span class="font-data-md text-data-md text-on-surface">9 Days</span>
+</div>
+<div class="bg-surface-container-lowest px-space-sm py-[5px] rounded border border-outline-variant flex items-center justify-between">
+<span class="font-label-caps text-label-caps text-on-surface-variant">SBY COUNT</span>
+<span class="font-data-md text-data-md text-on-surface">1 Duty</span>
+</div>
+<div class="bg-surface-container-lowest px-space-sm py-[5px] rounded border border-outline-variant flex items-center justify-between">
+<span class="font-label-caps text-label-caps text-on-surface-variant">SIM / OPC</span>
+<span class="font-data-md text-data-md text-tertiary-container">1 Session</span>
+</div>
+<div class="bg-surface-container-lowest px-space-sm py-[5px] rounded border border-outline-variant flex items-center justify-between">
+<span class="font-label-caps text-label-caps text-on-surface-variant">CAP UTILIZED</span>
+<div class="flex items-center gap-space-xs">
+<span class="font-data-md text-data-md text-primary">41.3%</span>
+<div class="w-10 h-1.5 bg-surface-container-highest rounded-full overflow-hidden">
+<div class="bg-secondary h-full rounded-full" style="width: 41.3%"></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Main Operational Canvas: Split Pane -->
+<div class="w-full px-gutter-desktop py-space-md grid grid-cols-1 lg:grid-cols-12 gap-space-md items-start">
+<!-- LEFT PANE: 7-Column Monthly Calendar Grid (65% width approx) -->
+<div class="lg:col-span-8 flex flex-col bg-surface-container-lowest border border-outline-variant rounded">
+<!-- Weekday Header Row -->
+<div class="grid grid-cols-7 border-b border-outline-variant bg-surface-container text-center font-label-caps text-label-caps text-on-surface-variant py-space-xs">
+<div class="py-space-xs border-r border-outline-variant">MON</div>
+<div class="py-space-xs border-r border-outline-variant">TUE</div>
+<div class="py-space-xs border-r border-outline-variant">WED</div>
+<div class="py-space-xs border-r border-outline-variant">THU</div>
+<div class="py-space-xs border-r border-outline-variant">FRI</div>
+<div class="py-space-xs border-r border-outline-variant">SAT</div>
+<div class="py-space-xs">SUN</div>
+</div>
+<!-- 35 Day Matrix Container -->
+<div class="grid grid-cols-7 bg-outline-variant gap-[1px]">
+<!-- W1: Sep 28 (Previous month) -->
+<div class="min-h-[108px] bg-surface-container-highest/60 p-space-xs flex flex-col justify-between opacity-50">
+<div class="flex justify-between items-start">
+<span class="font-data-sm text-data-sm text-on-surface-variant font-bold">28</span>
+<span class="font-label-caps text-[9px] text-on-surface-variant">SEP</span>
+</div>
+<div class="p-space-xs bg-surface-container rounded border border-outline-variant text-[10px] font-label-caps text-on-surface-variant">
+            OFF · LEGAL REST
+          </div>
+</div>
+<!-- W1: Sep 29 -->
+<div class="min-h-[108px] bg-surface-container-highest/60 p-space-xs flex flex-col justify-between opacity-50">
+<div class="flex justify-between items-start">
+<span class="font-data-sm text-data-sm text-on-surface-variant font-bold">29</span>
+<span class="font-label-caps text-[9px] text-on-surface-variant">SEP</span>
+</div>
+<div class="p-space-xs bg-surface-container rounded border border-outline-variant text-[10px] font-label-caps text-on-surface-variant">
+            LB1 · 4 SECTORS
+          </div>
+</div>
+<!-- W1: Sep 30 -->
+<div class="min-h-[108px] bg-surface-container-highest/60 p-space-xs flex flex-col justify-between opacity-50">
+<div class="flex justify-between items-start">
+<span class="font-data-sm text-data-sm text-on-surface-variant font-bold">30</span>
+<span class="font-label-caps text-[9px] text-on-surface-variant">SEP</span>
+</div>
+<div class="p-space-xs bg-surface-container rounded border border-outline-variant text-[10px] font-label-caps text-on-surface-variant">
+            LB2 · 2 SECTORS
+          </div>
+</div>
+<!-- W1: Thu 1 Oct (SELECTED / ACTIVE DAY) -->
+<div class="min-h-[108px] bg-surface-container-lowest p-space-xs flex flex-col justify-between relative ring-2 ring-primary ring-inset z-10 cursor-pointer shadow-sm">
+<div class="flex justify-between items-start">
+<span class="font-data-md text-data-md text-primary font-bold px-1 rounded bg-secondary-fixed/50">01</span>
+<span class="px-space-xs py-[1px] bg-primary text-on-primary font-label-caps text-[9px] rounded">SELECTED</span>
+</div>
+<div class="mt-space-xs bg-[#f5ebcf] border border-outline-variant rounded overflow-hidden flex shadow-sm">
+<div class="w-1.5 bg-[#2a6f97] shrink-0"></div>
+<div class="p-space-xs flex-1">
+<div class="flex items-center justify-between font-label-caps text-label-caps text-primary">
+<span class="font-bold">LB1 SHUTTLE</span>
+<span class="text-secondary font-data-sm">03h00</span>
+</div>
+<div class="font-data-sm text-data-sm text-on-surface font-semibold mt-[2px]">3W 102/103/104/105</div>
+<div class="flex items-center justify-between text-[10px] text-on-surface-variant mt-[2px]">
+<span>04:45-09:45</span>
+<span class="text-secondary">4 Sec</span>
+</div>
+</div>
+</div>
+<div class="flex items-center justify-between text-[9px] font-label-caps text-on-surface-variant mt-1">
+<span>LLW BASE</span>
+<span class="text-primary font-bold">Q400</span>
+</div>
+</div>
+<!-- W1: Fri 2 Oct -->
+<div class="min-h-[108px] bg-surface-container-lowest p-space-xs flex flex-col justify-between hover:bg-surface-container-low transition-colors cursor-pointer">
+<div class="flex justify-between items-start">
+<span class="font-data-md text-data-md text-on-surface">02</span>
+<span class="font-label-caps text-[9px] text-on-surface-variant">FRI</span>
+</div>
+<div class="my-auto py-space-sm px-space-xs bg-surface-container-high/60 rounded border border-dashed border-outline-variant text-center">
+<span class="block font-data-sm text-data-sm text-on-surface-variant font-bold">OFF</span>
+<span class="block font-label-caps text-[9px] text-on-surface-variant">FULL LEGAL REST</span>
+</div>
+<div class="text-[9px] font-label-caps text-on-surface-variant text-right">36H REST OK</div>
+</div>
+<!-- W1: Sat 3 Oct -->
+<div class="min-h-[108px] bg-surface-container-lowest p-space-xs flex flex-col justify-between hover:bg-surface-container-low transition-colors cursor-pointer">
+<div class="flex justify-between items-start">
+<span class="font-data-md text-data-md text-on-surface">03</span>
+<span class="font-label-caps text-[9px] text-on-surface-variant">SAT</span>
+</div>
+<div class="mt-space-xs bg-[#f5ebcf] border border-outline-variant rounded overflow-hidden flex">
+<div class="w-1.5 bg-[#2a6f97] shrink-0"></div>
+<div class="p-space-xs flex-1">
+<div class="flex items-center justify-between font-label-caps text-label-caps text-primary">
+<span>LB2 REGIONAL</span>
+<span class="text-secondary font-data-sm">03h15</span>
+</div>
+<div class="font-data-sm text-data-sm text-on-surface font-semibold mt-[2px]">3W 214 / 215</div>
+<div class="text-[10px] text-on-surface-variant mt-[2px]">14:15 - 19:00</div>
+</div>
+</div>
+<div class="flex items-center justify-between text-[9px] font-label-caps text-on-surface-variant mt-1">
+<span>LLW-HRE-LLW</span>
+<span class="text-primary">Q400</span>
+</div>
+</div>
+<!-- W1: Sun 4 Oct -->
+<div class="min-h-[108px] bg-surface-container-lowest p-space-xs flex flex-col justify-between hover:bg-surface-container-low transition-colors cursor-pointer">
+<div class="flex justify-between items-start">
+<span class="font-data-md text-data-md text-on-surface">04</span>
+<span class="font-label-caps text-[9px] text-on-surface-variant">SUN</span>
+</div>
+<div class="my-auto py-space-sm px-space-xs bg-surface-container-high/60 rounded border border-dashed border-outline-variant text-center">
+<span class="block font-data-sm text-data-sm text-on-surface-variant font-bold">OFF</span>
+<span class="block font-label-caps text-[9px] text-on-surface-variant">WEEKLY REST</span>
+</div>
+<div class="text-[9px] font-label-caps text-on-surface-variant text-right">SEC-7 FTL OK</div>
+</div>
+<!-- W2: Mon 5 Oct -->
+<div class="min-h-[108px] bg-surface-container-lowest p-space-xs flex flex-col justify-between hover:bg-surface-container-low transition-colors cursor-pointer">
+<div class="flex justify-between items-start">
+<span class="font-data-md text-data-md text-on-surface">05</span>
+<span class="px-space-xs py-[1px] bg-secondary-fixed text-on-secondary-fixed font-label-caps text-[9px] rounded">SBY</span>
+</div>
+<div class="mt-space-xs bg-surface-container border border-secondary/40 rounded overflow-hidden flex">
+<div class="w-1.5 bg-[#1f7a7a] shrink-0"></div>
+<div class="p-space-xs flex-1">
+<div class="font-label-caps text-label-caps text-secondary font-bold">STANDBY HOME</div>
+<div class="font-data-sm text-data-sm text-on-surface mt-[2px]">06:00 - 18:00</div>
+<div class="text-[10px] text-on-surface-variant">Callout Max 90m</div>
+</div>
+</div>
+<div class="text-[9px] font-label-caps text-on-surface-variant text-right">LLW DOMICILE</div>
+</div>
+<!-- W2: Tue 6 Oct -->
+<div class="min-h-[108px] bg-surface-container-lowest p-space-xs flex flex-col justify-between hover:bg-surface-container-low transition-colors cursor-pointer">
+<div class="flex justify-between items-start">
+<span class="font-data-md text-data-md text-on-surface">06</span>
+<span class="px-space-xs py-[1px] bg-tertiary-fixed text-on-tertiary-fixed font-label-caps text-[9px] rounded">SIM</span>
+</div>
+<div class="mt-space-xs bg-[#f4effa] border border-outline-variant rounded overflow-hidden flex">
+<div class="w-1.5 bg-[#5b4b9a] shrink-0"></div>
+<div class="p-space-xs flex-1">
+<div class="font-label-caps text-label-caps text-tertiary-container font-bold">LVL-D RECURRENT</div>
+<div class="font-data-sm text-data-sm text-on-surface mt-[2px]">08:00 - 16:00</div>
+<div class="text-[10px] text-on-surface-variant">OPC / IR Check</div>
+</div>
+</div>
+<div class="text-[9px] font-label-caps text-on-surface-variant text-right">SIM BAY 2 LLW</div>
+</div>
+<!-- W2: Wed 7 Oct -->
+<div class="min-h-[108px] bg-surface-container-lowest p-space-xs flex flex-col justify-between hover:bg-surface-container-low transition-colors cursor-pointer">
+<div class="flex justify-between items-start">
+<span class="font-data-md text-data-md text-on-surface">07</span>
+<span class="font-label-caps text-[9px] text-on-surface-variant">WED</span>
+</div>
+<div class="mt-space-xs bg-[#f5ebcf] border border-outline-variant rounded overflow-hidden flex">
+<div class="w-1.5 bg-[#2a6f97] shrink-0"></div>
+<div class="p-space-xs flex-1">
+<div class="flex items-center justify-between font-label-caps text-label-caps text-primary">
+<span>LB1 SHUTTLE</span>
+<span class="text-secondary font-data-sm">03h00</span>
+</div>
+<div class="font-data-sm text-data-sm text-on-surface font-semibold mt-[2px]">3W 102/103/104/105</div>
+<div class="text-[10px] text-on-surface-variant mt-[2px]">04:45 - 09:45</div>
+</div>
+</div>
+<div class="flex items-center justify-between text-[9px] font-label-caps text-on-surface-variant mt-1">
+<span>LLW-BLZ-LLW</span>
+<span class="text-primary">Q400</span>
+</div>
+</div>
+<!-- W2: Thu 8 Oct -->
+<div class="min-h-[108px] bg-surface-container-lowest p-space-xs flex flex-col justify-between hover:bg-surface-container-low transition-colors cursor-pointer">
+<div class="flex justify-between items-start">
+<span class="font-data-md text-data-md text-on-surface">08</span>
+<span class="font-label-caps text-[9px] text-on-surface-variant">THU</span>
+</div>
+<div class="mt-space-xs bg-[#f5ebcf] border border-outline-variant rounded overflow-hidden flex">
+<div class="w-1.5 bg-[#2a6f97] shrink-0"></div>
+<div class="p-space-xs flex-1">
+<div class="flex items-center justify-between font-label-caps text-label-caps text-primary">
+<span>LB2 REGIONAL</span>
+<span class="text-secondary font-data-sm">03h20</span>
+</div>
+<div class="font-data-sm text-data-sm text-on-surface font-semibold mt-[2px]">3W 301 / 302</div>
+<div class="text-[10px] text-on-surface-variant mt-[2px]">13:00 - 17:30</div>
+</div>
+</div>
+<div class="flex items-center justify-between text-[9px] font-label-caps text-on-surface-variant mt-1">
+<span>LLW-LUN-LLW</span>
+<span class="text-primary">Q400</span>
+</div>
+</div>
+<!-- W2: Fri 9 Oct (LEAVE 1/3) -->
+<div class="min-h-[108px] bg-[repeating-linear-gradient(45deg,#ebf5fd,#ebf5fd_8px,#dae4ec_8px,#dae4ec_16px)] p-space-xs flex flex-col justify-between">
+<div class="flex justify-between items-start">
+<span class="font-data-md text-data-md text-on-surface bg-surface-container-lowest px-1 rounded">09</span>
+<span class="px-space-xs py-[1px] bg-surface-container-lowest border border-outline-variant font-label-caps text-[9px] text-secondary rounded">AL-1/3</span>
+</div>
+<div class="bg-surface-container-lowest/90 backdrop-blur-sm p-space-xs rounded border border-outline-variant text-center my-auto">
+<span class="font-data-sm text-data-sm text-primary font-bold block">ANNUAL LEAVE</span>
+<span class="font-label-caps text-[9px] text-on-surface-variant">APPROVED MAL-AL-44</span>
+</div>
+<div class="text-[9px] font-label-caps text-on-surface-variant bg-surface-container-lowest/90 px-1 rounded w-fit">DUTY EXEMPT</div>
+</div>
+<!-- W2: Sat 10 Oct (LEAVE 2/3) -->
+<div class="min-h-[108px] bg-[repeating-linear-gradient(45deg,#ebf5fd,#ebf5fd_8px,#dae4ec_8px,#dae4ec_16px)] p-space-xs flex flex-col justify-between">
+<div class="flex justify-between items-start">
+<span class="font-data-md text-data-md text-on-surface bg-surface-container-lowest px-1 rounded">10</span>
+<span class="px-space-xs py-[1px] bg-surface-container-lowest border border-outline-variant font-label-caps text-[9px] text-secondary rounded">AL-2/3</span>
+</div>
+<div class="bg-surface-container-lowest/90 backdrop-blur-sm p-space-xs rounded border border-outline-variant text-center my-auto">
+<span class="font-data-sm text-data-sm text-primary font-bold block">ANNUAL LEAVE</span>
+<span class="font-label-caps text-[9px] text-on-surface-variant">REST NOT CHARGEABLE</span>
+</div>
+<div class="text-[9px] font-label-caps text-on-surface-variant bg-surface-container-lowest/90 px-1 rounded w-fit">DUTY EXEMPT</div>
+</div>
+<!-- W2: Sun 11 Oct (LEAVE 3/3) -->
+<div class="min-h-[108px] bg-[repeating-linear-gradient(45deg,#ebf5fd,#ebf5fd_8px,#dae4ec_8px,#dae4ec_16px)] p-space-xs flex flex-col justify-between">
+<div class="flex justify-between items-start">
+<span class="font-data-md text-data-md text-on-surface bg-surface-container-lowest px-1 rounded">11</span>
+<span class="px-space-xs py-[1px] bg-surface-container-lowest border border-outline-variant font-label-caps text-[9px] text-secondary rounded">AL-3/3</span>
+</div>
+<div class="bg-surface-container-lowest/90 backdrop-blur-sm p-space-xs rounded border border-outline-variant text-center my-auto">
+<span class="font-data-sm text-data-sm text-primary font-bold block">ANNUAL LEAVE</span>
+<span class="font-label-caps text-[9px] text-on-surface-variant">BLOCK CONCLUSION</span>
+</div>
+<div class="text-[9px] font-label-caps text-on-surface-variant bg-surface-container-lowest/90 px-1 rounded w-fit">DUTY EXEMPT</div>
+</div>
+<!-- W3: Mon 12 Oct (B737 Multi-day) -->
+<div class="min-h-[108px] bg-surface-container-lowest p-space-xs flex flex-col justify-between hover:bg-surface-container-low transition-colors cursor-pointer">
+<div class="flex justify-between items-start">
+<span class="font-data-md text-data-md text-on-surface">12</span>
+<span class="px-space-xs py-[1px] bg-tertiary-fixed text-on-tertiary-fixed font-label-caps text-[9px] rounded font-bold">NIGHT STOP</span>
+</div>
+<div class="mt-space-xs bg-[#fdf2f7] border border-outline-variant rounded overflow-hidden flex">
+<div class="w-1.5 bg-[#8c2f6b] shrink-0"></div>
+<div class="p-space-xs flex-1">
+<div class="flex items-center justify-between font-label-caps text-label-caps text-primary">
+<span class="text-tertiary font-bold">LA1 ADDIS ABABA</span>
+<span class="text-tertiary font-data-sm">04h15</span>
+</div>
+<div class="font-data-sm text-data-sm text-on-surface font-semibold mt-[2px]">3W 408 (Outbound)</div>
+<div class="text-[10px] text-on-surface-variant mt-[2px]">10:15 - 15:30</div>
+</div>
+</div>
+<div class="flex items-center justify-between text-[9px] font-label-caps text-on-surface-variant mt-1">
+<span>LLW → ADD</span>
+<span class="text-tertiary font-bold">B737-800</span>
+</div>
+</div>
+<!-- W3: Tue 13 Oct (B737 Return) -->
+<div class="min-h-[108px] bg-surface-container-lowest p-space-xs flex flex-col justify-between hover:bg-surface-container-low transition-colors cursor-pointer">
+<div class="flex justify-between items-start">
+<span class="font-data-md text-data-md text-on-surface">13</span>
+<span class="px-space-xs py-[1px] bg-surface-container-high text-on-surface font-label-caps text-[9px] rounded">RTN LEG</span>
+</div>
+<div class="mt-space-xs bg-[#fdf2f7] border border-outline-variant rounded overflow-hidden flex">
+<div class="w-1.5 bg-[#8c2f6b] shrink-0"></div>
+<div class="p-space-xs flex-1">
+<div class="flex items-center justify-between font-label-caps text-label-caps text-primary">
+<span class="text-tertiary font-bold">LA1 INBOUND</span>
+<span class="text-tertiary font-data-sm">04h10</span>
+</div>
+<div class="font-data-sm text-data-sm text-on-surface font-semibold mt-[2px]">3W 409 (Return)</div>
+<div class="text-[10px] text-on-surface-variant mt-[2px]">08:00 - 13:10</div>
+</div>
+</div>
+<div class="flex items-center justify-between text-[9px] font-label-caps text-on-surface-variant mt-1">
+<span>ADD → LLW</span>
+<span class="text-tertiary font-bold">B737-800</span>
+</div>
+</div>
+<!-- W3: Wed 14 Oct -->
+<div class="min-h-[108px] bg-surface-container-lowest p-space-xs flex flex-col justify-between hover:bg-surface-container-low transition-colors cursor-pointer">
+<div class="flex justify-between items-start">
+<span class="font-data-md text-data-md text-on-surface">14</span>
+<span class="font-label-caps text-[9px] text-on-surface-variant">WED</span>
+</div>
+<div class="my-auto py-space-sm px-space-xs bg-surface-container-high/60 rounded border border-dashed border-outline-variant text-center">
+<span class="block font-data-sm text-data-sm text-on-surface-variant font-bold">OFF</span>
+<span class="block font-label-caps text-[9px] text-on-surface-variant">POST-INTL REST</span>
+</div>
+<div class="text-[9px] font-label-caps text-on-surface-variant text-right">MIN 18H MET</div>
+</div>
+<!-- W3: Thu 15 Oct -->
+<div class="min-h-[108px] bg-surface-container-lowest p-space-xs flex flex-col justify-between hover:bg-surface-container-low transition-colors cursor-pointer">
+<div class="flex justify-between items-start">
+<span class="font-data-md text-data-md text-on-surface">15</span>
+<span class="font-label-caps text-[9px] text-on-surface-variant">THU</span>
+</div>
+<div class="mt-space-xs bg-[#f5ebcf] border border-outline-variant rounded overflow-hidden flex">
+<div class="w-1.5 bg-[#2a6f97] shrink-0"></div>
+<div class="p-space-xs flex-1">
+<div class="flex items-center justify-between font-label-caps text-label-caps text-primary">
+<span>LB1 SHUTTLE</span>
+<span class="text-secondary font-data-sm">03h00</span>
+</div>
+<div class="font-data-sm text-data-sm text-on-surface font-semibold mt-[2px]">3W 102/103/104/105</div>
+<div class="text-[10px] text-on-surface-variant mt-[2px]">04:45 - 09:45</div>
+</div>
+</div>
+<div class="flex items-center justify-between text-[9px] font-label-caps text-on-surface-variant mt-1">
+<span>LLW-BLZ 4X</span>
+<span class="text-primary">Q400</span>
+</div>
+</div>
+<!-- W3: Fri 16 Oct -->
+<div class="min-h-[108px] bg-surface-container-lowest p-space-xs flex flex-col justify-between hover:bg-surface-container-low transition-colors cursor-pointer">
+<div class="flex justify-between items-start">
+<span class="font-data-md text-data-md text-on-surface">16</span>
+<span class="font-label-caps text-[9px] text-on-surface-variant">FRI</span>
+</div>
+<div class="mt-space-xs bg-[#f5ebcf] border border-outline-variant rounded overflow-hidden flex">
+<div class="w-1.5 bg-[#2a6f97] shrink-0"></div>
+<div class="p-space-xs flex-1">
+<div class="flex items-center justify-between font-label-caps text-label-caps text-primary">
+<span>LB2 REGIONAL</span>
+<span class="text-secondary font-data-sm">03h15</span>
+</div>
+<div class="font-data-sm text-data-sm text-on-surface font-semibold mt-[2px]">3W 214 / 215</div>
+<div class="text-[10px] text-on-surface-variant mt-[2px]">14:15 - 19:00</div>
+</div>
+</div>
+<div class="flex items-center justify-between text-[9px] font-label-caps text-on-surface-variant mt-1">
+<span>LLW-HRE-LLW</span>
+<span class="text-primary">Q400</span>
+</div>
+</div>
+<!-- W3: Sat 17 Oct -->
+<div class="min-h-[108px] bg-surface-container-lowest p-space-xs flex flex-col justify-between hover:bg-surface-container-low transition-colors cursor-pointer">
+<div class="flex justify-between items-start">
+<span class="font-data-md text-data-md text-on-surface">17</span>
+<span class="font-label-caps text-[9px] text-on-surface-variant">SAT</span>
+</div>
+<div class="my-auto py-space-sm px-space-xs bg-surface-container-high/60 rounded border border-dashed border-outline-variant text-center">
+<span class="block font-data-sm text-data-sm text-on-surface-variant font-bold">OFF</span>
+<span class="block font-label-caps text-[9px] text-on-surface-variant">WEEKEND REST</span>
+</div>
+<div class="text-[9px] font-label-caps text-on-surface-variant text-right">SEC-FTL OK</div>
+</div>
+<!-- W3: Sun 18 Oct -->
+<div class="min-h-[108px] bg-surface-container-lowest p-space-xs flex flex-col justify-between hover:bg-surface-container-low transition-colors cursor-pointer">
+<div class="flex justify-between items-start">
+<span class="font-data-md text-data-md text-on-surface">18</span>
+<span class="font-label-caps text-[9px] text-on-surface-variant">SUN</span>
+</div>
+<div class="my-auto py-space-sm px-space-xs bg-surface-container-high/60 rounded border border-dashed border-outline-variant text-center">
+<span class="block font-data-sm text-data-sm text-on-surface-variant font-bold">OFF</span>
+<span class="block font-label-caps text-[9px] text-on-surface-variant">WEEKEND REST</span>
+</div>
+<div class="text-[9px] font-label-caps text-on-surface-variant text-right">60H REST OK</div>
+</div>
+<!-- W4: Mon 19 Oct -->
+<div class="min-h-[108px] bg-surface-container-lowest p-space-xs flex flex-col justify-between hover:bg-surface-container-low transition-colors cursor-pointer">
+<div class="flex justify-between items-start">
+<span class="font-data-md text-data-md text-on-surface">19</span>
+<span class="font-label-caps text-[9px] text-on-surface-variant">MON</span>
+</div>
+<div class="mt-space-xs bg-[#f5ebcf] border border-outline-variant rounded overflow-hidden flex">
+<div class="w-1.5 bg-[#2a6f97] shrink-0"></div>
+<div class="p-space-xs flex-1">
+<div class="flex items-center justify-between font-label-caps text-label-caps text-primary">
+<span>LB1 SHUTTLE</span>
+<span class="text-secondary font-data-sm">03h00</span>
+</div>
+<div class="font-data-sm text-data-sm text-on-surface font-semibold mt-[2px]">3W 102/103/104/105</div>
+<div class="text-[10px] text-on-surface-variant mt-[2px]">04:45 - 09:45</div>
+</div>
+</div>
+<div class="flex items-center justify-between text-[9px] font-label-caps text-on-surface-variant mt-1">
+<span>LLW-BLZ 4X</span>
+<span class="text-primary">Q400</span>
+</div>
+</div>
+<!-- W4: Tue 20 Oct -->
+<div class="min-h-[108px] bg-surface-container-lowest p-space-xs flex flex-col justify-between hover:bg-surface-container-low transition-colors cursor-pointer">
+<div class="flex justify-between items-start">
+<span class="font-data-md text-data-md text-on-surface">20</span>
+<span class="font-label-caps text-[9px] text-on-surface-variant">TUE</span>
+</div>
+<div class="mt-space-xs bg-[#f5ebcf] border border-outline-variant rounded overflow-hidden flex">
+<div class="w-1.5 bg-[#2a6f97] shrink-0"></div>
+<div class="p-space-xs flex-1">
+<div class="flex items-center justify-between font-label-caps text-label-caps text-primary">
+<span>LB2 REGIONAL</span>
+<span class="text-secondary font-data-sm">03h20</span>
+</div>
+<div class="font-data-sm text-data-sm text-on-surface font-semibold mt-[2px]">3W 301 / 302</div>
+<div class="text-[10px] text-on-surface-variant mt-[2px]">13:00 - 17:30</div>
+</div>
+</div>
+<div class="flex items-center justify-between text-[9px] font-label-caps text-on-surface-variant mt-1">
+<span>LLW-LUN-LLW</span>
+<span class="text-primary">Q400</span>
+</div>
+</div>
+<!-- W4: Wed 21 Oct -->
+<div class="min-h-[108px] bg-surface-container-lowest p-space-xs flex flex-col justify-between hover:bg-surface-container-low transition-colors cursor-pointer">
+<div class="flex justify-between items-start">
+<span class="font-data-md text-data-md text-on-surface">21</span>
+<span class="font-label-caps text-[9px] text-on-surface-variant">WED</span>
+</div>
+<div class="mt-space-xs bg-[#f5ebcf] border border-outline-variant rounded overflow-hidden flex">
+<div class="w-1.5 bg-[#2a6f97] shrink-0"></div>
+<div class="p-space-xs flex-1">
+<div class="flex items-center justify-between font-label-caps text-label-caps text-primary">
+<span>LB1 SHUTTLE</span>
+<span class="text-secondary font-data-sm">03h00</span>
+</div>
+<div class="font-data-sm text-data-sm text-on-surface font-semibold mt-[2px]">3W 102/103/104/105</div>
+<div class="text-[10px] text-on-surface-variant mt-[2px]">04:45 - 09:45</div>
+</div>
+</div>
+<div class="flex items-center justify-between text-[9px] font-label-caps text-on-surface-variant mt-1">
+<span>LLW-BLZ 4X</span>
+<span class="text-primary">Q400</span>
+</div>
+</div>
+<!-- W4: Thu 22 Oct -->
+<div class="min-h-[108px] bg-surface-container-lowest p-space-xs flex flex-col justify-between hover:bg-surface-container-low transition-colors cursor-pointer">
+<div class="flex justify-between items-start">
+<span class="font-data-md text-data-md text-on-surface">22</span>
+<span class="font-label-caps text-[9px] text-on-surface-variant">THU</span>
+</div>
+<div class="mt-space-xs bg-[#f5ebcf] border border-outline-variant rounded overflow-hidden flex">
+<div class="w-1.5 bg-[#2a6f97] shrink-0"></div>
+<div class="p-space-xs flex-1">
+<div class="flex items-center justify-between font-label-caps text-label-caps text-primary">
+<span>LB2 REGIONAL</span>
+<span class="text-secondary font-data-sm">03h15</span>
+</div>
+<div class="font-data-sm text-data-sm text-on-surface font-semibold mt-[2px]">3W 214 / 215</div>
+<div class="text-[10px] text-on-surface-variant mt-[2px]">14:15 - 19:00</div>
+</div>
+</div>
+<div class="flex items-center justify-between text-[9px] font-label-caps text-on-surface-variant mt-1">
+<span>LLW-HRE-LLW</span>
+<span class="text-primary">Q400</span>
+</div>
+</div>
+<!-- W4: Fri 23 Oct -->
+<div class="min-h-[108px] bg-surface-container-lowest p-space-xs flex flex-col justify-between hover:bg-surface-container-low transition-colors cursor-pointer">
+<div class="flex justify-between items-start">
+<span class="font-data-md text-data-md text-on-surface">23</span>
+<span class="font-label-caps text-[9px] text-on-surface-variant">FRI</span>
+</div>
+<div class="my-auto py-space-sm px-space-xs bg-surface-container-high/60 rounded border border-dashed border-outline-variant text-center">
+<span class="block font-data-sm text-data-sm text-on-surface-variant font-bold">OFF</span>
+<span class="block font-label-caps text-[9px] text-on-surface-variant">REST MANDATE</span>
+</div>
+<div class="text-[9px] font-label-caps text-on-surface-variant text-right">48H WINDOW</div>
+</div>
+<!-- W4: Sat 24 Oct -->
+<div class="min-h-[108px] bg-surface-container-lowest p-space-xs flex flex-col justify-between hover:bg-surface-container-low transition-colors cursor-pointer">
+<div class="flex justify-between items-start">
+<span class="font-data-md text-data-md text-on-surface">24</span>
+<span class="font-label-caps text-[9px] text-on-surface-variant">SAT</span>
+</div>
+<div class="my-auto py-space-sm px-space-xs bg-surface-container-high/60 rounded border border-dashed border-outline-variant text-center">
+<span class="block font-data-sm text-data-sm text-on-surface-variant font-bold">OFF</span>
+<span class="block font-label-caps text-[9px] text-on-surface-variant">WEEKEND REST</span>
+</div>
+<div class="text-[9px] font-label-caps text-on-surface-variant text-right">SEC-FTL OK</div>
+</div>
+<!-- W4: Sun 25 Oct -->
+<div class="min-h-[108px] bg-surface-container-lowest p-space-xs flex flex-col justify-between hover:bg-surface-container-low transition-colors cursor-pointer">
+<div class="flex justify-between items-start">
+<span class="font-data-md text-data-md text-on-surface">25</span>
+<span class="font-label-caps text-[9px] text-on-surface-variant">SUN</span>
+</div>
+<div class="mt-space-xs bg-[#f5ebcf] border border-outline-variant rounded overflow-hidden flex">
+<div class="w-1.5 bg-[#2a6f97] shrink-0"></div>
+<div class="p-space-xs flex-1">
+<div class="flex items-center justify-between font-label-caps text-label-caps text-primary">
+<span>LB1 SHUTTLE</span>
+<span class="text-secondary font-data-sm">03h00</span>
+</div>
+<div class="font-data-sm text-data-sm text-on-surface font-semibold mt-[2px]">3W 102/103/104/105</div>
+<div class="text-[10px] text-on-surface-variant mt-[2px]">04:45 - 09:45</div>
+</div>
+</div>
+<div class="flex items-center justify-between text-[9px] font-label-caps text-on-surface-variant mt-1">
+<span>LLW-BLZ 4X</span>
+<span class="text-primary">Q400</span>
+</div>
+</div>
+<!-- W5: Mon 26 Oct -->
+<div class="min-h-[108px] bg-surface-container-lowest p-space-xs flex flex-col justify-between hover:bg-surface-container-low transition-colors cursor-pointer">
+<div class="flex justify-between items-start">
+<span class="font-data-md text-data-md text-on-surface">26</span>
+<span class="font-label-caps text-[9px] text-on-surface-variant">MON</span>
+</div>
+<div class="mt-space-xs bg-[#f5ebcf] border border-outline-variant rounded overflow-hidden flex">
+<div class="w-1.5 bg-[#2a6f97] shrink-0"></div>
+<div class="p-space-xs flex-1">
+<div class="flex items-center justify-between font-label-caps text-label-caps text-primary">
+<span>LB2 REGIONAL</span>
+<span class="text-secondary font-data-sm">03h20</span>
+</div>
+<div class="font-data-sm text-data-sm text-on-surface font-semibold mt-[2px]">3W 301 / 302</div>
+<div class="text-[10px] text-on-surface-variant mt-[2px]">13:00 - 17:30</div>
+</div>
+</div>
+<div class="flex items-center justify-between text-[9px] font-label-caps text-on-surface-variant mt-1">
+<span>LLW-LUN-LLW</span>
+<span class="text-primary">Q400</span>
+</div>
+</div>
+<!-- W5: Tue 27 Oct -->
+<div class="min-h-[108px] bg-surface-container-lowest p-space-xs flex flex-col justify-between hover:bg-surface-container-low transition-colors cursor-pointer">
+<div class="flex justify-between items-start">
+<span class="font-data-md text-data-md text-on-surface">27</span>
+<span class="font-label-caps text-[9px] text-on-surface-variant">TUE</span>
+</div>
+<div class="mt-space-xs bg-[#f5ebcf] border border-outline-variant rounded overflow-hidden flex">
+<div class="w-1.5 bg-[#2a6f97] shrink-0"></div>
+<div class="p-space-xs flex-1">
+<div class="flex items-center justify-between font-label-caps text-label-caps text-primary">
+<span>LB1 SHUTTLE</span>
+<span class="text-secondary font-data-sm">03h00</span>
+</div>
+<div class="font-data-sm text-data-sm text-on-surface font-semibold mt-[2px]">3W 102/103/104/105</div>
+<div class="text-[10px] text-on-surface-variant mt-[2px]">04:45 - 09:45</div>
+</div>
+</div>
+<div class="flex items-center justify-between text-[9px] font-label-caps text-on-surface-variant mt-1">
+<span>LLW-BLZ 4X</span>
+<span class="text-primary">Q400</span>
+</div>
+</div>
+<!-- W5: Wed 28 Oct -->
+<div class="min-h-[108px] bg-surface-container-lowest p-space-xs flex flex-col justify-between hover:bg-surface-container-low transition-colors cursor-pointer">
+<div class="flex justify-between items-start">
+<span class="font-data-md text-data-md text-on-surface">28</span>
+<span class="font-label-caps text-[9px] text-on-surface-variant">WED</span>
+</div>
+<div class="my-auto py-space-sm px-space-xs bg-surface-container-high/60 rounded border border-dashed border-outline-variant text-center">
+<span class="block font-data-sm text-data-sm text-on-surface-variant font-bold">OFF</span>
+<span class="block font-label-caps text-[9px] text-on-surface-variant">MID-WEEK REST</span>
+</div>
+<div class="text-[9px] font-label-caps text-on-surface-variant text-right">REST OK</div>
+</div>
+<!-- W5: Thu 29 Oct -->
+<div class="min-h-[108px] bg-surface-container-lowest p-space-xs flex flex-col justify-between hover:bg-surface-container-low transition-colors cursor-pointer">
+<div class="flex justify-between items-start">
+<span class="font-data-md text-data-md text-on-surface">29</span>
+<span class="font-label-caps text-[9px] text-on-surface-variant">THU</span>
+</div>
+<div class="mt-space-xs bg-[#f5ebcf] border border-outline-variant rounded overflow-hidden flex">
+<div class="w-1.5 bg-[#2a6f97] shrink-0"></div>
+<div class="p-space-xs flex-1">
+<div class="flex items-center justify-between font-label-caps text-label-caps text-primary">
+<span>LB1 SHUTTLE</span>
+<span class="text-secondary font-data-sm">03h00</span>
+</div>
+<div class="font-data-sm text-data-sm text-on-surface font-semibold mt-[2px]">3W 102/103/104/105</div>
+<div class="text-[10px] text-on-surface-variant mt-[2px]">04:45 - 09:45</div>
+</div>
+</div>
+<div class="flex items-center justify-between text-[9px] font-label-caps text-on-surface-variant mt-1">
+<span>LLW-BLZ 4X</span>
+<span class="text-primary">Q400</span>
+</div>
+</div>
+<!-- W5: Fri 30 Oct -->
+<div class="min-h-[108px] bg-surface-container-lowest p-space-xs flex flex-col justify-between hover:bg-surface-container-low transition-colors cursor-pointer">
+<div class="flex justify-between items-start">
+<span class="font-data-md text-data-md text-on-surface">30</span>
+<span class="font-label-caps text-[9px] text-on-surface-variant">FRI</span>
+</div>
+<div class="mt-space-xs bg-[#f5ebcf] border border-outline-variant rounded overflow-hidden flex">
+<div class="w-1.5 bg-[#2a6f97] shrink-0"></div>
+<div class="p-space-xs flex-1">
+<div class="flex items-center justify-between font-label-caps text-label-caps text-primary">
+<span>LB2 REGIONAL</span>
+<span class="text-secondary font-data-sm">03h15</span>
+</div>
+<div class="font-data-sm text-data-sm text-on-surface font-semibold mt-[2px]">3W 214 / 215</div>
+<div class="text-[10px] text-on-surface-variant mt-[2px]">14:15 - 19:00</div>
+</div>
+</div>
+<div class="flex items-center justify-between text-[9px] font-label-caps text-on-surface-variant mt-1">
+<span>LLW-HRE-LLW</span>
+<span class="text-primary">Q400</span>
+</div>
+</div>
+<!-- W5: Sat 31 Oct -->
+<div class="min-h-[108px] bg-surface-container-lowest p-space-xs flex flex-col justify-between hover:bg-surface-container-low transition-colors cursor-pointer">
+<div class="flex justify-between items-start">
+<span class="font-data-md text-data-md text-on-surface">31</span>
+<span class="font-label-caps text-[9px] text-on-surface-variant">SAT</span>
+</div>
+<div class="my-auto py-space-sm px-space-xs bg-surface-container-high/60 rounded border border-dashed border-outline-variant text-center">
+<span class="block font-data-sm text-data-sm text-on-surface-variant font-bold">OFF</span>
+<span class="block font-label-caps text-[9px] text-on-surface-variant">MONTH-END REST</span>
+</div>
+<div class="text-[9px] font-label-caps text-on-surface-variant text-right">TOTAL: 41H20M</div>
+</div>
+</div>
+<!-- Calendar Legend Footer -->
+<div class="flex flex-wrap items-center gap-space-lg px-space-md py-space-sm bg-surface-container border-t border-outline-variant font-label-caps text-label-caps text-on-surface-variant">
+<div class="flex items-center gap-space-xs">
+<span class="w-3 h-3 rounded-sm bg-[#2a6f97]"></span>
+<span>Dash 8-Q400 Regional</span>
+</div>
+<div class="flex items-center gap-space-xs">
+<span class="w-3 h-3 rounded-sm bg-[#8c2f6b]"></span>
+<span>Boeing 737 Sector</span>
+</div>
+<div class="flex items-center gap-space-xs">
+<span class="w-3 h-3 rounded-sm bg-[#1f7a7a]"></span>
+<span>Standby / Reserve</span>
+</div>
+<div class="flex items-center gap-space-xs">
+<span class="w-3 h-3 rounded-sm bg-[#5b4b9a]"></span>
+<span>Simulator / Training</span>
+</div>
+<div class="flex items-center gap-space-xs">
+<span class="w-3 h-3 rounded-sm bg-outline-variant"></span>
+<span>Legal Rest / Off Day</span>
+</div>
+</div>
+</div>
+<!-- RIGHT PANE: Selected Day Inspector & Flight Strip Detail (35% width, sticky) -->
+<div class="lg:col-span-4 sticky top-32 flex flex-col gap-space-sm">
+<!-- Strip Container Card -->
+<div class="bg-[#f5ebcf] border border-outline-variant rounded p-space-md flex flex-col gap-space-sm shadow-sm relative overflow-hidden">
+<!-- Left Color Accent Bar: Dash 8 Blue -->
+<div class="absolute left-0 top-0 bottom-0 w-2 bg-[#2a6f97]"></div>
+<!-- Inspector Card Header -->
+<div class="pl-space-xs flex items-start justify-between border-b border-outline-variant/80 pb-space-xs">
+<div>
+<span class="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider block">SELECTED DUTY PAIRING</span>
+<h2 class="font-headline-sm text-headline-sm text-primary leading-tight mt-[2px]">Thursday, 1 Oct 2026</h2>
+</div>
+<span class="px-space-sm py-space-xs bg-primary text-on-primary font-label-caps text-label-caps rounded uppercase font-bold tracking-wider">ON TIME · LEGAL</span>
+</div>
+<!-- Flight Strip Summary Badge -->
+<div class="pl-space-xs flex items-center justify-between bg-surface-container-lowest/80 p-space-sm rounded border border-outline-variant">
+<div>
+<div class="font-data-md text-data-md text-primary font-bold">3W 102 / 103 / 104 / 105</div>
+<div class="font-label-caps text-label-caps text-secondary font-bold">LB1 ROTATION · BLANTYRE EXPRESS</div>
+</div>
+<div class="text-right">
+<span class="font-label-caps text-label-caps px-space-xs py-[2px] bg-secondary-fixed text-on-secondary-fixed rounded font-bold">DASH 8-Q400</span>
+<span class="block font-data-sm text-data-sm text-on-surface-variant mt-[2px]">Reg: 7Q-AAT</span>
+</div>
+</div>
+<!-- Sector Sequence (Detailed Timeline Breakdown) -->
+<div class="pl-space-xs flex flex-col gap-space-xs">
+<div class="flex items-center justify-between font-label-caps text-label-caps text-on-surface-variant px-space-xs">
+<span>SECTOR SEQUENCE (4 LEGS)</span>
+<span>TIMINGS (GMT+2)</span>
+</div>
+<!-- Leg 1 -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded p-space-xs flex items-center justify-between text-on-surface">
+<div class="flex items-center gap-space-sm">
+<span class="font-label-caps text-[10px] px-1 bg-surface-container-high rounded text-on-surface-variant">L1</span>
+<div>
+<span class="font-data-md text-data-md font-bold">LLW → BLZ</span>
+<span class="block font-label-caps text-[9px] text-on-surface-variant">3W 102 · FWKI / FWCL</span>
+</div>
+</div>
+<div class="text-right">
+<span class="font-data-md text-data-md text-primary">04:45 → 05:30</span>
+<span class="block font-label-caps text-[9px] text-secondary font-bold">BLK: 0h45m</span>
+</div>
+</div>
+<!-- Ground Turn 1 -->
+<div class="mx-space-md py-[2px] px-space-sm bg-surface-container-high/70 rounded text-center flex items-center justify-between text-on-surface-variant font-label-caps text-[9px]">
+<span class="flex items-center gap-1"><span class="material-symbols-outlined text-[12px]">schedule</span> Ground Turn BLZ (FWCL)</span>
+<span class="font-data-sm font-bold">0h40m</span>
+</div>
+<!-- Leg 2 -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded p-space-xs flex items-center justify-between text-on-surface">
+<div class="flex items-center gap-space-sm">
+<span class="font-label-caps text-[10px] px-1 bg-surface-container-high rounded text-on-surface-variant">L2</span>
+<div>
+<span class="font-data-md text-data-md font-bold">BLZ → LLW</span>
+<span class="block font-label-caps text-[9px] text-on-surface-variant">3W 103 · FWCL / FWKI</span>
+</div>
+</div>
+<div class="text-right">
+<span class="font-data-md text-data-md text-primary">06:10 → 06:55</span>
+<span class="block font-label-caps text-[9px] text-secondary font-bold">BLK: 0h45m</span>
+</div>
+</div>
+<!-- Ground Turn 2 -->
+<div class="mx-space-md py-[2px] px-space-sm bg-surface-container-high/70 rounded text-center flex items-center justify-between text-on-surface-variant font-label-caps text-[9px]">
+<span class="flex items-center gap-1"><span class="material-symbols-outlined text-[12px]">schedule</span> Turnaround LLW (Pax Transit)</span>
+<span class="font-data-sm font-bold">0h45m</span>
+</div>
+<!-- Leg 3 -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded p-space-xs flex items-center justify-between text-on-surface">
+<div class="flex items-center gap-space-sm">
+<span class="font-label-caps text-[10px] px-1 bg-surface-container-high rounded text-on-surface-variant">L3</span>
+<div>
+<span class="font-data-md text-data-md font-bold">LLW → BLZ</span>
+<span class="block font-label-caps text-[9px] text-on-surface-variant">3W 104 · FWKI / FWCL</span>
+</div>
+</div>
+<div class="text-right">
+<span class="font-data-md text-data-md text-primary">07:40 → 08:25</span>
+<span class="block font-label-caps text-[9px] text-secondary font-bold">BLK: 0h45m</span>
+</div>
+</div>
+<!-- Ground Turn 3 -->
+<div class="mx-space-md py-[2px] px-space-sm bg-surface-container-high/70 rounded text-center flex items-center justify-between text-on-surface-variant font-label-caps text-[9px]">
+<span class="flex items-center gap-1"><span class="material-symbols-outlined text-[12px]">schedule</span> Ground Turn BLZ (FWCL)</span>
+<span class="font-data-sm font-bold">0h35m</span>
+</div>
+<!-- Leg 4 -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded p-space-xs flex items-center justify-between text-on-surface">
+<div class="flex items-center gap-space-sm">
+<span class="font-label-caps text-[10px] px-1 bg-surface-container-high rounded text-on-surface-variant">L4</span>
+<div>
+<span class="font-data-md text-data-md font-bold">BLZ → LLW</span>
+<span class="block font-label-caps text-[9px] text-on-surface-variant">3W 105 · FWCL / FWKI</span>
+</div>
+</div>
+<div class="text-right">
+<span class="font-data-md text-data-md text-primary">09:00 → 09:45</span>
+<span class="block font-label-caps text-[9px] text-secondary font-bold">BLK: 0h45m</span>
+</div>
+</div>
+</div>
+<!-- Duty Period Totals Matrix -->
+<div class="pl-space-xs grid grid-cols-3 gap-space-xs pt-space-xs border-t border-outline-variant/70">
+<div class="bg-surface-container-lowest p-space-xs rounded border border-outline-variant text-center">
+<span class="font-label-caps text-[9px] text-on-surface-variant block">TOTAL BLOCK</span>
+<span class="font-data-md text-data-md text-primary font-bold">03h 00m</span>
+</div>
+<div class="bg-surface-container-lowest p-space-xs rounded border border-outline-variant text-center">
+<span class="font-label-caps text-[9px] text-on-surface-variant block">DUTY (FDP)</span>
+<span class="font-data-md text-data-md text-secondary font-bold">05h 50m</span>
+</div>
+<div class="bg-surface-container-lowest p-space-xs rounded border border-outline-variant text-center">
+<span class="font-label-caps text-[9px] text-on-surface-variant block">FDP LIMIT</span>
+<span class="font-data-md text-data-md text-on-surface font-bold">12h 00m</span>
+</div>
+</div>
+<!-- Crew Complement -->
+<div class="pl-space-xs bg-surface-container-lowest/90 border border-outline-variant rounded p-space-sm">
+<span class="font-label-caps text-label-caps text-on-surface-variant uppercase block mb-space-xs">CREW COMPLEMENT · FLIGHT DECK &amp; CABIN</span>
+<div class="grid grid-cols-2 gap-space-xs text-on-surface font-body-sm text-body-sm">
+<div class="flex items-center gap-space-xs">
+<span class="w-5 h-5 rounded bg-primary text-on-primary font-label-caps text-[9px] flex items-center justify-center font-bold">CP</span>
+<div>
+<span class="font-title-sm text-[12px] block font-bold text-primary">C. Chirwa (PIC)</span>
+<span class="font-label-caps text-[9px] text-on-surface-variant">MAL-0418 · Line Capt</span>
+</div>
+</div>
+<div class="flex items-center gap-space-xs">
+<span class="w-5 h-5 rounded bg-secondary-fixed text-on-secondary-fixed font-label-caps text-[9px] flex items-center justify-center font-bold">FO</span>
+<div>
+<span class="font-title-sm text-[12px] block font-bold text-primary">T. Mwale</span>
+<span class="font-label-caps text-[9px] text-on-surface-variant">MAL-0892 · First Officer</span>
+</div>
+</div>
+<div class="flex items-center gap-space-xs">
+<span class="w-5 h-5 rounded bg-surface-container-high text-on-surface font-label-caps text-[9px] flex items-center justify-center font-bold">SC</span>
+<div>
+<span class="font-title-sm text-[12px] block font-bold text-primary">C. Banda</span>
+<span class="font-label-caps text-[9px] text-on-surface-variant">MAL-1044 · Senior CC</span>
+</div>
+</div>
+<div class="flex items-center gap-space-xs">
+<span class="w-5 h-5 rounded bg-surface-container-high text-on-surface font-label-caps text-[9px] flex items-center justify-center font-bold">CC</span>
+<div>
+<span class="font-title-sm text-[12px] block font-bold text-primary">E. Phiri</span>
+<span class="font-label-caps text-[9px] text-on-surface-variant">MAL-1102 · Cabin Crew</span>
+</div>
+</div>
+</div>
+</div>
+<!-- FTL Legality & Rest Certification Card -->
+<div class="pl-space-xs bg-surface-container-lowest border border-outline-variant rounded p-space-sm flex items-start gap-space-sm">
+<span class="material-symbols-outlined text-secondary text-[22px] shrink-0">verified</span>
+<div>
+<span class="font-label-caps text-label-caps text-secondary font-bold block">SUBPART FTL AUDIT: COMPLIANT</span>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-[2px] leading-tight">
+              Full Legal Rest Observed: 14h 10m rest prior to 04:15 report exceeds 12h ICAO/MCAA statutory minimum. Post-duty rest guaranteed at 14h 30m.
+            </p>
+</div>
+</div>
+<!-- Tactical Operational Actions -->
+<div class="pl-space-xs flex flex-col gap-space-xs pt-space-xs">
+<div class="grid grid-cols-2 gap-space-xs">
+<button class="h-11 px-space-sm bg-surface-container-lowest border border-primary text-primary font-label-caps text-label-caps uppercase rounded hover:bg-surface-container flex items-center justify-center gap-1 transition-colors" type="button">
+<span class="material-symbols-outlined text-[16px]">swap_horiz</span>Request Swap
+            </button>
+<button class="h-11 px-space-sm bg-surface-container-lowest border border-primary text-primary font-label-caps text-label-caps uppercase rounded hover:bg-surface-container flex items-center justify-center gap-1 transition-colors" type="button">
+<span class="material-symbols-outlined text-[16px]">picture_as_pdf</span>Export PDF
+            </button>
+</div>
+<button class="h-11 w-full bg-primary text-on-primary font-label-caps text-label-caps uppercase rounded hover:bg-primary-container transition-colors flex items-center justify-center gap-space-xs font-bold tracking-wider" type="button">
+<span class="material-symbols-outlined text-[16px]">policy</span>Inspect Full Legality Audit
+          </button>
+</div>
+</div>
+<!-- Quick Airfield METAR Context -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded p-space-sm">
+<div class="flex items-center justify-between text-on-surface-variant font-label-caps text-[10px] mb-space-xs">
+<span>STATION METAR · BASE TERMINALS</span>
+<span>10 MIN AGO</span>
+</div>
+<div class="grid grid-cols-2 gap-space-sm">
+<div class="border-r border-outline-variant pr-space-xs">
+<span class="font-data-sm text-data-sm font-bold text-primary block">FWKI (LLW)</span>
+<span class="font-data-sm text-data-sm text-on-surface-variant block font-mono">11006KT 9999 FEW025 24/13 Q1020</span>
+</div>
+<div class="pl-space-xs">
+<span class="font-data-sm text-data-sm font-bold text-primary block">FWCL (BLZ)</span>
+<span class="font-data-sm text-data-sm text-on-surface-variant block font-mono">16008KT 9999 SCT030 26/15 Q1018</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div></main><footer class="w-full bg-surface-container-lowest border-t border-outline-variant py-space-sm"><div class="w-full px-gutter-desktop mx-auto flex items-center justify-between text-on-surface-variant font-data-sm text-data-sm"><div><span>Malawi Airlines Dispatch System</span><span class="mx-space-xs">·</span><span>Flight Operations Directorate</span><span class="mx-space-xs">·</span><span>Kamuzu International Airport (LLW / FWKI)</span></div><div class="flex items-center gap-space-md"><span class="flex items-center gap-space-xs"><span class="w-1.5 h-1.5 rounded-full bg-secondary"></span>Server: Lilongwe Node Alpha</span><span>FTL Status: Legal Compliant</span><span>Build v4.2.1-FTL</span></div></div></footer></body></html>

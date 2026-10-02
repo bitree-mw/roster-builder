@@ -1,0 +1,11 @@
+.record-filter { min-width: 220px; }
+.record-filter select { min-height: 38px; }
+#alert-list .empty-state .icon { color: var(--color-success); }
+.alert-row .button { flex: none; }
+.next-due { display: flex; flex-direction: column; gap: .25rem; }
+#record-rows td:first-child { font-family: var(--font-mono); white-space: nowrap; }
+#record-dialog { width: min(100% - 2rem, 46rem); }
+@media (max-width: 640px) {
+    .alert-row { flex-wrap: wrap; }
+    .alert-row .button { width: 100%; }
+}
