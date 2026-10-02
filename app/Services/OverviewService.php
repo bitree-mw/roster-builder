@@ -13,7 +13,12 @@ class OverviewService
 {
     public function __construct(private ExpiryService $expiry, private MaintenanceService $maintenance) {}
 
-    /** @return array<string, array<string, int>> */
+    /**
+     * Counts for crew (with document expiry), flights, fleet status and maintenance alerts.
+     * Document alerts only consider active crew.
+     *
+     * @return array<string, array<string, int>>
+     */
     public function summary(): array
     {
         $documentStates = CrewDocument::query()->whereHas('crewMember', fn ($query) => $query->where('active', true))->get(['expires_on'])

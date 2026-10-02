@@ -4,6 +4,9 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
+/**
+ * Airports (keyed by IATA code, with base flag and UTC offset) and aircraft types.
+ */
 return new class extends Migration
 {
     public function up(): void
@@ -15,6 +18,7 @@ return new class extends Migration
             $table->boolean('is_base')->default(false);
             $table->timestamps();
         });
+        // palette stores a semantic token name (forest, gold, ...), never a colour value.
         Schema::create('aircraft_types', function (Blueprint $table) {
             $table->id();
             $table->string('code', 20)->unique();

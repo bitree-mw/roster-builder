@@ -6,13 +6,24 @@ use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
 
+/**
+ * Validates a complete crew member payload, including ratings and the three optional expiry documents.
+ */
 class CrewMemberRequest extends FormRequest
 {
+    /**
+     * Staff with write access only.
+     */
     public function authorize(): bool
     {
         return $this->user()?->can('manage-operations') ?? false;
     }
 
+    /**
+     * Base must be a crew base; at most one document per kind.
+     *
+     * @return array<string, array<int, mixed>>
+     */
     public function rules(): array
     {
         return [
@@ -31,6 +42,12 @@ class CrewMemberRequest extends FormRequest
         ];
     }
 
+    /**
+     * Cross-field rating rules, checked only once the basic rules pass: "all aircraft" is for cabin crew only,
+     * and a crew member needs either "all aircraft" or at least one specific rating, never both.
+     *
+     * @return array<int, callable>
+     */
     public function after(): array
     {
         return [function (Validator $validator): void {

@@ -1,6 +1,8 @@
+{{-- Sign-in page. Behaviour: resources/js/pages/login.js; layout fits the viewport (pages/login.css). --}}
 @extends('layouts.guest')
 @section('content')
 <div class="login-shell">
+    {{-- Brand panel: what the system does. The route strip is decorative (aria-hidden). --}}
     <section class="login-hero" aria-labelledby="login-hero-title">
         <div class="login-hero-brand">
             <span class="login-logo"><img src="{{ asset('images/malawi-airlines-logo.png') }}" alt="Malawi Airlines"></span>
@@ -23,6 +25,7 @@
         </div>
     </section>
 
+    {{-- Sign-in card: one "email or username" field, password with show/hide, inline errors. --}}
     <section class="login-panel" aria-labelledby="login-title">
         <div class="login-card">
             <span class="login-card-logo"><img src="{{ asset('images/malawi-airlines-logo.png') }}" alt="Malawi Airlines"></span>

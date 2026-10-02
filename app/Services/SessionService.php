@@ -7,6 +7,9 @@ use Illuminate\Contracts\Session\Session;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
 
+/**
+ * Browser sign-in and sign-out for the Blade client (Sanctum stateful session cookies).
+ */
 class SessionService
 {
     /**

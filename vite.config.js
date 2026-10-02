@@ -2,6 +2,8 @@ import { defineConfig } from 'vite';
 import laravel from 'laravel-vite-plugin';
 import tailwindcss from '@tailwindcss/vite';
 
+// Each page has its own CSS and JS entry (resources/css/pages/<page>.css, resources/js/pages/<page>.js),
+// loaded by the layouts alongside the shared app.css / app.js.
 const pages = ['login', 'roster', 'aircraft', 'maintenance', 'crew', 'flights', 'rules'];
 export default defineConfig({
     plugins: [

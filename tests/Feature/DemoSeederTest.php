@@ -11,6 +11,9 @@ use Database\Seeders\DemoSeeder;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Tests\TestCase;
 
+/**
+ * The demo seeder is repeatable, creates the documented data set and its flight patterns pass validation.
+ */
 class DemoSeederTest extends TestCase
 {
     use LazilyRefreshDatabase;

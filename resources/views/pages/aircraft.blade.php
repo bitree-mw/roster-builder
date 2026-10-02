@@ -1,3 +1,4 @@
+{{-- Fleet page shell. Data and interactions: resources/js/pages/aircraft.js (API: /api/v1/aircraft, /aircraft-types). --}}
 @extends('layouts.app')
 @section('content')
 <x-page-heading eyebrow="Fleet / Airworthiness" heading="Fleet" description="Registered airframes, their current availability and the aircraft types used by flight patterns. Mark an aircraft as in maintenance, grounded or unavailable with a reason so planners know what can fly.">
@@ -5,6 +6,7 @@
     <button id="add-aircraft" class="button" type="button" disabled><x-icon name="plus" class="icon-sm" />Register aircraft</button>
 </x-page-heading>
 
+{{-- Fleet status counts. --}}
 <div class="kpi-grid">
     <x-kpi label="Registered airframes" icon="plane" value="fleet.total" meta="Across all aircraft types" />
     <x-kpi label="Available" icon="check" value="fleet.available" tone="success" meta="Serviceable for planning" />
@@ -13,6 +15,7 @@
     <x-kpi label="Unavailable" icon="power" value="fleet.unavailable" meta="Leased out, stored or withdrawn" />
 </div>
 
+{{-- Airframe cards with a status filter (options come from Aircraft::STATUSES). --}}
 <section class="panel" aria-labelledby="airframes-title">
     <div class="panel-heading">
         <div class="panel-title"><x-icon name="plane" /><h2 id="airframes-title">Airframes</h2><span id="aircraft-count" class="chip"></span></div>
@@ -26,6 +29,7 @@
     <div id="aircraft-cards" class="airframe-grid" aria-live="polite" aria-busy="true"><p class="loading-block">Loading fleet…</p></div>
 </section>
 
+{{-- Aircraft types table. --}}
 <section class="panel" aria-labelledby="types-title">
     <div class="panel-heading">
         <div class="panel-title"><x-icon name="grid" /><h2 id="types-title">Aircraft types</h2><span id="type-count" class="chip"></span></div>
@@ -37,6 +41,7 @@
     </table></div>
 </section>
 
+{{-- Register/edit airframe dialog (status is not edited here). --}}
 <dialog id="aircraft-dialog" class="dialog" aria-labelledby="aircraft-dialog-title"><form id="aircraft-form" novalidate>
     <div class="dialog-heading"><div><h2 id="aircraft-dialog-title" data-dialog-title>Register aircraft</h2><p>New aircraft start as available. Use “Change status” to ground or withdraw them.</p></div><button type="button" class="icon-button" data-close aria-label="Close"><x-icon name="x" /></button></div>
     <div class="form-grid">
@@ -49,6 +54,7 @@
     <div class="form-actions"><button class="button button-secondary" type="button" data-close-secondary>Cancel</button><button class="button" type="submit">Save aircraft</button></div>
 </form></dialog>
 
+{{-- Change status dialog: radio cards for each status and a reason (required unless available). --}}
 <dialog id="status-dialog" class="dialog" aria-labelledby="status-dialog-title"><form id="status-form" novalidate>
     <div class="dialog-heading"><div><h2 id="status-dialog-title">Change aircraft status</h2><p id="status-dialog-subtitle"></p></div><button type="button" class="icon-button" data-close aria-label="Close"><x-icon name="x" /></button></div>
     <fieldset><legend>Status</legend><div class="option-cards">
@@ -66,6 +72,7 @@
     <div class="form-actions"><button class="button button-secondary" type="button" data-close-secondary>Cancel</button><button class="button" type="submit">Update status</button></div>
 </form></dialog>
 
+{{-- Add/edit aircraft type dialog. --}}
 <dialog id="type-dialog" class="dialog" aria-labelledby="type-dialog-title"><form id="type-form" novalidate>
     <div class="dialog-heading"><div><h2 id="type-dialog-title" data-dialog-title>Add aircraft type</h2><p>Cabin complement is used when crewing every flight of this type.</p></div><button type="button" class="icon-button" data-close aria-label="Close"><x-icon name="x" /></button></div>
     <div class="form-grid">

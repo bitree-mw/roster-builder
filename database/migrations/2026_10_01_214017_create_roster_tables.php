@@ -4,10 +4,14 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
+/**
+ * Duty rules, monthly roster periods, dated trips, seat assignments and manual exclusions.
+ */
 return new class extends Migration
 {
     public function up(): void
     {
+        // Defaults mirror the product brief; they are configurable planning parameters, not regulations.
         Schema::create('rule_sets', function (Blueprint $table) {
             $table->id();
             $table->string('name')->default('Standard');
@@ -23,6 +27,7 @@ return new class extends Migration
             $table->smallInteger('utc_offset_minutes')->default(120);
             $table->timestamps();
         });
+        // One period per month; rules_snapshot freezes the rules in force when the period was created.
         Schema::create('roster_periods', function (Blueprint $table) {
             $table->id();
             $table->date('month')->unique();
@@ -32,6 +37,7 @@ return new class extends Migration
             $table->foreignId('published_by')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamps();
         });
+        // schedule_snapshot keeps the planned legs (UTC instants) so later pattern edits do not change history.
         Schema::create('trips', function (Blueprint $table) {
             $table->id();
             $table->foreignId('roster_period_id')->constrained()->cascadeOnDelete();
@@ -41,6 +47,7 @@ return new class extends Migration
             $table->timestamps();
             $table->unique(['roster_period_id', 'flight_id', 'start_date']);
         });
+        // One row per seat; crew_member_id is null for open time, and a crew member holds at most one seat per trip.
         Schema::create('assignments', function (Blueprint $table) {
             $table->id();
             $table->foreignId('trip_id')->constrained()->cascadeOnDelete();

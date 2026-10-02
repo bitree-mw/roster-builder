@@ -19,20 +19,24 @@ const DEFAULTS = {
 };
 let region = null;
 
+/** Minimal element factory (kept local so this module has no dependency on ui.js, which imports it). */
 function node(tag, className, text) {
     const element = document.createElement(tag);
     if (className) element.className = className;
     if (text !== undefined && text !== null) element.textContent = text;
     return element;
 }
+/** Icon from the layout's SVG sprite. */
 function svgIcon(name) {
     const svg = document.createElementNS(SVG, 'svg');
     svg.setAttribute('class', 'icon'); svg.setAttribute('aria-hidden', 'true'); svg.setAttribute('focusable', 'false');
     const use = document.createElementNS(SVG, 'use'); use.setAttribute('href', `#icon-${name}`); svg.append(use);
     return svg;
 }
+/** Older browsers without the Popover API fall back to a plain fixed-position region. */
 const supportsPopover = () => typeof HTMLElement !== 'undefined' && 'popover' in HTMLElement.prototype;
 
+/** Create the notification region once (an aria-live region, and a manual popover where supported). */
 function getRegion() {
     if (region?.isConnected) return region;
     region = node('section', 'toast-region');
@@ -52,11 +56,13 @@ function raise() {
         target.showPopover();
     } catch { /* popover unsupported in this context; the region still renders as a fixed element */ }
 }
+/** Close the popover when the last toast has gone so it does not sit in the top layer. */
 function hideIfEmpty() {
     if (!region || region.childElementCount || !supportsPopover()) return;
     try { if (region.matches(':popover-open')) region.hidePopover(); } catch { /* ignore */ }
 }
 
+/** Animate a toast out and remove it (immediately when the user prefers reduced motion). */
 function dismiss(item) {
     if (!item.isConnected || item.dataset.leaving) return;
     item.dataset.leaving = 'true';
@@ -65,17 +71,20 @@ function dismiss(item) {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) remove();
     else { item.addEventListener('animationend', remove, { once: true }); setTimeout(remove, 400); }
 }
+/** Start (or restart) the auto-dismiss timer with the toast's remaining time. */
 function schedule(item) {
     clearTimeout(item.timer);
     item.startedAt = Date.now();
     item.timer = setTimeout(() => dismiss(item), item.remaining);
 }
+/** Pause auto-dismiss while the toast is hovered or focused, remembering the time left. */
 function pause(item) {
     if (item.paused) return;
     item.paused = true; clearTimeout(item.timer);
     item.remaining = Math.max(1200, item.remaining - (Date.now() - item.startedAt));
     item.dataset.paused = 'true';
 }
+/** Resume auto-dismiss once the pointer and focus have both left the toast. */
 function resume(item) {
     if (!item.paused || item.matches(':hover') || item.contains(document.activeElement)) return;
     item.paused = false; delete item.dataset.paused; schedule(item);
@@ -119,6 +128,7 @@ export function flash(message, options = {}) {
     try { sessionStorage.setItem(FLASH_KEY, JSON.stringify({ message, ...options })); }
     catch { toast(message, options); }
 }
+/** Show (once) a toast queued by flash() on the previous page. */
 function consumeFlash() {
     let stored = null;
     try { stored = sessionStorage.getItem(FLASH_KEY); sessionStorage.removeItem(FLASH_KEY); } catch { return; }

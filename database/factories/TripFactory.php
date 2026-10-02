@@ -10,6 +10,11 @@ use Illuminate\Database\Eloquent\Factories\Factory;
 /** @extends Factory<Trip> */
 class TripFactory extends Factory
 {
+    /**
+     * Default attributes for a dated trip.
+     *
+     * @return array<string, mixed>
+     */
     public function definition(): array
     {
         return ['roster_period_id' => RosterPeriod::factory(), 'flight_id' => Flight::factory(), 'start_date' => '2026-10-01', 'schedule_snapshot' => ['code' => 'LB1', 'periods' => []]];

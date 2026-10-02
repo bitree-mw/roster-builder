@@ -5,6 +5,7 @@
 body[data-page="login"] { height: 100dvh; overflow: hidden; }
 .login-shell { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); height: 100dvh; overflow: hidden; }
 
+/* Left panel: brand, headline, feature list and route strip (hidden on narrow screens). */
 .login-hero { position: relative; display: flex; flex-direction: column; justify-content: flex-start; gap: clamp(1rem, 3.5vh, 2.5rem); min-height: 0; padding: clamp(1.25rem, 4.5vh, 2.5rem) clamp(2rem, 4vw, 3.5rem); overflow: hidden; background-color: var(--color-brand); background-image: linear-gradient(var(--hero-grid) 1px, transparent 1px), linear-gradient(90deg, var(--hero-grid) 1px, transparent 1px); background-size: 48px 48px; color: var(--color-brand-contrast); }
 .login-hero-brand { display: flex; align-items: center; gap: 1rem; }
 .login-logo { display: grid; place-items: center; padding: .375rem .75rem; border-radius: 6px; background: var(--color-surface); }
@@ -24,6 +25,7 @@ body[data-page="login"] { height: 100dvh; overflow: hidden; }
 .login-strip-line { position: relative; flex: 1; display: flex; justify-content: center; border-top: 2px dashed var(--color-line-strong); }
 .login-strip-line .icon { margin-top: -11px; padding: 0 .375rem; width: 2rem; background: var(--color-strip); }
 
+/* Right panel with the sign-in card. */
 .login-panel { display: flex; flex-direction: column; justify-content: center; align-items: center; gap: clamp(.75rem, 2.4vh, 1.5rem); min-height: 0; padding: clamp(1rem, 4vh, 2.5rem) 1.5rem; overflow: hidden; background: var(--color-canvas); }
 .login-card { width: 100%; max-width: 26rem; padding: clamp(1.25rem, 4vh, 2.25rem) 2rem; border: 1px solid var(--color-line); border-top: 4px solid var(--color-wordmark); border-radius: 6px; background: var(--color-surface); }
 .login-card-logo { display: none; margin-bottom: clamp(.75rem, 2vh, 1.25rem); }

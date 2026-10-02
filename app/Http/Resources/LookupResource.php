@@ -5,8 +5,14 @@ namespace App\Http\Resources;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
+/**
+ * Airports and aircraft types for dropdowns. Wraps an array: ['airports' => ..., 'aircraft_types' => ...].
+ */
 class LookupResource extends JsonResource
 {
+    /**
+     * @return array<string, mixed>
+     */
     public function toArray(Request $request): array
     {
         return ['airports' => $this->resource['airports']->map(fn ($airport): array => ['code' => $airport->code, 'name' => $airport->name, 'is_base' => $airport->is_base])->all(),

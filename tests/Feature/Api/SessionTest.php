@@ -6,6 +6,9 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Tests\TestCase;
 
+/**
+ * Browser sign-in/out: email or username (case-insensitive), generic errors, rate limiting and CSRF cookie.
+ */
 class SessionTest extends TestCase
 {
     use LazilyRefreshDatabase;

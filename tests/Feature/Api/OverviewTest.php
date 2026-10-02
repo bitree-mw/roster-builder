@@ -12,6 +12,9 @@ use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
+/**
+ * The overview counts behind the KPI strips and navigation badges, and crew document expiry states.
+ */
 class OverviewTest extends TestCase
 {
     use LazilyRefreshDatabase;

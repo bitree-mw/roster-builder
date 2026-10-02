@@ -1,3 +1,6 @@
+/*
+ * Duty rules page (pages/rules.blade.php): grouped number fields with a unit suffix inside each input.
+ */
 .rules-panel { max-width: 64rem; }
 .rules-form { display: flex; flex-direction: column; gap: 1.25rem; }
 .rules-name { max-width: 24rem; }

@@ -1,3 +1,8 @@
+/*
+ * Fleet page (pages/aircraft.blade.php). Colours come from tokens.css via var(); no values here.
+ */
+
+/* Airframe card grid. The left accent bar shows status: green available, amber maintenance, red grounded. */
 .airframe-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: .875rem; padding: 1.125rem; }
 .airframe-grid > .loading-block, .airframe-grid > .empty-state { grid-column: 1 / -1; }
 .airframe-card { display: flex; flex-direction: column; gap: .875rem; padding: 1rem 1rem .875rem 1.25rem; border: 1px solid var(--color-line); border-radius: 6px; background: var(--color-surface); position: relative; }
@@ -15,6 +20,7 @@
 .airframe-due-line { display: flex; flex-wrap: wrap; align-items: center; gap: .375rem; font-size: .75rem; font-weight: 500; }
 .airframe-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .375rem; margin-top: auto; padding-top: .75rem; border-top: 1px solid var(--color-line); }
 .airframe-actions .row-actions { margin-left: auto; }
+/* Aircraft types table and dialog widths. */
 #type-rows td:first-child { font-family: var(--font-mono); font-weight: 700; }
 #status-dialog { width: min(100% - 2rem, 40rem); }
 #type-dialog, #aircraft-dialog { width: min(100% - 2rem, 38rem); }

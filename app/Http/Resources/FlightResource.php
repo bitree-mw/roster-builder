@@ -5,8 +5,14 @@ namespace App\Http\Resources;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
+/**
+ * JSON shape of a flight pattern with legs, weekdays, block minutes and its aircraft type.
+ */
 class FlightResource extends JsonResource
 {
+    /**
+     * @return array<string, mixed>
+     */
     public function toArray(Request $request): array
     {
         return ['id' => $this->id,

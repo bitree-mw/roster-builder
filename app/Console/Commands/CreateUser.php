@@ -9,12 +9,22 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
 
+/**
+ * Operator tooling to create accounts (there is no public registration). The password is entered at a
+ * hidden prompt, never as an argument, so it does not end up in shell history.
+ *
+ * Example: php artisan roster:create-user scheduler@example.com --name="Crew Scheduler" --username=scheduler --role=scheduler
+ */
 class CreateUser extends Command
 {
     protected $signature = 'roster:create-user {email} {--name=} {--username= : Optional sign-in name (letters, numbers, dot, dash, underscore)} {--role=crew} {--crew-id=}';
 
     protected $description = 'Create an operator-managed account; password is entered securely';
 
+    /**
+     * Validate the details (12+ character password, unique email/username, crew role needs a crew profile)
+     * and create the account. Role and links are set explicitly, never mass-assigned.
+     */
     public function handle(): int
     {
         $data = ['email' => $this->argument('email'), 'name' => $this->option('name') ?: $this->ask('Full name'), 'username' => $this->option('username') !== null ? mb_strtolower(trim($this->option('username'))) : null, 'role' => $this->option('role'), 'crew_member_id' => $this->option('crew-id'), 'password' => $this->secret('Password (at least 12 characters)')];

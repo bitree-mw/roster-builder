@@ -4,6 +4,9 @@ namespace Tests\Unit;
 
 use PHPUnit\Framework\TestCase;
 
+/**
+ * Laravel's default unit test example.
+ */
 class ExampleTest extends TestCase
 {
     /**

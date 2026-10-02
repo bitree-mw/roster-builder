@@ -12,6 +12,10 @@ use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
+/**
+ * Roster periods: idempotent draft creation with a rules snapshot, the planning window, and crew seeing
+ * only their own assignments in published periods.
+ */
 class RosterPeriodTest extends TestCase
 {
     use LazilyRefreshDatabase;

@@ -6,8 +6,15 @@ use App\Services\ExpiryService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
+/**
+ * JSON shape of a crew member. Each document carries its expiry state and days remaining, calculated on the
+ * server against the base-local date.
+ */
 class CrewMemberResource extends JsonResource
 {
+    /**
+     * @return array<string, mixed>
+     */
     public function toArray(Request $request): array
     {
         return ['id' => $this->id,

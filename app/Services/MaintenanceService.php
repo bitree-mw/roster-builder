@@ -9,13 +9,28 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
+/**
+ * Maintenance records and the due-item / alert logic built on them. Alerts never change aircraft status;
+ * grounding stays a deliberate, audited decision.
+ */
 class MaintenanceService
 {
-    /** @var array<string, int> */
+    /**
+     * Sort order: most urgent first.
+     *
+     * @var array<string, int>
+     */
     private const SEVERITY = ['overdue' => 0, 'due_soon' => 1, 'ok' => 2];
 
     public function __construct(private AuditService $audit, private ExpiryService $expiry) {}
 
+    /**
+     * Record or correct completed maintenance. The recorder is taken from the signed-in user, never the payload.
+     *
+     * @param  array<string, mixed>  $data  validated MaintenanceRecordRequest payload
+     *
+     * @throws ValidationException when the next due hours do not exceed the hours at completion
+     */
     public function save(array $data, User $actor, ?MaintenanceRecord $record = null): MaintenanceRecord
     {
         if (isset($data['airframe_hours_at'], $data['next_due_hours']) && $data['next_due_hours'] <= $data['airframe_hours_at']) {
@@ -36,6 +51,9 @@ class MaintenanceService
         });
     }
 
+    /**
+     * Remove a record (for example one entered by mistake) with an audit entry.
+     */
     public function delete(MaintenanceRecord $record, User $actor): void
     {
         DB::transaction(function () use ($record, $actor): void {
@@ -62,13 +80,20 @@ class MaintenanceService
             ->values();
     }
 
-    /** @return Collection<int, array{record: MaintenanceRecord, state: string, days_remaining: ?int, hours_remaining: ?float}> */
+    /**
+     * Only items that are overdue or due soon, most urgent first.
+     *
+     * @return Collection<int, array{record: MaintenanceRecord, state: string, days_remaining: ?int, hours_remaining: ?float}>
+     */
     public function alerts(): Collection
     {
         return $this->dueItems()->reject(fn (array $item): bool => $item['state'] === 'ok')->values();
     }
 
     /**
+     * Attach each airframe's current due items as a "dueItems" relation for AircraftResource.
+     * Runs one query for all airframes instead of one per airframe.
+     *
      * @param  iterable<Aircraft>  $aircraft
      */
     public function attachDueItems(iterable $aircraft): void
@@ -79,7 +104,12 @@ class MaintenanceService
         }
     }
 
-    /** @return array{record: MaintenanceRecord, state: string, days_remaining: ?int, hours_remaining: ?float} */
+    /**
+     * Work out how urgent one record's next due point is. When both a date and hours are set, the more urgent
+     * of the two wins ("whichever comes first").
+     *
+     * @return array{record: MaintenanceRecord, state: string, days_remaining: ?int, hours_remaining: ?float}
+     */
     private function evaluate(MaintenanceRecord $record): array
     {
         $states = [];

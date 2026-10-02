@@ -9,6 +9,9 @@ use App\Support\Api\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Gate;
 
+/**
+ * GET /api/v1/overview — counts for the KPI strips, navigation badges and header alerts (staff only).
+ */
 class OverviewController extends Controller
 {
     public function __invoke(OverviewService $service): JsonResponse

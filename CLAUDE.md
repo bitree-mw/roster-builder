@@ -13,6 +13,7 @@ Use App/Casts/LocalDate for calendar-only columns. Pattern times are base-local;
 All colors belong in resources/css/common/tokens.css. Keep common CSS/JS and page-specific CSS/JS separate. No inline scripts/styles or runtime CDN dependencies.
 Use textContent for API data. Provide accessible loading, empty and error states. Avoid fake build/publish/export buttons for unimplemented features.
 No production demo accounts or committed secrets. No sample-data reset without explicit confirmation.
+Comment all code you write or change so it can be tracked easily: a PHPDoc block on every class and method (purpose, business rule, parameters/return shapes), a header comment on every JavaScript module and function, section comments in CSS and Blade, and short inline comments only for non-obvious logic. Explain why, not what the syntax does. Replace make:* stub boilerplate with real descriptions.
 Run PHP tests, Pint and npm build. Record remaining functionality honestly in docs/roadmap.md; do not claim the planner is finished or legally certified.
 
 === foundation rules ===

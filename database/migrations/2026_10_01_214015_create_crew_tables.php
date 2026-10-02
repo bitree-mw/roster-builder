@@ -4,6 +4,9 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
+/**
+ * Crew members, their aircraft ratings (pivot), expiry documents and day-planning activities.
+ */
 return new class extends Migration
 {
     public function up(): void
@@ -20,11 +23,13 @@ return new class extends Migration
             $table->timestamps();
             $table->index(['active', 'rank', 'base_airport']);
         });
+        // Many-to-many: a crew member can be rated on several aircraft types.
         Schema::create('crew_ratings', function (Blueprint $table) {
             $table->foreignId('crew_member_id')->constrained()->cascadeOnDelete();
             $table->foreignId('aircraft_type_id')->constrained()->restrictOnDelete();
             $table->primary(['crew_member_id', 'aircraft_type_id']);
         });
+        // One document per kind per crew member; a missing kind means "not recorded", never "valid".
         Schema::create('crew_documents', function (Blueprint $table) {
             $table->id();
             $table->foreignId('crew_member_id')->constrained()->cascadeOnDelete();
@@ -33,6 +38,7 @@ return new class extends Migration
             $table->timestamps();
             $table->unique(['crew_member_id', 'kind']);
         });
+        // At most one activity per crew member per calendar day.
         Schema::create('crew_activities', function (Blueprint $table) {
             $table->id();
             $table->foreignId('crew_member_id')->constrained()->cascadeOnDelete();

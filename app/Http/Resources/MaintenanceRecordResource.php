@@ -6,8 +6,14 @@ use App\Models\MaintenanceRecord;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
+/**
+ * JSON shape of a maintenance record with a compact summary of its aircraft.
+ */
 class MaintenanceRecordResource extends JsonResource
 {
+    /**
+     * @return array<string, mixed>
+     */
     public function toArray(Request $request): array
     {
         return ['id' => $this->id,

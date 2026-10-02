@@ -11,8 +11,14 @@ use App\Support\Api\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Gate;
 
+/**
+ * /api/v1/rules — the standard duty rule set. Staff can read; only schedulers can change it.
+ */
 class RuleSetController extends Controller
 {
+    /**
+     * GET /rules
+     */
     public function show(): JsonResponse
     {
         Gate::authorize('read-operations');
@@ -20,6 +26,9 @@ class RuleSetController extends Controller
         return ApiResponse::resource(new RuleSetResource(RuleSet::findOrFail(1)));
     }
 
+    /**
+     * PUT /rules — applies to roster periods created afterwards.
+     */
     public function update(RuleSetRequest $request, RuleSetService $service): JsonResponse
     {
         return ApiResponse::resource(new RuleSetResource($service->update($request->validated(), $request->user())), 'rules.updated');

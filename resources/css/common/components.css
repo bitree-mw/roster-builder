@@ -30,6 +30,7 @@
     [hidden] { display: none !important; }
 }
 
+/* Reusable components. Class names are documented in .claude/skills/malawi-ops-frontend/SKILL.md. */
 @layer components {
     /* Icons from the shared SVG sprite. */
     .icon { width: 1.125rem; height: 1.125rem; flex: none; stroke: currentColor; fill: none; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
@@ -262,6 +263,7 @@
     .link-card-icon { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 4px; background: var(--color-brand-soft); color: var(--color-info); }
 }
 
+/* Responsive adjustments: side panels stack on tablets; compact header and single-column forms on phones. */
 @media (max-width: 1100px) {
     .split { grid-template-columns: 1fr; }
     .sticky-panel { position: static; }
@@ -279,6 +281,7 @@
     .statusbar { padding: .75rem 1rem; }
     .toast-region { inset: auto 1rem 1rem 1rem; width: auto; }
 }
+/* Respect the user's reduced-motion setting everywhere. */
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
 }

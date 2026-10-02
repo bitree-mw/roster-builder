@@ -1,3 +1,7 @@
+/**
+ * Roster workspace: readiness KPIs and "needs attention" (staff), and the monthly roster period with
+ * month navigation. Crew accounts only ever receive their own published roster from the API.
+ */
 import { api } from '../common/api';
 import { overview } from '../common/overview';
 import { busy, chip, dueSummary, element, emptyState, formatDate, icon, plural, setKpi, setKpiTone, showError } from '../common/ui';
@@ -9,21 +13,25 @@ const create = document.querySelector('#create-period');
 const state = document.querySelector('#period-state');
 const today = new Date();
 
+// Month choices: six months back to 24 months ahead (the same window the API accepts).
 for (let offset = -6; offset <= 24; offset++) {
     const date = new Date(today.getFullYear(), today.getMonth() + offset, 1);
     const value = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
     const option = element('option', date.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })); option.value = value; option.selected = offset === 0; month.append(option);
 }
+/** Move the month selector backwards or forwards. */
 function step(delta) {
     const index = month.selectedIndex + delta;
     if (index < 0 || index >= month.options.length) return;
     month.selectedIndex = index; refresh().catch(showError);
 }
+/** Disable the arrows at either end of the month window. */
 function updateStepButtons() {
     document.querySelector('#previous-month').disabled = month.selectedIndex === 0;
     document.querySelector('#next-month').disabled = month.selectedIndex === month.options.length - 1;
 }
 
+/** Group the period's trips by date and render them as flight strips with open/flagged seat chips. */
 function renderTrips(period) {
     const byDate = Map.groupBy ? Map.groupBy(period.trips, trip => trip.start_date) : period.trips.reduce((map, trip) => map.set(trip.start_date, [...(map.get(trip.start_date) || []), trip]), new Map());
     const nodes = [];
@@ -47,6 +55,7 @@ function renderTrips(period) {
     content.replaceChildren(...nodes);
 }
 
+/** Load the selected month's period and show its trips or an honest empty state (no planner yet). */
 async function refresh() {
     updateStepButtons();
     content.setAttribute('aria-busy', 'true'); state.textContent = 'Loading'; delete state.dataset.tone;
@@ -64,6 +73,7 @@ async function refresh() {
     content.replaceChildren(empty);
 }
 
+/** Staff only: fill KPIs and list grounded/unavailable airframes, maintenance alerts and document alerts. */
 async function loadReadiness() {
     const [data, alerts, fleet] = await Promise.all([overview(), api('/api/v1/maintenance-alerts'), api('/api/v1/aircraft')]);
     const maintenanceAlerts = data.maintenance.overdue + data.maintenance.due_soon;
@@ -88,6 +98,7 @@ async function loadReadiness() {
     if (documentAlerts) rows.push(attentionRow(data.crew.documents_expired ? 'danger' : 'warning', 'id-card', `${plural(documentAlerts, 'crew document')} need attention`, `${data.crew.documents_expired} expired · ${data.crew.documents_due_soon} expiring soon`, '/crew', 'Crew'));
     list.replaceChildren(...(rows.length ? rows : [emptyState('All clear', 'Every airframe is available and nothing is overdue or due soon.', 'shield')]));
 }
+/** One "needs attention" row with a link to the page that resolves it. */
 function attentionRow(tone, iconName, title, detail, href, linkLabel) {
     const row = element('div', null, 'alert-row'); if (tone === 'danger') row.dataset.tone = 'danger';
     const severity = icon(iconName); severity.classList.add('alert-row-icon');
@@ -96,6 +107,7 @@ function attentionRow(tone, iconName, title, detail, href, linkLabel) {
     row.append(severity, text, link); return row;
 }
 
+// Month navigation and draft creation (the server confirms creation with a pop-up).
 month.addEventListener('change', () => refresh().catch(showError));
 document.querySelector('#previous-month').addEventListener('click', () => step(-1));
 document.querySelector('#next-month').addEventListener('click', () => step(1));

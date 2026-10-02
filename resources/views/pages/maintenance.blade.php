@@ -1,9 +1,11 @@
+{{-- Maintenance shell. Data and interactions: resources/js/pages/maintenance.js (API: /maintenance-records, /maintenance-alerts). --}}
 @extends('layouts.app')
 @section('content')
 <x-page-heading eyebrow="Fleet / Continuing airworthiness" heading="Maintenance" description="Record completed checks and services with their next due date or airframe hours. The latest record of each check type per aircraft drives the alerts, so overdue and upcoming work is flagged before it affects the schedule.">
     <button id="add-record" class="button" type="button" disabled><x-icon name="plus" class="icon-sm" />Record maintenance</button>
 </x-page-heading>
 
+{{-- Alert counts; the "due soon" window comes from config/roster.php. --}}
 <div class="kpi-grid">
     <x-kpi label="Overdue" icon="alert" value="maintenance.overdue" tone="danger" meta="Past due date or hours" />
     <x-kpi label="Due soon" icon="clock" value="maintenance.due_soon" tone="warning" meta="Within {{ config('roster.maintenance_due_soon_days') }} days or {{ config('roster.maintenance_due_soon_hours') }} h" />
@@ -11,6 +13,7 @@
     <x-kpi label="Grounded (AOG)" icon="ban" value="fleet.grounded" meta="Airframes on ground" :href="route('aircraft')" />
 </div>
 
+{{-- Overdue and due-soon items, most urgent first. --}}
 <section class="panel" aria-labelledby="alerts-title">
     <div class="panel-heading">
         <div class="panel-title"><x-icon name="bell" /><h2 id="alerts-title">Maintenance due</h2><span id="alert-count" class="chip"></span></div>
@@ -19,6 +22,7 @@
     <div id="alert-list" aria-live="polite" aria-busy="true"><p class="loading-block">Checking maintenance due items…</p></div>
 </section>
 
+{{-- Maintenance log with an aircraft filter. --}}
 <section class="panel" aria-labelledby="records-title">
     <div class="panel-heading">
         <div class="panel-title"><x-icon name="clipboard" /><h2 id="records-title">Maintenance log</h2><span id="record-count" class="chip"></span></div>
@@ -30,6 +34,7 @@
     </table></div>
 </section>
 
+{{-- Record/edit maintenance dialog; check types come from MaintenanceRecord::KINDS. --}}
 <dialog id="record-dialog" class="dialog" aria-labelledby="record-dialog-title"><form id="record-form" novalidate>
     <div class="dialog-heading"><div><h2 id="record-dialog-title" data-dialog-title>Record maintenance</h2><p>Set a next due date, next due airframe hours, or both. Whichever comes first raises the alert.</p></div><button type="button" class="icon-button" data-close aria-label="Close"><x-icon name="x" /></button></div>
     <div class="form-grid">

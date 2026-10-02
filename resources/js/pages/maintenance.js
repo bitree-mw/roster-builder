@@ -1,3 +1,7 @@
+/**
+ * Maintenance page: due alerts (overdue / due soon, calculated by the server), the maintenance log with an
+ * aircraft filter (?aircraft=ID), and the record dialog.
+ */
 import { api, allPages } from '../common/api';
 import { editor } from '../common/editor';
 import { refreshShell } from '../common/shell';
@@ -7,10 +11,13 @@ const form = document.querySelector('#record-form');
 const rows = document.querySelector('#record-rows');
 const alertList = document.querySelector('#alert-list');
 const filter = document.querySelector('#aircraft-filter');
+// Aircraft pre-selected by a link from the Fleet page.
 const requested = new URLSearchParams(window.location.search).get('aircraft');
 let aircraft = [];
+// Empty number fields are sent as null ("not recorded") rather than 0.
 const numberOrNull = input => input.value === '' ? null : Number(input.value);
 
+// Create/edit dialog; a filtered aircraft is pre-selected for new records.
 const controller = editor({
     form, dialog: document.querySelector('#record-dialog'), endpoint: '/api/v1/maintenance-records', label: 'Maintenance record', refresh,
     title: record => `${record.title} on ${record.aircraft?.registration ?? 'this aircraft'}`,
@@ -26,6 +33,7 @@ const controller = editor({
     },
 });
 
+/** Render the due list; each alert offers "Record completion" pre-filled with the same aircraft and check. */
 function renderAlerts(items) {
     alertList.setAttribute('aria-busy', 'false');
     document.querySelector('#alert-count').textContent = plural(items.length, 'alert');
@@ -46,6 +54,7 @@ function renderAlerts(items) {
     }));
 }
 
+/** Next due date and/or hours for a log row. */
 function nextDue(record) {
     const wrap = element('div', null, 'next-due');
     if (!record.next_due_on && record.next_due_hours === null) { wrap.append(element('span', 'No repeat interval', 'small muted')); return wrap; }
@@ -54,6 +63,7 @@ function nextDue(record) {
     return wrap;
 }
 
+/** Render the log; rows that are the current due item for their check show its state chip. */
 function renderRecords(records, current) {
     document.querySelector('#record-count').textContent = plural(records.length, 'record');
     if (!records.length) return emptyRow(rows, 7, filter.value ? 'No maintenance recorded for this aircraft yet.' : 'No maintenance recorded yet. Record the last completed check for each aircraft to start receiving alerts.', 'clipboard');
@@ -71,6 +81,7 @@ function renderRecords(records, current) {
     }));
 }
 
+/** Reload the log, alerts and fleet due items, then update KPIs and navigation counts. */
 async function refresh() {
     loadingRow(rows, 7, 'Loading maintenance log…');
     const query = filter.value ? `?aircraft_id=${filter.value}` : '';
@@ -84,6 +95,7 @@ async function refresh() {
     }
 }
 
+// Keep the aircraft filter in the URL so the view can be bookmarked or shared.
 filter.addEventListener('change', () => {
     const url = new URL(window.location.href);
     if (filter.value) url.searchParams.set('aircraft', filter.value); else url.searchParams.delete('aircraft');
@@ -92,6 +104,7 @@ filter.addEventListener('change', () => {
 });
 document.querySelector('#add-record').addEventListener('click', () => controller.open());
 
+// Load aircraft for the dropdowns, apply any requested filter, then load the page.
 (async () => {
     aircraft = await allPages('/api/v1/aircraft');
     options(form.elements.aircraft_id, aircraft, 'id', record => `${record.registration} · ${record.aircraft_type?.code ?? ''}`);

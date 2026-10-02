@@ -1,5 +1,7 @@
+/* Shared stylesheet: Tailwind, design tokens (all colours) and reusable components. Page styles are separate entries. */
 @import "tailwindcss";
 @import "./common/tokens.css";
 @import "./common/components.css";
+/* Tell Tailwind where utility classes are used. */
 @source "../views/**/*.blade.php";
 @source "../js/**/*.js";

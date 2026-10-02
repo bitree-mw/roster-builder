@@ -1,9 +1,11 @@
+{{-- Flights & routes shell. Data and interactions: resources/js/pages/flights.js (API: /api/v1/flights). --}}
 @extends('layouts.app')
 @section('content')
 <x-page-heading eyebrow="Network / Flight operations" heading="Flights & routes" description="Connected flight patterns with operating days and base-local times. Every duty starts and ends at a crew base. Disable a pattern to stop it being planned without losing its legs or history.">
     <button id="add-flight" class="button" type="button" disabled><x-icon name="plus" class="icon-sm" />Add flight</button>
 </x-page-heading>
 
+{{-- Pattern counts, filled from the loaded flights. --}}
 <div class="kpi-grid">
     <x-kpi label="Flight patterns" icon="route" value="flights.total" meta="Registered lines" />
     <x-kpi label="Enabled" icon="power" value="flights.enabled" tone="success" meta="Available for planning" />
@@ -12,6 +14,7 @@
     <x-kpi label="Aircraft warnings" icon="alert" value="flights.aircraft" tone="warning" meta="Enabled flights with no available airframe" />
 </div>
 
+{{-- Pattern table (left) and the selected flight's rotation breakdown (right). --}}
 <div class="split">
     <section class="panel" aria-labelledby="patterns-title">
         <div class="panel-heading">
@@ -38,6 +41,7 @@
     </aside>
 </div>
 
+{{-- Add/edit/copy flight dialog with operating days and an ordered leg editor. --}}
 <dialog id="flight-dialog" class="dialog" aria-labelledby="flight-dialog-title"><form id="flight-form" novalidate>
     <div class="dialog-heading"><div><h2 id="flight-dialog-title" data-dialog-title>Add flight</h2><p>Enter all times in base local time, including outstation legs. Use trip day 2–4 for night stops.</p></div><button type="button" class="icon-button" data-close aria-label="Close"><x-icon name="x" /></button></div>
     <div class="form-grid">

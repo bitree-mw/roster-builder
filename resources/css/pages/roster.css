@@ -1,6 +1,10 @@
+/*
+ * Roster workspace (pages/roster.blade.php): month navigation, quick links and trip strips.
+ */
 .period-nav { display: flex; align-items: center; gap: .25rem; }
 .month-select { min-width: 12rem; min-height: 38px; font-family: var(--font-mono); font-weight: 700; }
 .setup-links { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: .75rem; }
+/* Trips grouped by date, each shown as a flight strip. */
 .trip-day { padding: 1rem 1.125rem; border-bottom: 1px solid var(--color-line); }
 .trip-day:last-child { border-bottom: 0; }
 .trip-day-title { margin-bottom: .5rem; }

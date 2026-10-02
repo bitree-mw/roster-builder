@@ -6,8 +6,15 @@ use App\Models\Airport;
 use App\Models\RuleSet;
 use Illuminate\Database\Seeder;
 
+/**
+ * Reference data needed in every environment (including production): airports and the standard rule set.
+ * Safe to run repeatedly.
+ */
 class DatabaseSeeder extends Seeder
 {
+    /**
+     * LLW and BLZ are crew bases; East African stations are UTC+3, the rest UTC+2.
+     */
     public function run(): void
     {
         foreach (['LLW' => 'Lilongwe', 'BLZ' => 'Blantyre', 'LUN' => 'Lusaka', 'HRE' => 'Harare', 'JNB' => 'Johannesburg', 'DAR' => 'Dar es Salaam', 'NBO' => 'Nairobi', 'ADD' => 'Addis Ababa'] as $code => $name) {

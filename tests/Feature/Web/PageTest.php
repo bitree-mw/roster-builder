@@ -7,10 +7,18 @@ use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
+/**
+ * Blade page shells render for staff with escaped user data, and management pages are forbidden to crew.
+ */
 class PageTest extends TestCase
 {
     use LazilyRefreshDatabase;
 
+    /**
+     * Every Blade page that staff can open.
+     *
+     * @return array<int, array{0: string}>
+     */
     public static function pages(): array
     {
         return [['roster'], ['aircraft'], ['maintenance'], ['crew'], ['flights'], ['rules']];

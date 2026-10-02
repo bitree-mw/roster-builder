@@ -14,10 +14,16 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 
+/**
+ * /api/v1/maintenance-records and /api/v1/maintenance-alerts — the maintenance log and due alerts.
+ */
 class MaintenanceRecordController extends Controller
 {
     public function __construct(private MaintenanceService $service) {}
 
+    /**
+     * GET /maintenance-records?aircraft_id= — newest first.
+     */
     public function index(MaintenanceQueryRequest $request): JsonResponse
     {
         return ApiResponse::resource(MaintenanceRecordResource::collection(MaintenanceRecord::with('aircraft.aircraftType', 'recorder')
@@ -25,6 +31,9 @@ class MaintenanceRecordController extends Controller
             ->orderByDesc('performed_on')->orderByDesc('id')->paginate(100)));
     }
 
+    /**
+     * GET /maintenance-alerts — overdue then due-soon items, most urgent first.
+     */
     public function alerts(): JsonResponse
     {
         Gate::authorize('read-operations');
@@ -32,6 +41,9 @@ class MaintenanceRecordController extends Controller
         return ApiResponse::resource(MaintenanceAlertResource::collection($this->service->alerts()));
     }
 
+    /**
+     * GET /maintenance-records/{id}
+     */
     public function show(MaintenanceRecord $maintenanceRecord): JsonResponse
     {
         Gate::authorize('read-operations');
@@ -39,6 +51,9 @@ class MaintenanceRecordController extends Controller
         return ApiResponse::resource(new MaintenanceRecordResource($maintenanceRecord->load('aircraft.aircraftType', 'recorder')));
     }
 
+    /**
+     * POST /maintenance-records — the recorder is the signed-in user.
+     */
     public function store(MaintenanceRecordRequest $request): JsonResponse
     {
         $record = $this->service->save($request->validated(), $request->user());
@@ -46,6 +61,9 @@ class MaintenanceRecordController extends Controller
         return ApiResponse::created(new MaintenanceRecordResource($record), 'maintenance.created', $this->labels($record));
     }
 
+    /**
+     * PUT /maintenance-records/{id}
+     */
     public function update(MaintenanceRecordRequest $request, MaintenanceRecord $maintenanceRecord): JsonResponse
     {
         $record = $this->service->save($request->validated(), $request->user(), $maintenanceRecord);
@@ -53,6 +71,9 @@ class MaintenanceRecordController extends Controller
         return ApiResponse::resource(new MaintenanceRecordResource($record), 'maintenance.updated', $this->labels($record));
     }
 
+    /**
+     * DELETE /maintenance-records/{id} — labels are captured before deletion for the confirmation message.
+     */
     public function destroy(Request $request, MaintenanceRecord $maintenanceRecord): JsonResponse
     {
         Gate::authorize('manage-operations');

@@ -10,6 +10,9 @@ use App\Support\Api\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Gate;
 
+/**
+ * GET /api/v1/lookups — airports (with base flag) and aircraft types for form dropdowns.
+ */
 class LookupController extends Controller
 {
     public function __invoke(): JsonResponse

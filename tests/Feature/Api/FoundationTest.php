@@ -13,10 +13,19 @@ use Laravel\Sanctum\Sanctum;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
+/**
+ * Core API contract: authentication on every endpoint, role and token-scope authorization, aircraft type
+ * CRUD with audit, crew ratings/documents and mass-assignment protection.
+ */
 class FoundationTest extends TestCase
 {
     use LazilyRefreshDatabase;
 
+    /**
+     * API endpoints that must reject anonymous callers.
+     *
+     * @return array<int, array{0: string}>
+     */
     public static function protectedEndpoints(): array
     {
         return array_map(fn (string $path): array => [$path], ['aircraft-types', 'aircraft', 'maintenance-records', 'maintenance-alerts', 'overview', 'crew-members', 'flights', 'rules', 'roster-periods', 'lookups', 'me']);

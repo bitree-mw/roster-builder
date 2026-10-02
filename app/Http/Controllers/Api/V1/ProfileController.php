@@ -10,13 +10,22 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 
+/**
+ * Endpoints about the signed-in user.
+ */
 class ProfileController extends Controller
 {
+    /**
+     * GET /api/v1/me — safe account fields (never the password or tokens).
+     */
     public function show(Request $request): JsonResponse
     {
         return ApiResponse::resource(new UserResource($request->user()));
     }
 
+    /**
+     * GET /api/v1/my-profile — the caller's own crew profile; 404 when the account has no linked crew member.
+     */
     public function crew(Request $request): JsonResponse
     {
         Gate::authorize('read-rosters');

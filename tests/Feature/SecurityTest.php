@@ -9,6 +9,9 @@ use Laravel\Sanctum\Sanctum;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
+/**
+ * Security boundaries: the gate permission matrix and CSRF protection on sign-in and stateful API writes.
+ */
 class SecurityTest extends TestCase
 {
     use LazilyRefreshDatabase;

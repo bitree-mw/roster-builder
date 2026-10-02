@@ -6,13 +6,23 @@ use App\Models\MaintenanceRecord;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
+/**
+ * Validates a maintenance record. The hours ordering rule lives in MaintenanceService because either value
+ * may be omitted.
+ */
 class MaintenanceRecordRequest extends FormRequest
 {
+    /**
+     * Staff with write access only.
+     */
     public function authorize(): bool
     {
         return $this->user()?->can('manage-operations') ?? false;
     }
 
+    /**
+     * @return array<string, array<int, mixed>>
+     */
     public function rules(): array
     {
         return [
@@ -27,6 +37,9 @@ class MaintenanceRecordRequest extends FormRequest
         ];
     }
 
+    /**
+     * @return array<string, string>
+     */
     public function messages(): array
     {
         return ['next_due_on.after' => 'The next due date must be after the date the work was performed.'];

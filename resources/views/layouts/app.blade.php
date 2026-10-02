@@ -6,12 +6,15 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{{ $title }} · Malawi Airlines Roster Builder</title>
     <link rel="icon" type="image/png" href="{{ asset('images/malawi-airlines-logo.png') }}">
+    {{-- Signed-in layout. Loads the shared CSS/JS plus the page's own entry (resources/{css,js}/pages/{page}). --}}
     @vite(['resources/css/app.css', 'resources/js/app.js', 'resources/css/pages/'.$page.'.css', 'resources/js/pages/'.$page.'.js'])
 </head>
 <body data-role="{{ auth()->user()?->role }}" data-page="{{ $page }}">
+{{-- SVG symbols referenced by <x-icon> and icon() in JS. --}}
 <x-icon-sprite />
 <a class="skip-link" href="#main">Skip to content</a>
 @php($staff = auth()->user()->isStaff())
+{{-- Top bar: logo, header alert pills (filled by resources/js/common/shell.js for staff), user chip and sign-out. --}}
 <header class="topbar">
     <div class="topbar-inner">
         <a class="brand" href="{{ route('roster') }}" aria-label="Malawi Airlines Roster Builder home">
@@ -33,6 +36,7 @@
             <button id="logout" class="icon-button" type="button" aria-label="Sign out" title="Sign out"><x-icon name="logout" /></button>
         </div>
     </div>
+    {{-- Main navigation. Crew accounts only see the roster; data-tab-count badges are filled from /api/v1/overview. --}}
     <nav class="tabs" aria-label="Main navigation">
         <a class="tab" href="{{ route('roster') }}" @if($page === 'roster') aria-current="page" @endif><x-icon name="calendar" class="icon-sm" />Roster</a>
         @if($staff)
@@ -48,9 +52,11 @@
         @endif
     </nav>
 </header>
+{{-- Page content from @section('content'). --}}
 <main id="main" class="workspace">
     @yield('content')
 </main>
+{{-- Status bar: makes the time convention and the non-approved status of this build explicit. --}}
 <footer class="statusbar">
     <span>Malawi Airlines · Crew Control · Kamuzu International Airport (LLW)</span>
     <span><span class="statusbar-dot" aria-hidden="true"></span>Signed in as {{ auth()->user()->roleLabel() }}</span>

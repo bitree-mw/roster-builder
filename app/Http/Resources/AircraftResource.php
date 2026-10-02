@@ -6,8 +6,14 @@ use App\Models\Aircraft;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
+/**
+ * JSON shape of an airframe, including a human status label and (when attached) its maintenance due items.
+ */
 class AircraftResource extends JsonResource
 {
+    /**
+     * @return array<string, mixed>
+     */
     public function toArray(Request $request): array
     {
         return ['id' => $this->id,

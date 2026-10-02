@@ -9,6 +9,11 @@ use Illuminate\Http\Resources\Json\JsonResource;
 /** @property array{record: MaintenanceRecord, state: string, days_remaining: ?int, hours_remaining: ?float} $resource */
 class MaintenanceAlertResource extends JsonResource
 {
+    /**
+     * One due item from MaintenanceService: state (overdue, due_soon, ok), days/hours remaining and the record.
+     *
+     * @return array<string, mixed>
+     */
     public function toArray(Request $request): array
     {
         return [

@@ -9,10 +9,19 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
+/**
+ * Business operations for flight patterns: saving (with duty/rest validation), enabling/disabling and deletion.
+ */
 class FlightService
 {
     public function __construct(private AuditService $audit, private FlightTimelineService $timeline) {}
 
+    /**
+     * Validate the leg timeline against the current duty rules, then create or replace the pattern, its
+     * operating days and its legs in one transaction with an audit entry.
+     *
+     * @param  array<string, mixed>  $data  validated FlightRequest payload (weekdays and ordered legs)
+     */
     public function save(array $data, User $actor, ?Flight $flight = null): Flight
     {
         return DB::transaction(function () use ($data, $actor, $flight): Flight {
@@ -20,6 +29,7 @@ class FlightService
             $flight ??= new Flight;
             $before = $flight->exists ? $flight->load('legs', 'days')->toArray() : null;
             $flight->fill(Arr::except($data, ['weekdays', 'legs']))->save();
+            // Days and legs are fully replaced from the payload; leg sequence is assigned here, never by the client.
             $flight->days()->delete();
             $flight->days()->createMany(array_map(fn (int $day): array => ['weekday' => $day], $data['weekdays']));
             $flight->legs()->delete();
@@ -50,6 +60,11 @@ class FlightService
         });
     }
 
+    /**
+     * Delete a pattern that has never been rostered. Patterns with trips must be disabled instead.
+     *
+     * @throws ValidationException when trip history exists
+     */
     public function delete(Flight $flight, User $actor): void
     {
         DB::transaction(function () use ($flight, $actor): void {

@@ -1,3 +1,7 @@
+/**
+ * Flights & routes page: pattern table with enable/disable switches, a rotation breakdown side panel,
+ * and the create/edit/copy dialog with its leg editor. Times are base-local throughout.
+ */
 import { api, allPages } from '../common/api';
 import { editor } from '../common/editor';
 import { refreshShell } from '../common/shell';
@@ -8,13 +12,16 @@ const tbody = document.querySelector('#flight-rows');
 const legs = document.querySelector('#leg-editor');
 const detail = document.querySelector('#flight-detail');
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+// Page state: lookup airports, loaded flights, the selected row and the active filters.
 let airports = [];
 let flights = [];
 let selectedId = null;
 let stateFilter = '';
 let search = '';
 
+/** Keep the leg badges (1, 2, 3...) in order after adding or removing a leg. */
 function renumberLegs() { [...legs.children].forEach((row, index) => { row.querySelector('.leg-number').textContent = index + 1; }); }
+/** Append an editable leg row (trip day, from, to, departs, arrives) to the dialog. */
 function addLeg(record = {}) {
     const row = element('div', null, 'leg-row');
     row.append(element('span', '', 'leg-number'));
@@ -31,6 +38,7 @@ function addLeg(record = {}) {
     legs.append(row); renumberLegs();
 }
 
+// Create/edit dialog. "Copy" opens it pre-filled with an empty code so a new pattern is created.
 const controller = editor({
     form, dialog: document.querySelector('#flight-dialog'), endpoint: '/api/v1/flights', label: 'Flight pattern', refresh,
     read: () => ({
@@ -48,6 +56,7 @@ const controller = editor({
     },
 });
 
+/** "LLW → BLZ → LLW" with a note for multi-day rotations. */
 function routeChain(record) {
     const chain = element('div', null, 'route-chain');
     record.legs.forEach((leg, index) => {
@@ -58,18 +67,22 @@ function routeChain(record) {
     chain.append(element('span', `${plural(record.legs.length, 'leg')}${days > 1 ? ` · ${days}-day rotation with night stop` : ''}`, 'route-meta'));
     return chain;
 }
+/** Seven day boxes with operating days highlighted (Monday first). */
 function weekStrip(weekdays) {
     const strip = element('span', null, 'week-strip'); strip.setAttribute('aria-label', weekdays.map(day => DAYS[day]).join(', ') || 'No operating days');
     DAYS.forEach((day, index) => { const box = element('span', day[0]); box.dataset.on = String(weekdays.includes(index)); box.setAttribute('aria-hidden', 'true'); strip.append(box); });
     return strip;
 }
+/** True when airframes of the type are registered but none is currently available. */
 function noAvailableAircraft(record) { return record.aircraft?.aircraft_count > 0 && record.aircraft.available_aircraft_count === 0; }
+/** Aircraft type chip plus an availability warning when needed. */
 function aircraftCell(record) {
     const wrap = element('div', null, 'aircraft-cell');
     wrap.append(element('span', record.aircraft.code, `chip palette-${record.aircraft.palette}`));
     if (noAvailableAircraft(record)) wrap.append(chip('No available airframe', 'warning', { iconName: 'alert' }));
     return wrap;
 }
+/** Enable/disable switch; calls PATCH /flights/{id}/status and the server's message pops up. */
 function statusSwitch(record) {
     const button = element('button', null, 'switch'); button.type = 'button'; button.setAttribute('role', 'switch');
     button.setAttribute('aria-checked', String(record.active)); button.setAttribute('aria-label', `${record.code} enabled for planning`);
@@ -83,11 +96,13 @@ function statusSwitch(record) {
     });
     return button;
 }
+/** First departure – last arrival, with "+Nd" when the rotation ends on a later day. */
 function firstLastTimes(record) {
     const first = record.legs[0]; const last = record.legs[record.legs.length - 1];
     return `${first.departs_local} – ${last.arrives_local}${last.trip_day > 1 ? ` (+${last.trip_day - 1}d)` : ''}`;
 }
 
+/** Fill the rotation breakdown panel for the selected flight. */
 function renderDetail() {
     const record = flights.find(flight => flight.id === selectedId);
     if (!record) { detail.replaceChildren(element('p', 'Select a flight to see its legs, block time and status.', 'muted small')); return; }
@@ -122,7 +137,9 @@ function renderDetail() {
     detail.replaceChildren(...nodes);
 }
 
+/** Select a flight row and show its breakdown. */
 function select(id) { selectedId = id; render(); }
+/** Render the table for the current filters, the side panel and the KPI strip. */
 function render() {
     const term = search.trim().toUpperCase();
     const visible = flights.filter(record => (!stateFilter || (stateFilter === 'enabled') === record.active)
@@ -147,12 +164,14 @@ function render() {
     setKpi('flights.aircraft', flights.filter(record => record.active && noAvailableAircraft(record)).length);
 }
 
+/** Reload flights (keeping the selection when possible) and refresh navigation counts. */
 async function refresh() {
     flights = await allPages('/api/v1/flights');
     if (!flights.some(record => record.id === selectedId)) selectedId = flights[0]?.id ?? null;
     render(); refreshShell({ refresh: true }).catch(() => {});
 }
 
+// Wire up filters and buttons, load lookups, then load flights.
 segmented(document.querySelector('#state-filter'), value => { stateFilter = value; render(); });
 document.querySelector('#flight-search').addEventListener('input', event => { search = event.target.value; render(); });
 document.querySelector('#add-leg').addEventListener('click', () => addLeg());

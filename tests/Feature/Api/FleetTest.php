@@ -11,6 +11,10 @@ use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
+/**
+ * Airframes and flight enable/disable: registration rules, status changes with reasons and audit,
+ * authorization, deletion guards and airframe availability counts on flights.
+ */
 class FleetTest extends TestCase
 {
     use LazilyRefreshDatabase;

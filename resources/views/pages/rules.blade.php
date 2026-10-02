@@ -1,3 +1,4 @@
+{{-- Duty rules shell. Data and saving: resources/js/pages/rules.js (API: /api/v1/rules). Only schedulers can save. --}}
 @extends('layouts.app')
 @section('content')
 <x-page-heading eyebrow="Parameters / Duty limits" heading="Duty rules" description="Server-side planning parameters. Each roster period keeps a snapshot of the rules it was created with; changes apply to newly created periods only. These values are configurable defaults, not a certified statement of aviation regulations." />
@@ -9,6 +10,7 @@
     </div>
     <form id="rules-form" class="panel-body rules-form" novalidate>
         <label class="rules-name">Rule set name<input name="name" required maxlength="100"></label>
+        {{-- Field groups: name => [label, unit, min, max, step]. Limits mirror RuleSetRequest. --}}
         @foreach([
             'Duty period' => [
                 'report_before_min' => ['Report before first departure', 'min', 0, 240, 1],

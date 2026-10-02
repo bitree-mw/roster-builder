@@ -5,13 +5,23 @@ namespace App\Http\Requests;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
+/**
+ * Validates the shape of a flight pattern. Timeline rules (connections, base return, duty and rest) are
+ * checked afterwards by FlightTimelineService because they depend on the configured rules.
+ */
 class FlightRequest extends FormRequest
 {
+    /**
+     * Staff with write access only.
+     */
     public function authorize(): bool
     {
         return $this->user()?->can('manage-operations') ?? false;
     }
 
+    /**
+     * Flight codes are stored trimmed and upper-case.
+     */
     protected function prepareForValidation(): void
     {
         if (is_string($this->input('code'))) {
@@ -19,6 +29,11 @@ class FlightRequest extends FormRequest
         }
     }
 
+    /**
+     * Legs only accept the listed keys, so a client cannot inject a sequence or flight id.
+     *
+     * @return array<string, array<int, mixed>>
+     */
     public function rules(): array
     {
         return [

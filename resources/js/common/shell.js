@@ -1,11 +1,13 @@
 import { overview } from './overview';
 import { plural } from './ui';
 
+/** Set (or hide, when empty) the count badge on a navigation tab. */
 function tabCount(key, text, tone) {
     const target = document.querySelector(`[data-tab-count="${key}"]`); if (!target) return;
     target.textContent = text; target.hidden = text === '';
     if (tone) target.dataset.tone = tone; else delete target.dataset.tone;
 }
+/** Show or hide a header alert pill (maintenance or crew documents). */
 function alertPill(key, text, visible) {
     const pill = document.querySelector(`[data-alert-pill="${key}"]`); if (!pill) return;
     pill.querySelector('[data-alert-pill-text]').textContent = text; pill.hidden = !visible;

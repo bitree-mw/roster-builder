@@ -12,6 +12,10 @@ use Laravel\Sanctum\Sanctum;
 use RuntimeException;
 use Tests\TestCase;
 
+/**
+ * The JSON envelope and error rendering from App\Support\Api: success messages, customisation through
+ * config/api.php, error codes for 401/403/404/422/429/500, and that 500s never leak details without debug.
+ */
 class ApiResponseTest extends TestCase
 {
     use LazilyRefreshDatabase;

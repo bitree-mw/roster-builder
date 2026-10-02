@@ -6,6 +6,7 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{{ $title }} · Malawi Airlines Roster Builder</title>
     <link rel="icon" type="image/png" href="{{ asset('images/malawi-airlines-logo.png') }}">
+    {{-- Guest layout (sign-in): no navigation and no app.js; pop-up notifications still work through the page script. --}}
     @vite(['resources/css/app.css', 'resources/css/pages/'.$page.'.css', 'resources/js/pages/'.$page.'.js'])
 </head>
 <body data-page="{{ $page }}">

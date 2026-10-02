@@ -1,3 +1,7 @@
+/**
+ * Crew directory page: searchable, filterable crew table with rating chips and document expiry states
+ * (states are calculated by the server), plus the create/edit dialog.
+ */
 import { api, allPages } from '../common/api';
 import { editor } from '../common/editor';
 import { overview } from '../common/overview';
@@ -8,10 +12,12 @@ const form = document.querySelector('#crew-form');
 const tbody = document.querySelector('#crew-rows');
 const RANKS = { CPT: 'Captain', FO: 'First officer', CC: 'Cabin crew' };
 const KINDS = ['licence', 'medical', 'recurrent'];
+// Page state: loaded crew, the rank filter (applied by the API) and the search text (applied locally).
 let crew = [];
 let rank = '';
 let search = '';
 
+// Create/edit dialog. Documents left blank are simply not sent ("not recorded").
 const controller = editor({
     form, dialog: document.querySelector('#crew-dialog'), endpoint: '/api/v1/crew-members', label: 'Crew member', refresh,
     read: () => ({
@@ -29,7 +35,9 @@ const controller = editor({
     },
 });
 
+/** Up to two initials for the avatar. */
 function initials(name) { return name.split(' ').filter(Boolean).slice(0, 2).map(part => part[0].toUpperCase()).join(''); }
+/** A document column: expiry date plus an expired / days-left chip from the server-calculated state. */
 function documentCell(record, kind) {
     const wrap = element('div', null, 'document-cell');
     const document = record.documents.find(item => item.kind === kind);
@@ -41,6 +49,7 @@ function documentCell(record, kind) {
 }
 const hasAlert = record => record.documents.some(document => document.state !== 'valid');
 
+/** Render the table for the current search text and "document alerts only" option. */
 function render() {
     const term = search.trim().toLowerCase();
     const alertsOnly = document.querySelector('#alerts-only').checked;
@@ -66,6 +75,7 @@ function render() {
     }));
 }
 
+/** Reload crew for the selected rank and update the KPI strip from the overview counts. */
 async function refresh() {
     loadingRow(tbody, 9, 'Loading crew…');
     crew = await allPages('/api/v1/crew-members' + (rank ? `?rank=${rank}` : ''));
@@ -74,6 +84,7 @@ async function refresh() {
     for (const key of ['active', 'captains', 'first_officers', 'cabin', 'documents_expired', 'documents_due_soon']) setKpi(`crew.${key}`, data.crew[key]);
 }
 
+// Wire up filters and buttons, load dropdown lookups, then load the crew.
 segmented(document.querySelector('#rank-filter'), value => { rank = value; refresh().catch(showError); });
 document.querySelector('#crew-search').addEventListener('input', event => { search = event.target.value; render(); });
 document.querySelector('#alerts-only').addEventListener('change', render);

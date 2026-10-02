@@ -1,3 +1,7 @@
+/**
+ * Fleet page: airframe cards with availability status and next maintenance, the status dialog,
+ * and the aircraft types table. All data comes from /api/v1/aircraft and /api/v1/aircraft-types.
+ */
 import { api, allPages } from '../common/api';
 import { editor } from '../common/editor';
 import { refreshShell } from '../common/shell';
@@ -12,11 +16,13 @@ const aircraftForm = document.querySelector('#aircraft-form');
 const typeForm = document.querySelector('#type-form');
 const statusDialog = document.querySelector('#status-dialog');
 const statusForm = document.querySelector('#status-form');
+// Page state: loaded records, the active status filter and the airframe whose status is being changed.
 let aircraft = [];
 let types = [];
 let statusFilter = '';
 let statusTarget = null;
 
+// Create/edit dialog for airframes (status is changed separately through the status dialog).
 const aircraftEditor = editor({
     form: aircraftForm, dialog: document.querySelector('#aircraft-dialog'), endpoint: '/api/v1/aircraft', label: 'Aircraft', refresh,
     read: () => ({
@@ -31,12 +37,14 @@ const aircraftEditor = editor({
         aircraftForm.elements.notes.value = record.notes || '';
     },
 });
+// Create/edit dialog for aircraft types.
 const typeEditor = editor({
     form: typeForm, dialog: document.querySelector('#type-dialog'), endpoint: '/api/v1/aircraft-types', label: 'Aircraft type', refresh,
     read: () => ({ code: typeForm.elements.code.value, cabin_crew_required: Number(typeForm.elements.cabin_crew_required.value), palette: typeForm.elements.palette.value }),
     fill: record => { if (record) for (const key of ['code', 'cabin_crew_required', 'palette']) typeForm.elements[key].value = record[key]; },
 });
 
+/** Open the status dialog pre-selected with the airframe's current status and reason. */
 function openStatus(record) {
     statusTarget = record; statusForm.reset(); status('', false, statusForm.querySelector('[data-form-status]'));
     document.querySelector('#status-dialog-subtitle').textContent = `${record.registration} · ${record.aircraft_type?.code ?? ''} · currently ${record.status_label.toLowerCase()}`;
@@ -44,6 +52,7 @@ function openStatus(record) {
     statusForm.elements.reason.value = record.status_reason || '';
     statusDialog.showModal();
 }
+// Submit a status change; the API's message pops up and inline errors stay in the dialog.
 statusDialog.querySelector('[data-close]').addEventListener('click', () => statusDialog.close());
 statusForm.addEventListener('submit', async event => {
     event.preventDefault();
@@ -55,6 +64,7 @@ statusForm.addEventListener('submit', async event => {
     });
 });
 
+/** "Next maintenance" section of a card: the two most urgent due items, or a note when none are recorded. */
 function dueBlock(record) {
     const block = element('div', null, 'airframe-due');
     block.append(element('span', 'Next maintenance', 'label-caps muted'));
@@ -69,6 +79,7 @@ function dueBlock(record) {
     return block;
 }
 
+/** Build one airframe card (registration, type, status, reason, hours, due items and actions). */
 function airframeCard(record) {
     const card = element('article', null, 'airframe-card'); card.dataset.status = record.status;
     const head = element('header', null, 'airframe-head');
@@ -89,6 +100,7 @@ function airframeCard(record) {
     return card;
 }
 
+/** Render the cards for the selected status filter, or an empty state. */
 function renderAircraft() {
     const visible = aircraft.filter(record => !statusFilter || record.status === statusFilter);
     document.querySelector('#aircraft-count').textContent = plural(aircraft.length, 'airframe');
@@ -100,6 +112,7 @@ function renderAircraft() {
     cards.replaceChildren(...visible.map(airframeCard));
 }
 
+/** Render the aircraft types table with available/total airframe counts. */
 function renderTypes() {
     document.querySelector('#type-count').textContent = plural(types.length, 'type');
     if (!types.length) return emptyRow(typeRows, 5, 'No aircraft types yet. Add a type before registering aircraft or flight patterns.', 'grid');
@@ -114,12 +127,14 @@ function renderTypes() {
     }));
 }
 
+/** Status counts for the KPI strip, from the loaded airframes. */
 function renderKpis() {
     const count = value => aircraft.filter(record => record.status === value).length;
     setKpi('fleet.total', aircraft.length, `${plural(types.length, 'aircraft type')}`);
     for (const value of ['available', 'maintenance', 'grounded', 'unavailable']) setKpi(`fleet.${value}`, count(value));
 }
 
+/** Reload airframes and types, re-render everything and refresh the navigation counts. */
 async function refresh() {
     [aircraft, types] = await Promise.all([allPages('/api/v1/aircraft'), allPages('/api/v1/aircraft-types')]);
     options(aircraftForm.elements.aircraft_type_id, types);
@@ -129,6 +144,7 @@ async function refresh() {
     refreshShell({ refresh: true }).catch(() => {});
 }
 
+// Wire up filters and buttons, then load the page.
 segmented(document.querySelector('#status-filter'), value => { statusFilter = value; renderAircraft(); });
 document.querySelector('#add-aircraft').addEventListener('click', () => aircraftEditor.open());
 document.querySelector('#add-type').addEventListener('click', () => typeEditor.open());

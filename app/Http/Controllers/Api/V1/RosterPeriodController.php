@@ -11,8 +11,15 @@ use App\Services\RosterPeriodService;
 use App\Support\Api\ApiResponse;
 use Illuminate\Http\JsonResponse;
 
+/**
+ * /api/v1/roster-periods — monthly roster periods. Crew see only published periods and only their own seats.
+ */
 class RosterPeriodController extends Controller
 {
+    /**
+     * GET /roster-periods?month=YYYY-MM. For crew accounts the trips and assignments are filtered to the
+     * caller's own crew member, so peer records and unpublished data never leave the server.
+     */
     public function index(RosterQueryRequest $request): JsonResponse
     {
         $user = $request->user();
@@ -33,6 +40,9 @@ class RosterPeriodController extends Controller
         return ApiResponse::resource(RosterPeriodResource::collection($query));
     }
 
+    /**
+     * POST /roster-periods — 201 for a new draft, 200 when the month already exists (idempotent).
+     */
     public function store(RosterPeriodRequest $request, RosterPeriodService $service): JsonResponse
     {
         $period = $service->create($request->validated('month'), $request->user());

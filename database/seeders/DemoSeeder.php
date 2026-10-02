@@ -11,8 +11,16 @@ use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
+/**
+ * Fictional demonstration data for local development and tests: 2 aircraft types, 48 crew, 9 flight patterns,
+ * 4 airframes with maintenance history, and an optional demo scheduler from DEMO_EMAIL / DEMO_PASSWORD.
+ * Repeatable: existing records are left as they are. Refuses to run outside local/testing.
+ */
 class DemoSeeder extends Seeder
 {
+    /**
+     * Seed everything in one transaction so a failure leaves no partial demo data.
+     */
     public function run(): void
     {
         if (! app()->environment(['local', 'testing'])) {
@@ -22,6 +30,8 @@ class DemoSeeder extends Seeder
         DB::transaction(function (): void {
             $q400 = AircraftType::firstOrCreate(['code' => 'Q400'], ['cabin_crew_required' => 2, 'palette' => 'forest']);
             $b737 = AircraftType::firstOrCreate(['code' => 'B737'], ['cabin_crew_required' => 3, 'palette' => 'gold']);
+            // Crew: every 4th person is based at BLZ; pilots alternate Q400/B737 ratings; cabin crew are all-aircraft.
+            // Crew #1 of each rank has a medical expiring mid-month, #2 leave, #3 a simulator session, #4 a standby.
             foreach (['CPT' => 12, 'FO' => 12, 'CC' => 24] as $rank => $count) {
                 for ($number = 1; $number <= $count; $number++) {
                     $crew = CrewMember::firstOrCreate(['email' => strtolower($rank).$number.'@example.com'], ['name' => $rank.' Demo '.str_pad((string) $number, 2, '0', STR_PAD_LEFT), 'rank' => $rank, 'base_airport' => $number % 4 === 0 ? 'BLZ' : 'LLW', 'all_aircraft' => $rank === 'CC', 'active' => true]);
@@ -47,6 +57,8 @@ class DemoSeeder extends Seeder
                     }
                 }
             }
+            // Flight patterns: [code, base, destination, dep, arr, return dep, return arr, aircraft, return trip day].
+            // LA1 returns on trip day 2, i.e. a night stop at ADD.
             $routes = [
                 ['LB1', 'LLW', 'BLZ', '08:00', '09:00', '09:40', '10:40', $q400->id, 1],
                 ['LB2', 'LLW', 'BLZ', '14:00', '15:00', '15:40', '16:40', $q400->id, 1],
@@ -69,6 +81,7 @@ class DemoSeeder extends Seeder
                     ['trip_day' => $returnDay, 'sequence' => $returnDay === 1 ? 2 : 1, 'from_airport' => $destination, 'to_airport' => $base, 'departs_local' => $returnDep, 'arrives_local' => $returnArr],
                 ]);
             }
+            // Airframes covering every status, with overdue, due-soon (date and hours) and current maintenance examples.
             $airframes = [
                 ['7Q-DMA', $q400->id, 'available', null, 18240.5],
                 ['7Q-DMB', $q400->id, 'maintenance', 'Scheduled A-check in progress at LLW hangar', 21310.0],
@@ -96,6 +109,7 @@ class DemoSeeder extends Seeder
                     default => [['kind' => 'inspection', 'title' => 'Landing gear inspection', 'performed_on' => $base->copy()->subMonths(6), 'next_due_on' => $base->copy()->addMonths(6)]],
                 });
             }
+            // Optional demo account, only when both values are set locally; never a default credential.
             if (config('roster.demo_email') && config('roster.demo_password')) {
                 $user = User::firstOrNew(['email' => config('roster.demo_email')]);
                 if (! $user->exists) {

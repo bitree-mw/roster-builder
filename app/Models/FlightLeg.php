@@ -7,16 +7,26 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * One sector of a flight pattern. Times are base-local wall-clock times (never browser time); an arrival
+ * earlier than the departure rolls into the next day.
+ */
 #[Fillable(['flight_id', 'trip_day', 'sequence', 'from_airport', 'to_airport', 'departs_local', 'arrives_local'])]
 class FlightLeg extends Model
 {
     use HasFactory;
 
+    /**
+     * @return array<string, string>
+     */
     protected function casts(): array
     {
         return ['trip_day' => 'integer', 'sequence' => 'integer'];
     }
 
+    /**
+     * The pattern this leg belongs to.
+     */
     public function flight(): BelongsTo
     {
         return $this->belongsTo(Flight::class);

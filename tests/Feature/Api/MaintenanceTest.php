@@ -10,6 +10,10 @@ use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
+/**
+ * Maintenance records and alerts: overdue / due-soon by date and hours, supersession by newer records,
+ * base-local dates, validation of due points, recorder and audit, and staff-only access.
+ */
 class MaintenanceTest extends TestCase
 {
     use LazilyRefreshDatabase;

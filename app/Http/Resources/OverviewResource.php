@@ -8,6 +8,11 @@ use Illuminate\Http\Resources\Json\JsonResource;
 /** @property array<string, array<string, int>> $resource */
 class OverviewResource extends JsonResource
 {
+    /**
+     * Overview counts grouped as crew, flights, fleet and maintenance.
+     *
+     * @return array<string, array<string, int>>
+     */
     public function toArray(Request $request): array
     {
         return [

@@ -1,3 +1,4 @@
+{{-- Page heading card with optional action buttons in the slot. Outcomes are shown as pop-ups, not here. --}}
 @props(['eyebrow', 'heading', 'description'])
 <div class="page-heading">
     <div>

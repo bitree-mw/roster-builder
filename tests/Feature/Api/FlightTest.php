@@ -11,6 +11,10 @@ use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
+/**
+ * Flight pattern saving: connected legs, night-stop rest, overnight duty with UTC conversion, and that
+ * invalid patterns leave no partial writes.
+ */
 class FlightTest extends TestCase
 {
     use LazilyRefreshDatabase;

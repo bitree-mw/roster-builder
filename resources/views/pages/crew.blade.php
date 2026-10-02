@@ -1,9 +1,11 @@
+{{-- Crew directory shell. Data and interactions: resources/js/pages/crew.js (API: /api/v1/crew-members). --}}
 @extends('layouts.app')
 @section('content')
 <x-page-heading eyebrow="People / Licensing" heading="Crew directory" description="Flight deck and cabin crew with their base, aircraft ratings and licence, medical and recurrent training expiry. Documents expiring within {{ config('roster.document_warning_days') }} days are flagged.">
     <button id="add-crew" class="button" type="button" disabled><x-icon name="plus" class="icon-sm" />Add crew member</button>
 </x-page-heading>
 
+{{-- Crew counts and document expiry alerts (from /api/v1/overview). --}}
 <div class="kpi-grid">
     <x-kpi label="Active crew" icon="users" value="crew.active" meta="Available to roster" />
     <x-kpi label="Captains" icon="id-card" value="crew.captains" tone="info" meta="CPT" />
@@ -13,6 +15,7 @@
     <x-kpi label="Expiring soon" icon="clock" value="crew.documents_due_soon" tone="warning" meta="Within {{ config('roster.document_warning_days') }} days" />
 </div>
 
+{{-- Crew table with search, rank filter and "document alerts only". --}}
 <section class="panel" aria-labelledby="crew-title">
     <div class="panel-heading">
         <div class="panel-title"><x-icon name="users" /><h2 id="crew-title">Crew members</h2><span id="crew-count" class="chip"></span></div>
@@ -34,6 +37,7 @@
     <div class="panel-footer"><span>Dates are calendar dates at base; missing documents are never assumed valid.</span></div>
 </section>
 
+{{-- Add/edit crew member dialog; blank document dates mean "not recorded". --}}
 <dialog id="crew-dialog" class="dialog" aria-labelledby="crew-dialog-title"><form id="crew-form" novalidate>
     <div class="dialog-heading"><div><h2 id="crew-dialog-title" data-dialog-title>Add crew member</h2><p>Ratings constrain which flights a crew member can be assigned to.</p></div><button type="button" class="icon-button" data-close aria-label="Close"><x-icon name="x" /></button></div>
     <div class="form-grid">

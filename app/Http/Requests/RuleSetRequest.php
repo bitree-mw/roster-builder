@@ -4,13 +4,24 @@ namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
 
+/**
+ * Validates the duty rule set. Ranges are sanity limits, not regulatory values.
+ */
 class RuleSetRequest extends FormRequest
 {
+    /**
+     * Schedulers only (crew control can read but not change rules).
+     */
     public function authorize(): bool
     {
         return $this->user()?->can('manage-rules') ?? false;
     }
 
+    /**
+     * The base offset must be a whole quarter hour.
+     *
+     * @return array<string, array<int, string>>
+     */
     public function rules(): array
     {
         return [

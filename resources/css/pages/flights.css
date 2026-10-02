@@ -1,12 +1,19 @@
+/*
+ * Flights & routes page (pages/flights.blade.php).
+ */
+
+/* Pattern table: clickable rows; disabled patterns are dimmed except their status switch and actions. */
 .flight-table tbody tr { cursor: pointer; }
 .flight-table tbody tr[data-active="false"] td:not(:nth-last-child(-n+2)) { opacity: .55; }
 .route-chain { display: flex; flex-wrap: wrap; align-items: center; gap: .25rem; font-family: var(--font-mono); font-size: .75rem; font-weight: 700; }
 .route-chain .icon { width: .75rem; height: .75rem; color: var(--color-muted); }
 .route-meta { display: block; flex-basis: 100%; margin-top: .125rem; color: var(--color-muted); font-size: .6875rem; font-family: var(--font-sans); font-weight: 400; }
+/* Seven-day operating strip (Mon..Sun). */
 .week-strip { display: inline-grid; grid-template-columns: repeat(7, 1.25rem); gap: 2px; }
 .week-strip span { display: grid; place-items: center; height: 1.25rem; border-radius: 2px; background: var(--color-surface-sunken); color: var(--color-subtle); font-family: var(--font-mono); font-size: .625rem; font-weight: 700; }
 .week-strip span[data-on="true"] { background: var(--color-brand); color: var(--color-brand-contrast); }
 .aircraft-cell { display: flex; flex-direction: column; align-items: flex-start; gap: .25rem; }
+/* Rotation breakdown side panel: summary boxes and legs drawn as flight strips. */
 .detail-head { display: flex; align-items: flex-start; justify-content: space-between; gap: .75rem; margin-bottom: 1rem; }
 .detail-code { font-family: var(--font-mono); font-size: 1.5rem; font-weight: 700; letter-spacing: .02em; color: var(--color-ink-strong); }
 .detail-summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: .5rem; margin-bottom: 1rem; }
@@ -19,6 +26,7 @@
 .leg-times { text-align: right; font-family: var(--font-mono); font-size: .8125rem; font-weight: 600; }
 .leg-block { display: block; color: var(--color-info); font-size: .6875rem; }
 .detail-warning { margin-bottom: 1rem; }
+/* Create/edit dialog and its leg editor rows. */
 .legs-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: .375rem; }
 #flight-dialog { width: min(100% - 2rem, 60rem); }
 #leg-editor { display: flex; flex-direction: column; gap: .5rem; margin-top: .75rem; }
@@ -28,5 +36,6 @@
     .leg-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .leg-number { grid-column: 1 / -1; }
 }
+/* Flight code button (selects the row) and a minimum width for the route column. */
 .flight-table button.code-tag { min-height: 36px; padding: 0; border: 0; background: none; color: var(--color-ink-strong); }
 .flight-table td:nth-child(3) { min-width: 12rem; }

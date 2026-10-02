@@ -5,8 +5,15 @@ namespace App\Http\Resources;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
+/**
+ * JSON shape of a roster period. Trips and assignments are included only when loaded, already filtered by
+ * the controller for crew users.
+ */
 class RosterPeriodResource extends JsonResource
 {
+    /**
+     * @return array<string, mixed>
+     */
     public function toArray(Request $request): array
     {
         return ['id' => $this->id,

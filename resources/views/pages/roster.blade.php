@@ -1,3 +1,4 @@
+{{-- Roster workspace shell. Data and interactions: resources/js/pages/roster.js. Crew see only their own published roster. --}}
 @extends('layouts.app')
 @section('content')
 @php($staff = auth()->user()->isStaff())
@@ -8,6 +9,7 @@
 </x-page-heading>
 
 @if($staff)
+{{-- Staff readiness KPIs and "needs attention" list. --}}
 <div class="kpi-grid">
     <x-kpi label="Active crew" icon="users" value="crew.active" meta="CPT · FO · CC" :href="route('crew')" />
     <x-kpi label="Flights enabled" icon="route" value="flights.enabled" tone="success" meta="Patterns available for planning" :href="route('flights')" />
@@ -22,6 +24,7 @@
 </section>
 @endif
 
+{{-- Monthly roster period with month navigation (draft creation is staff-only). --}}
 <section class="panel" aria-labelledby="period-title">
     <div class="panel-heading">
         <div class="period-nav">
@@ -36,6 +39,7 @@
 </section>
 
 @if($staff)
+{{-- Quick links to the setup pages. --}}
 <div class="setup-links">
     <a href="{{ route('flights') }}" class="link-card"><span class="link-card-icon"><x-icon name="route" /></span><h2>Flights &amp; routes</h2><p>Operating days, connected legs, night stops and enabling or disabling patterns.</p></a>
     <a href="{{ route('aircraft') }}" class="link-card"><span class="link-card-icon"><x-icon name="plane" /></span><h2>Fleet</h2><p>Airframes by registration and whether each is available, in maintenance, grounded or unavailable.</p></a>

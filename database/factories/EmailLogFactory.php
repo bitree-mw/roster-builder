@@ -10,6 +10,11 @@ use Illuminate\Database\Eloquent\Factories\Factory;
 /** @extends Factory<EmailLog> */
 class EmailLogFactory extends Factory
 {
+    /**
+     * Default attributes for a roster email log entry.
+     *
+     * @return array<string, mixed>
+     */
     public function definition(): array
     {
         return ['crew_member_id' => CrewMember::factory(), 'roster_period_id' => RosterPeriod::factory(), 'status' => 'queued'];

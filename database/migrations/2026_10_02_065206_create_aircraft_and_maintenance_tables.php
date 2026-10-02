@@ -4,6 +4,9 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
+/**
+ * Individual airframes with availability status, and their maintenance records (date- and hour-based due points).
+ */
 return new class extends Migration
 {
     public function up(): void
@@ -19,6 +22,7 @@ return new class extends Migration
             $table->text('notes')->nullable();
             $table->timestamps();
         });
+        // restrictOnDelete: an airframe with maintenance history cannot be deleted, only marked unavailable.
         Schema::create('maintenance_records', function (Blueprint $table) {
             $table->id();
             $table->foreignId('aircraft_id')->constrained('aircraft')->restrictOnDelete();

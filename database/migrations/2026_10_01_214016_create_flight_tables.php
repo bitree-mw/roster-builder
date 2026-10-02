@@ -4,6 +4,9 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
+/**
+ * Flight patterns, their operating weekdays (Monday = 0) and ordered legs with base-local times.
+ */
 return new class extends Migration
 {
     public function up(): void
@@ -20,6 +23,7 @@ return new class extends Migration
             $table->unsignedTinyInteger('weekday');
             $table->primary(['flight_id', 'weekday']);
         });
+        // Legs are ordered by trip day (1-4) and sequence within the day.
         Schema::create('flight_legs', function (Blueprint $table) {
             $table->id();
             $table->foreignId('flight_id')->constrained()->cascadeOnDelete();

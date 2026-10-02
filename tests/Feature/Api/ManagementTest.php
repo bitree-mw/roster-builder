@@ -12,6 +12,9 @@ use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
+/**
+ * Crew replacement updates and deletion guards, and duty rule changes that preserve existing period snapshots.
+ */
 class ManagementTest extends TestCase
 {
     use LazilyRefreshDatabase;

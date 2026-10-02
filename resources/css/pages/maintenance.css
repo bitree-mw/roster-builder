@@ -1,3 +1,6 @@
+/*
+ * Maintenance page (pages/maintenance.blade.php): due alerts list and the maintenance log.
+ */
 .record-filter { min-width: 220px; }
 .record-filter select { min-height: 38px; }
 #alert-list .empty-state .icon { color: var(--color-success); }
@@ -5,6 +8,7 @@
 .next-due { display: flex; flex-direction: column; gap: .25rem; }
 #record-rows td:first-child { font-family: var(--font-mono); white-space: nowrap; }
 #record-dialog { width: min(100% - 2rem, 46rem); }
+/* On phones, alert actions drop below the text at full width. */
 @media (max-width: 640px) {
     .alert-row { flex-wrap: wrap; }
     .alert-row .button { width: 100%; }

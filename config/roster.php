@@ -1,6 +1,7 @@
 <?php
 
 return [
+    /** Optional local demo scheduler created by DemoSeeder; both must be set, and never in production. */
     'demo_email' => env('DEMO_EMAIL'),
     'demo_password' => env('DEMO_PASSWORD'),
 

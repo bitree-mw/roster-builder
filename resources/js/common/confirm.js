@@ -1,8 +1,10 @@
 import { element, icon } from './ui';
 
+// One shared dialog, built on first use; resolver settles the pending confirmAction() promise.
 let dialog = null;
 let resolver = null;
 
+/** Build the confirmation dialog once. Buttons use form method="dialog", so closing sets returnValue. */
 function build() {
     dialog = element('dialog', null, 'dialog confirm-dialog');
     dialog.setAttribute('aria-labelledby', 'confirm-title');

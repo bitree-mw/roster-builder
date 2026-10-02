@@ -12,6 +12,10 @@ use App\Http\Controllers\Api\V1\RosterPeriodController;
 use App\Http\Controllers\Api\V1\RuleSetController;
 use Illuminate\Support\Facades\Route;
 
+/*
+ * Versioned JSON API used by the Blade client (Sanctum session cookies) and scoped integration tokens.
+ * Authorization happens in Form Requests and controllers via gates (see AppServiceProvider).
+ */
 Route::prefix('v1')->name('api.v1.')->middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
     Route::get('me', [ProfileController::class, 'show'])->name('me');
     Route::get('my-profile', [ProfileController::class, 'crew'])->name('my-profile');

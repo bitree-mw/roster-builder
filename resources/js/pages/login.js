@@ -1,3 +1,7 @@
+/**
+ * Sign-in page: email-or-username login with show/hide password, Caps Lock hint and inline errors.
+ * The welcome message is passed to the next page as a pop-up.
+ */
 import { api, csrf } from '../common/api';
 import { flash } from '../common/toast';
 import { showError, status } from '../common/ui';
@@ -8,6 +12,7 @@ const password = form.elements.password;
 const toggle = document.querySelector('#toggle-password');
 const submit = form.querySelector('[type="submit"]');
 
+// Show/hide password toggle (keeps focus in the field).
 toggle.addEventListener('click', () => {
     const visible = password.type === 'password';
     password.type = visible ? 'text' : 'password';
@@ -18,16 +23,19 @@ toggle.addEventListener('click', () => {
     password.focus();
 });
 
+// Warn when Caps Lock is on while typing the password.
 for (const type of ['keydown', 'keyup']) {
     password.addEventListener(type, event => {
         if (typeof event.getModifierState === 'function') document.querySelector('#caps-warning').hidden = !event.getModifierState('CapsLock');
     });
 }
 
+/** Flag the named fields as invalid for assistive technology and styling. */
 function markInvalid(fields) {
     for (const input of [form.elements.login, password]) input.setAttribute('aria-invalid', String(fields.includes(input.name)));
 }
 
+// Validate locally, fetch the CSRF cookie, sign in, then open the roster. Errors stay inline on this page.
 form.addEventListener('submit', async event => {
     event.preventDefault();
     const missing = [form.elements.login, password].filter(input => !input.value.trim() || !input.checkValidity()).map(input => input.name);

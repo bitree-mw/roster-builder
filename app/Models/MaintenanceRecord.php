@@ -25,6 +25,11 @@ class MaintenanceRecord extends Model
         'other' => 'Other',
     ];
 
+    /**
+     * Calendar dates use LocalDate (no time component); hours are fractional.
+     *
+     * @return array<string, string>
+     */
     protected function casts(): array
     {
         return [
@@ -35,11 +40,17 @@ class MaintenanceRecord extends Model
         ];
     }
 
+    /**
+     * The airframe the work was done on.
+     */
     public function aircraft(): BelongsTo
     {
         return $this->belongsTo(Aircraft::class);
     }
 
+    /**
+     * The user who recorded the work (set by MaintenanceService, never from the request).
+     */
     public function recorder(): BelongsTo
     {
         return $this->belongsTo(User::class, 'recorded_by');

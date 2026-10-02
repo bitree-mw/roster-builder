@@ -22,18 +22,30 @@ class Aircraft extends Model
         'unavailable' => 'Unavailable',
     ];
 
+    /** "aircraft" is its own plural, so the table name is set explicitly. */
     protected $table = 'aircraft';
 
+    /**
+     * Hours are fractional (one decimal place); status changes are recorded as immutable instants.
+     *
+     * @return array<string, string>
+     */
     protected function casts(): array
     {
         return ['airframe_hours' => 'float', 'status_changed_at' => 'immutable_datetime'];
     }
 
+    /**
+     * The type (e.g. Q400) whose flights this airframe can operate.
+     */
     public function aircraftType(): BelongsTo
     {
         return $this->belongsTo(AircraftType::class);
     }
 
+    /**
+     * Every check or service recorded for this airframe; the newest of each kind drives due alerts.
+     */
     public function maintenanceRecords(): HasMany
     {
         return $this->hasMany(MaintenanceRecord::class);

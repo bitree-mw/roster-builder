@@ -4,6 +4,9 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
+/**
+ * Access roles and crew links on users, the audit log, and roster email delivery logs.
+ */
 return new class extends Migration
 {
     public function up(): void
