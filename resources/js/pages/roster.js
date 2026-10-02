@@ -1,6 +1,6 @@
 import { api } from '../common/api';
 import { overview } from '../common/overview';
-import { busy, chip, dueSummary, element, emptyState, formatDate, icon, plural, setKpi, setKpiTone, showError, status } from '../common/ui';
+import { busy, chip, dueSummary, element, emptyState, formatDate, icon, plural, setKpi, setKpiTone, showError } from '../common/ui';
 
 const staff = ['scheduler', 'crew_control'].includes(document.body.dataset.role);
 const month = document.querySelector('#month');
@@ -48,7 +48,7 @@ function renderTrips(period) {
 }
 
 async function refresh() {
-    updateStepButtons(); status('');
+    updateStepButtons();
     content.setAttribute('aria-busy', 'true'); state.textContent = 'Loading'; delete state.dataset.tone;
     const { data } = await api('/api/v1/roster-periods?month=' + month.value); const period = data[0];
     document.querySelector('#period-title').textContent = month.selectedOptions[0].textContent;
@@ -101,7 +101,7 @@ document.querySelector('#previous-month').addEventListener('click', () => step(-
 document.querySelector('#next-month').addEventListener('click', () => step(1));
 create?.addEventListener('click', async event => {
     await busy(event.currentTarget, async () => {
-        try { await api('/api/v1/roster-periods', { method: 'POST', body: { month: month.value } }); await refresh(); status('Draft period created with a snapshot of the current duty rules.'); }
+        try { await api('/api/v1/roster-periods', { method: 'POST', body: { month: month.value } }); await refresh(); }
         catch (error) { showError(error); }
     });
 });

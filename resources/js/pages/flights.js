@@ -1,7 +1,7 @@
 import { api, allPages } from '../common/api';
 import { editor } from '../common/editor';
 import { refreshShell } from '../common/shell';
-import { actions, cell, chip, element, emptyRow, formatMinutes, icon, iconButton, options, plural, segmented, setKpi, showError, status } from '../common/ui';
+import { actions, cell, chip, element, emptyRow, formatMinutes, icon, iconButton, options, plural, segmented, setKpi, showError } from '../common/ui';
 
 const form = document.querySelector('#flight-form');
 const tbody = document.querySelector('#flight-rows');
@@ -79,7 +79,6 @@ function statusSwitch(record) {
         try {
             const { data } = await api(`/api/v1/flights/${record.id}/status`, { method: 'PATCH', body: { active: !record.active } });
             Object.assign(record, data); render(); refreshShell({ refresh: true }).catch(() => {});
-            status(`${data.code} ${data.active ? 'enabled — it will be included in planning.' : 'disabled — it stays on file but will not be planned.'}`);
         } catch (error) { showError(error); button.disabled = false; }
     });
     return button;

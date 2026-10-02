@@ -8,11 +8,12 @@ use App\Http\Requests\RosterQueryRequest;
 use App\Http\Resources\RosterPeriodResource;
 use App\Models\RosterPeriod;
 use App\Services\RosterPeriodService;
-use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use App\Support\Api\ApiResponse;
+use Illuminate\Http\JsonResponse;
 
 class RosterPeriodController extends Controller
 {
-    public function index(RosterQueryRequest $request): AnonymousResourceCollection
+    public function index(RosterQueryRequest $request): JsonResponse
     {
         $user = $request->user();
         $query = RosterPeriod::query()->when($request->validated('month'), fn ($query, $month) => $query->where('month', $month.'-01'))
@@ -29,11 +30,16 @@ class RosterPeriodController extends Controller
                 }]);
             }])->orderByDesc('month')->paginate(12);
 
-        return RosterPeriodResource::collection($query);
+        return ApiResponse::resource(RosterPeriodResource::collection($query));
     }
 
-    public function store(RosterPeriodRequest $request, RosterPeriodService $service): RosterPeriodResource
+    public function store(RosterPeriodRequest $request, RosterPeriodService $service): JsonResponse
     {
-        return new RosterPeriodResource($service->create($request->validated('month'), $request->user()));
+        $period = $service->create($request->validated('month'), $request->user());
+        $label = ['label' => $period->month->format('F Y')];
+
+        return $period->wasRecentlyCreated
+            ? ApiResponse::created(new RosterPeriodResource($period), 'roster_period.created', $label)
+            : ApiResponse::resource(new RosterPeriodResource($period), 'roster_period.exists', $label);
     }
 }

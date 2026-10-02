@@ -1,4 +1,5 @@
 import { api, csrf } from '../common/api';
+import { flash } from '../common/toast';
 import { showError, status } from '../common/ui';
 
 const form = document.querySelector('#login-form');
@@ -42,7 +43,8 @@ form.addEventListener('submit', async event => {
     status('', false, target);
     try {
         await csrf();
-        await api('/login', { method: 'POST', body: { login: form.elements.login.value.trim(), password: password.value } });
+        const response = await api('/login', { method: 'POST', notify: false, body: { login: form.elements.login.value.trim(), password: password.value } });
+        flash(response.message, { type: 'success', title: 'Signed in' });
         submit.querySelector('[data-submit-label]').textContent = 'Opening workspace…';
         window.location.assign('/roster');
     } catch (error) {

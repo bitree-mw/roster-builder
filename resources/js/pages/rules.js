@@ -16,7 +16,7 @@ form.addEventListener('submit', async event => {
     await busy(form.querySelector('[type="submit"]'), async () => {
         const body = Object.fromEntries(inputs.map(input => [input.name, input.type === 'number' ? Number(input.value) : input.value]));
         for (const input of inputs) input.removeAttribute('aria-invalid');
-        try { await api('/api/v1/rules', { method: 'PUT', body }); status('Duty rules saved. Existing period snapshots are unchanged.', false, formStatus); }
+        try { status('', false, formStatus); await api('/api/v1/rules', { method: 'PUT', body }); }
         catch (error) {
             showError(error, formStatus);
             for (const field of Object.keys(error.errors || {})) form.elements[field]?.setAttribute('aria-invalid', 'true');

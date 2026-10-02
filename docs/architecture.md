@@ -25,7 +25,8 @@ The initial setup includes roster periods and read contracts, not an approved au
 resources/css/app.css imports Tailwind and common tokens/components.
 resources/css/common/{tokens,components}.css own colors and reusable styles.
 resources/css/pages/*.css and resources/js/pages/*.js are page-scoped Vite entries.
-resources/js/common/{api,ui}.js own CSRF-aware fetch and safe DOM helpers.
+resources/js/common/{api,ui}.js own CSRF-aware fetch and safe DOM helpers; toast.js shows pop-up notifications (api() raises them automatically from the server message on every change and on errors) and confirm.js replaces window.confirm.
+app/Support/Api owns the JSON response envelope and API exception rendering; wording and codes live in config/api.php.
 No inline scripts/styles, hardcoded colors in templates/JS, third-party CDNs or frontend business rules. Use textContent for API text, accessible forms, keyboard focus and visible error/empty/loading states.
 
 ## Verification

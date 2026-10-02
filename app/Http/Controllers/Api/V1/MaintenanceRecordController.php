@@ -9,51 +9,62 @@ use App\Http\Resources\MaintenanceAlertResource;
 use App\Http\Resources\MaintenanceRecordResource;
 use App\Models\MaintenanceRecord;
 use App\Services\MaintenanceService;
+use App\Support\Api\ApiResponse;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
-use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Gate;
 
 class MaintenanceRecordController extends Controller
 {
     public function __construct(private MaintenanceService $service) {}
 
-    public function index(MaintenanceQueryRequest $request): AnonymousResourceCollection
+    public function index(MaintenanceQueryRequest $request): JsonResponse
     {
-        return MaintenanceRecordResource::collection(MaintenanceRecord::with('aircraft.aircraftType', 'recorder')
+        return ApiResponse::resource(MaintenanceRecordResource::collection(MaintenanceRecord::with('aircraft.aircraftType', 'recorder')
             ->when($request->validated('aircraft_id'), fn ($query, $id) => $query->where('aircraft_id', $id))
-            ->orderByDesc('performed_on')->orderByDesc('id')->paginate(100));
+            ->orderByDesc('performed_on')->orderByDesc('id')->paginate(100)));
     }
 
-    public function alerts(): AnonymousResourceCollection
+    public function alerts(): JsonResponse
     {
         Gate::authorize('read-operations');
 
-        return MaintenanceAlertResource::collection($this->service->alerts());
+        return ApiResponse::resource(MaintenanceAlertResource::collection($this->service->alerts()));
     }
 
-    public function show(MaintenanceRecord $maintenanceRecord): MaintenanceRecordResource
+    public function show(MaintenanceRecord $maintenanceRecord): JsonResponse
     {
         Gate::authorize('read-operations');
 
-        return new MaintenanceRecordResource($maintenanceRecord->load('aircraft.aircraftType', 'recorder'));
+        return ApiResponse::resource(new MaintenanceRecordResource($maintenanceRecord->load('aircraft.aircraftType', 'recorder')));
     }
 
-    public function store(MaintenanceRecordRequest $request): MaintenanceRecordResource
+    public function store(MaintenanceRecordRequest $request): JsonResponse
     {
-        return new MaintenanceRecordResource($this->service->save($request->validated(), $request->user()));
+        $record = $this->service->save($request->validated(), $request->user());
+
+        return ApiResponse::created(new MaintenanceRecordResource($record), 'maintenance.created', $this->labels($record));
     }
 
-    public function update(MaintenanceRecordRequest $request, MaintenanceRecord $maintenanceRecord): MaintenanceRecordResource
+    public function update(MaintenanceRecordRequest $request, MaintenanceRecord $maintenanceRecord): JsonResponse
     {
-        return new MaintenanceRecordResource($this->service->save($request->validated(), $request->user(), $maintenanceRecord));
+        $record = $this->service->save($request->validated(), $request->user(), $maintenanceRecord);
+
+        return ApiResponse::resource(new MaintenanceRecordResource($record), 'maintenance.updated', $this->labels($record));
     }
 
-    public function destroy(Request $request, MaintenanceRecord $maintenanceRecord): Response
+    public function destroy(Request $request, MaintenanceRecord $maintenanceRecord): JsonResponse
     {
         Gate::authorize('manage-operations');
+        $labels = $this->labels($maintenanceRecord->load('aircraft'));
         $this->service->delete($maintenanceRecord, $request->user());
 
-        return response()->noContent();
+        return ApiResponse::success('maintenance.deleted', $labels);
+    }
+
+    /** @return array{label: string, aircraft: string} */
+    private function labels(MaintenanceRecord $record): array
+    {
+        return ['label' => $record->title, 'aircraft' => $record->aircraft->registration];
     }
 }

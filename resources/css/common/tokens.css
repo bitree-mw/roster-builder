@@ -65,6 +65,7 @@
     --focus-ring: #2a6f97;
     --dialog-shade: rgb(22 35 58 / 0.55);
     --lift-shadow: 0 2px 0 rgb(22 35 58 / 0.15);
+    --toast-shadow: 0 2px 0 rgb(22 35 58 / 0.12), 0 8px 24px rgb(22 35 58 / 0.18);
     --hero-grid: rgb(255 255 255 / 0.06);
     --hero-ink-muted: #b6c3d6;
     --hero-panel: rgb(255 255 255 / 0.06);

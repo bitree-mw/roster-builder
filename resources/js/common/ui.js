@@ -1,3 +1,5 @@
+import { toast } from './toast';
+
 const SVG = 'http://www.w3.org/2000/svg';
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -32,14 +34,22 @@ export function iconButton(iconName, label, onClick, tone) {
     button.append(icon(iconName)); button.addEventListener('click', onClick);
     return button;
 }
-export function status(message = '', error = false, target = document.querySelector('#status')) {
-    if (!target) return;
+/**
+ * Report an outcome. With a target (a [data-form-status] element inside a form or dialog) the message is shown
+ * inline next to the fields; without one it appears as a pop-up notification.
+ */
+export function status(message = '', error = false, target = null) {
+    if (!target) { if (message) toast(message, { type: error ? 'error' : 'success' }); return; }
     target.textContent = message; target.dataset.error = String(error);
 }
+/** Show an API or client error. Pop-ups already raised by api() are not repeated. */
 export function showError(error, target) {
     const messages = Object.values(error.errors || {}).flat();
-    status(messages.length ? messages.join(' ') : error.message || 'Unable to complete this action.', true, target);
+    const text = messages.length ? messages.join(' ') : error.message || 'Unable to complete this action.';
+    if (!target) { if (!error.notified) toast(text, { type: 'error' }); return; }
+    status(text, true, target);
 }
+export { toast };
 export async function busy(button, action) {
     button.disabled = true;
     try { await action(); } finally { button.disabled = false; }

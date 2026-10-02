@@ -43,7 +43,7 @@ class FoundationTest extends TestCase
             ->assertCreated()->assertJsonPath('data.code', 'Q400')->json('data.id');
         $this->putJson('/api/v1/aircraft-types/'.$id, ['code' => 'Q400', 'cabin_crew_required' => 3, 'palette' => 'gold'])->assertOk()->assertJsonPath('data.cabin_crew_required', 3);
         $this->assertDatabaseHas('aircraft_types', ['id' => $id, 'cabin_crew_required' => 3]);
-        $this->deleteJson('/api/v1/aircraft-types/'.$id)->assertNoContent();
+        $this->deleteJson('/api/v1/aircraft-types/'.$id)->assertOk()->assertJsonPath('message', 'Aircraft type Q400 removed.');
         $this->assertDatabaseMissing('aircraft_types', ['id' => $id]);
         $this->assertDatabaseCount('audit_logs', 3);
     }

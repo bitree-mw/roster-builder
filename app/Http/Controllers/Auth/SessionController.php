@@ -6,20 +6,23 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\LoginRequest;
 use App\Http\Resources\UserResource;
 use App\Services\SessionService;
+use App\Support\Api\ApiResponse;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Http\Response;
 
 class SessionController extends Controller
 {
-    public function store(LoginRequest $request, SessionService $service): UserResource
+    public function store(LoginRequest $request, SessionService $service): JsonResponse
     {
-        return new UserResource($service->login($request->validated(), $request->session()));
+        $user = $service->login($request->validated(), $request->session());
+
+        return ApiResponse::resource(new UserResource($user), 'session.login', ['label' => $user->name]);
     }
 
-    public function destroy(Request $request, SessionService $service): Response
+    public function destroy(Request $request, SessionService $service): JsonResponse
     {
         $service->logout($request->session());
 
-        return response()->noContent();
+        return ApiResponse::success('session.logout');
     }
 }

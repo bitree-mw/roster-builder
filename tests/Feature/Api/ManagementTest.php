@@ -30,7 +30,7 @@ class ManagementTest extends TestCase
         $this->assertDatabaseCount('crew_documents', 0);
         $this->getJson('/api/v1/crew-members?rank=CPT')->assertJsonCount(0, 'data');
         $this->getJson('/api/v1/crew-members?rank=CC&base='.$base->code)->assertJsonCount(1, 'data');
-        $this->deleteJson('/api/v1/crew-members/'.$crew->id)->assertNoContent();
+        $this->deleteJson('/api/v1/crew-members/'.$crew->id)->assertOk()->assertJsonPath('message', 'Cabin Example removed from the crew directory.');
         $this->assertModelMissing($crew);
     }
 

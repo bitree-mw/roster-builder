@@ -16,7 +16,7 @@ class SessionTest extends TestCase
         $this->postJson('/login', ['login' => $user->email, 'password' => 'test-password-123'])
             ->assertOk()->assertJsonPath('data.role', 'scheduler')->assertJsonMissingPath('data.password');
         $this->assertAuthenticatedAs($user);
-        $this->postJson('/logout')->assertNoContent();
+        $this->postJson('/logout')->assertOk()->assertJsonPath('message', 'You have signed out.');
         $this->assertGuest();
     }
 

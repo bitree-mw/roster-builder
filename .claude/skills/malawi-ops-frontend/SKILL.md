@@ -21,7 +21,7 @@ Read `docs/architecture.md` and the project rules in `CLAUDE.md` first. They ove
 5. **API text goes in with `textContent`** (use `element()`/`chip()` helpers). Never `innerHTML` with data.
 6. **Times:** pattern times are base-local; instants are UTC. Format dates with `formatDate()` (no browser timezone) and instants with `formatInstant()` (explicit UTC).
 7. **Be honest.** No fake Build/Publish/Export/Reset buttons, no "FTL compliant" claims. Unimplemented features get an explanatory empty state.
-8. Every page has **loading, empty and error states** and a polite live region (`#status`).
+8. Every page has **loading, empty and error states**; outcomes are announced through the pop-up region (it is an aria-live region).
 
 ## File layout for a page `foo`
 
@@ -37,7 +37,7 @@ Read `docs/architecture.md` and the project rules in `CLAUDE.md` first. They ove
 
 ## Blade components
 
-- `<x-page-heading eyebrow heading description>` + slot for action buttons. It also renders `#status`.
+- `<x-page-heading eyebrow heading description>` + slot for action buttons. Page-level outcomes are pop-ups (toast.js), not inline banners.
 - `<x-kpi label icon value="group.key" meta tone href>` — skeleton until JS calls `setKpi('group.key', value, meta)`; `setKpiTone()` changes the accent.
 - `<x-icon name="plane" class="icon-sm" />` — sprite icons: plane, calendar, users, route, wrench, shield, alert, plus, pencil, trash, copy, x, check, logout, clock, sliders, grid, eye, eye-off, lock, mail, chevron-left/right, search, bell, clipboard, id-card, power, ban, gauge, moon, arrow-right. Add new symbols to `components/icon-sprite.blade.php` only.
 
@@ -46,6 +46,7 @@ Read `docs/architecture.md` and the project rules in `CLAUDE.md` first. They ove
 - Frame: `.topbar`, `.tabs/.tab/.tab-count`, `.workspace`, `.statusbar`, `.alert-pill`, `.user-chip`, `.avatar`.
 - Surfaces: `.panel` + `.panel-heading/.panel-title/.panel-body/.panel-footer`, `.split` (content + 380px side panel), `.sticky-panel`, `.link-card`.
 - Data: `table` (styled in base), `.table-wrap`, `.mono`, `.label-caps`, `.eyebrow`, `.detail-list`, `.strip` (buff flight strip with `--accent` bar; set `accent-{palette}`), `.code-tag`.
+- Feedback: `.toast-region`, `.toast[data-type]`, `.confirm-dialog[data-tone]` (built by toast.js / confirm.js — do not hand-write them).
 - State: `.chip[data-tone=success|warning|danger|info|brand]` (+`.chip-dot`), `.palette-{forest|gold|sky|plum|coral}`, `.alert-row[data-tone=danger]` with `.alert-row-title/.alert-row-meta/.alert-row-icon`, `.empty-state`, `.loading-row`, `.loading-block`, `.skeleton`.
 - Controls: `.button` (primary navy, uppercase mono), `.button-secondary`, `.button-quiet`, `.button-danger`, `.button-sm`, `.icon-button[data-tone=danger]`, `.segmented` (buttons with `data-value` + `aria-pressed`), `.switch[role=switch][aria-checked]`, `.search`, `.toolbar`.
 - Forms/dialogs: native `<dialog class="dialog">` with `.dialog-heading`, `.form-grid` (`.span-2`), `.field-hint`, `.form-actions`, `.check-label`, `.option-cards/.option-card` (radio cards), `.day-picker`, `[data-form-status]`, `[data-close]`, `[data-close-secondary]`.
@@ -54,8 +55,10 @@ Semantic tones: available/valid/enabled → `success`; due soon/maintenance → 
 
 ## JavaScript helpers (`resources/js/common`)
 
-- `api.js`: `api(path, {method, body})` (CSRF-aware, throws `ApiError` with `.errors`), `allPages(path)`, `csrf()`.
-- `ui.js`: `element`, `icon`, `chip`, `iconButton`, `cell`, `actions(row, onEdit, onDelete, extraButtons)`, `emptyRow`, `loadingRow`, `emptyState`, `options(select, rows, valueKey, labelKeyOrFn)`, `segmented`, `status`, `showError`, `busy`, `setKpi`, `setKpiTone`, `formatDate`, `formatInstant`, `formatMinutes`, `formatNumber`, `plural`, `dueSummary`, tone maps `aircraftStatusTone`/`dueTone`.
+- `api.js`: `api(path, {method, body, notify})` (CSRF-aware, throws `ApiError` with `.errors`/`.code`/`.status`), `allPages(path)`, `csrf()`. Responses follow `app/Support/Api/ApiResponse`: `{success, message, data, errors, code}`. `notify` defaults to true for POST/PUT/PATCH/DELETE: the server's configured `message` pops up on success and the error message on failure. Do **not** add client-side success messages for API changes — edit `config/api.php` wording instead. Pass `notify: false` only when the page presents the outcome itself (e.g. sign-in).
+- `toast.js`: `toast(message, {type: success|info|warning|error, title})` and `flash(message, options)` (shows on the next page load, e.g. after sign-in/out). Toasts live in a manual popover so they appear above modal dialogs; they pause on hover/focus and close with Escape.
+- `confirm.js`: `confirmAction({title, message, confirmLabel, tone})` → `Promise<boolean>`. Use instead of `window.confirm`; destructive confirmations focus Cancel.
+- `ui.js`: `status(message, error, target)` shows inline text in a `[data-form-status]` target, or a pop-up when no target is given; `showError(error, target)` never repeats a pop-up already raised by `api()`. Also `element`, `icon`, `chip`, `iconButton`, `cell`, `actions(row, onEdit, onDelete, extraButtons)`, `emptyRow`, `loadingRow`, `emptyState`, `options(select, rows, valueKey, labelKeyOrFn)`, `segmented`, `status`, `showError`, `busy`, `setKpi`, `setKpiTone`, `formatDate`, `formatInstant`, `formatMinutes`, `formatNumber`, `plural`, `dueSummary`, tone maps `aircraftStatusTone`/`dueTone`.
 - `editor.js`: `editor({form, dialog, endpoint, read, fill, refresh, label})` → `{ open(record, {copy}), remove(record) }` handles PUT/POST, validation messages and `aria-invalid`.
 - `overview.js`/`shell.js`: memoised `/api/v1/overview`; call `refreshShell({ refresh: true })` after mutations so nav badges and header alert pills stay current.
 

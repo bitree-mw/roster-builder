@@ -12,9 +12,9 @@
             <p>Plan monthly crew duties, keep flight patterns current, and see which aircraft are available, in maintenance or grounded before you schedule.</p>
         </div>
         <ul class="login-features" aria-label="What you can do">
-            <li><x-icon name="route" /><span><strong>Flights &amp; routes</strong>Connected legs, night stops and enable or disable patterns.</span></li>
-            <li><x-icon name="plane" /><span><strong>Fleet status</strong>Available, in maintenance, grounded (AOG) or unavailable.</span></li>
-            <li><x-icon name="wrench" /><span><strong>Maintenance alerts</strong>Checks due by date or airframe hours, flagged early.</span></li>
+            <li><x-icon name="route" /><span><strong>Flights &amp; routes</strong><span class="login-feature-text">Connected legs, night stops and enable or disable patterns.</span></span></li>
+            <li><x-icon name="plane" /><span><strong>Fleet status</strong><span class="login-feature-text">Available, in maintenance, grounded (AOG) or unavailable.</span></span></li>
+            <li><x-icon name="wrench" /><span><strong>Maintenance alerts</strong><span class="login-feature-text">Checks due by date or airframe hours, flagged early.</span></span></li>
         </ul>
         <div class="login-strip" aria-hidden="true">
             <span class="login-strip-code">LLW</span>

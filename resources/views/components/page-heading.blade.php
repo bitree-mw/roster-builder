@@ -9,4 +9,3 @@
     <div class="page-actions">{{ $slot }}</div>
     @endif
 </div>
-<div id="status" class="status" role="status" aria-live="polite"></div>

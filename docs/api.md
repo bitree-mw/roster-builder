@@ -2,10 +2,24 @@
 
 Base path: /api/v1. JSON request/response, Accept: application/json. Authentication: Sanctum session cookie for Blade; scoped bearer tokens for controlled integrations. Laravel Resources wrap records in data; collections include links/meta pagination. Maximum page size is fixed at 100 for management data and 12 roster periods.
 
+## Response envelope
+All JSON responses (API and the JSON session endpoints) are built by app/Support/Api/ApiResponse and app/Support/Api/ApiExceptionRenderer. Wording, codes and envelope options are customised in config/api.php, not in controllers.
+
+```json
+{"success": true, "message": "Flight LB1 disabled — it stays on file but will not be planned.", "data": {...}}
+{"success": false, "message": "The requested aircraft could not be found. It may have been removed.", "code": "not_found"}
+{"success": false, "message": "Give a reason when an aircraft is not available.", "code": "validation_failed", "errors": {"reason": ["..."]}}
+```
+
+- Changes (POST/PUT/PATCH/DELETE) include a user-facing message; reads omit it. Deletes and logout return 200 with a message instead of 204.
+- Error codes: validation_failed (422), unauthenticated (401), forbidden (403), not_found (404), method_not_allowed (405), conflict (409), session_expired (419), too_many_requests (429, with Retry-After), server_error (500), unavailable (503).
+- 500 responses never include exception details unless both APP_DEBUG and API_EXPOSE_DEBUG are true, in which case a debug block is added.
+- Browser page requests (non-JSON) keep Laravel's normal HTML error pages.
+
 ## Session
 - GET /sanctum/csrf-cookie — establish CSRF cookie.
 - POST /login — {"login":"admin or user@example.com","password":"…"}; login accepts an email address or a username (case-insensitive; usernames cannot contain @). Web middleware, throttled per login+IP, JSON UserResource. Validation errors are keyed "login".
-- POST /logout — invalidate browser session; CSRF required.
+- POST /logout — invalidate browser session; CSRF required. Returns 200 {"success": true, "message": "You have signed out."}.
 - GET /api/v1/me — current account safe fields.
 - GET /api/v1/my-profile — own linked crew profile, requires roster:read.
 

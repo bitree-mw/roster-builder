@@ -49,8 +49,8 @@ statusForm.addEventListener('submit', async event => {
     event.preventDefault();
     await busy(statusForm.querySelector('[type="submit"]'), async () => {
         try {
-            const { data } = await api(`/api/v1/aircraft/${statusTarget.id}/status`, { method: 'PATCH', body: { status: statusForm.elements.status.value, reason: statusForm.elements.reason.value || null } });
-            statusDialog.close(); await refresh(); status(`${data.registration} is now ${data.status_label.toLowerCase()}.`);
+            await api(`/api/v1/aircraft/${statusTarget.id}/status`, { method: 'PATCH', body: { status: statusForm.elements.status.value, reason: statusForm.elements.reason.value || null } });
+            statusDialog.close(); await refresh();
         } catch (error) { showError(error, statusForm.querySelector('[data-form-status]')); }
     });
 });
