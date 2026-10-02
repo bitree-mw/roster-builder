@@ -1,0 +1,37 @@
+/*
+ * Operations dashboard (pages/dashboard.blade.php). Colours come from tokens.css via var(); no values here.
+ */
+
+/* Roster week cards: last, this, next and the following week. This week gets a navy top rule. */
+.week-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: .75rem; padding: 1.125rem; }
+.week-cards > .loading-block, .week-cards > .empty-state { grid-column: 1 / -1; }
+.week-card { display: flex; flex-direction: column; gap: .75rem; padding: 1rem; border: 1px solid var(--color-line); border-top: 4px solid var(--color-line-strong); border-radius: 6px; background: var(--color-surface); }
+.week-card[data-current="true"] { border-top-color: var(--color-brand); background: var(--color-surface-muted); }
+.week-card[data-state="published"] { border-top-color: var(--color-success); }
+.week-card[data-state="unbuilt"], .week-card[data-state="missing"] { border-top-style: dashed; }
+.week-card .button { align-self: flex-start; margin-top: auto; }
+.week-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: .5rem; }
+.week-card-head > div { display: flex; flex-direction: column; gap: .125rem; }
+.week-card-title { font-family: var(--font-mono); font-size: 1.125rem; color: var(--color-ink-strong); }
+
+/* Conflicts and today's flying side by side; stacked on narrow screens. */
+.dashboard-split { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 1.25rem; align-items: start; }
+.dashboard-list { max-height: 30rem; overflow-y: auto; }
+.dashboard-list .alert-row .chip { flex: none; }
+.dashboard-more { padding: .75rem 1rem; }
+#today-list { display: grid; gap: .5rem; padding: 1rem; }
+#today-list > .empty-state { padding: 2rem 1rem; }
+.today-trip { display: flex; flex-direction: column; gap: .375rem; text-decoration: none; }
+.today-trip:hover { box-shadow: var(--lift-shadow); }
+.today-trip .chip { align-self: flex-start; }
+.today-trip-head { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
+
+.setup-links { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: .75rem; }
+
+@media (max-width: 1100px) {
+    .dashboard-split { grid-template-columns: 1fr; }
+}
+@media (max-width: 760px) {
+    .dashboard-list .alert-row { flex-wrap: wrap; }
+    .dashboard-list .alert-row-text { flex-basis: calc(100% - 2.5rem); }
+}

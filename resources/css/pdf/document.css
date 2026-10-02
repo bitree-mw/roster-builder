@@ -1,0 +1,53 @@
+/*
+ * Stylesheet for PDF documents (rendered by App\Services\PdfService with dompdf, not loaded by Vite).
+ * var(--token) values are substituted from resources/css/common/tokens.css when a PDF is rendered.
+ * Keep to CSS that dompdf supports: tables, block layout, simple borders; no flex or grid.
+ */
+@page { margin: 16mm 12mm 18mm 12mm; }
+body { font-family: "DejaVu Sans", sans-serif; font-size: 8.5pt; color: var(--color-ink); }
+
+/* Document header: logo, title, subtitle and generation time; footer note on every page. */
+.doc-header { width: 100%; border-bottom: 2px solid var(--color-brand); margin-bottom: 8pt; }
+.doc-header td { border: 0; padding: 0 0 6pt 0; vertical-align: bottom; }
+.doc-logo { height: 30pt; }
+.doc-title { font-size: 15pt; font-weight: bold; color: var(--color-ink-strong); }
+.doc-subtitle { font-size: 8.5pt; color: var(--color-muted); }
+.doc-meta { text-align: right; font-size: 7.5pt; color: var(--color-muted); }
+.doc-footer { position: fixed; bottom: -12mm; left: 0; right: 0; font-size: 7pt; color: var(--color-muted); }
+
+/* Summary figures above a table. */
+.summary { width: 100%; margin-bottom: 8pt; border-collapse: separate; border-spacing: 4pt 0; }
+.summary td { border: 1px solid var(--color-line); border-left: 3pt solid var(--color-brand); padding: 4pt 6pt; background: var(--color-surface-muted); }
+.summary .label { display: block; font-size: 6.5pt; text-transform: uppercase; letter-spacing: .5pt; color: var(--color-muted); }
+.summary .value { display: block; font-size: 12pt; font-weight: bold; color: var(--color-ink-strong); }
+
+/* Data tables; the header row repeats on continuation pages. */
+table.data { width: 100%; border-collapse: collapse; }
+table.data thead { display: table-header-group; }
+table.data tr { page-break-inside: avoid; }
+table.data th { background: var(--color-brand); color: var(--color-brand-contrast); font-size: 7pt; text-transform: uppercase; letter-spacing: .4pt; text-align: left; padding: 4pt 5pt; }
+table.data td { border-bottom: 1px solid var(--color-line); padding: 3.5pt 5pt; vertical-align: top; }
+table.data tr.alt td { background: var(--color-surface-muted); }
+table.data .num { text-align: right; }
+table.data .muted { color: var(--color-muted); }
+
+/* Roster grid: crew × day cells with duty strips. */
+table.grid td, table.grid th { border: 1px solid var(--color-line); padding: 2.5pt 3pt; vertical-align: top; }
+table.grid th { background: var(--color-brand); color: var(--color-brand-contrast); font-size: 7pt; text-align: center; }
+table.grid td.crew { width: 22%; }
+.duty { background: var(--color-strip); border: 1px solid var(--color-strip-line); padding: 1.5pt 2pt; margin-bottom: 1.5pt; font-size: 7pt; }
+.duty strong { font-size: 7.5pt; }
+.activity { border: 1px dashed var(--color-line-strong); padding: 1.5pt 2pt; margin-bottom: 1.5pt; font-size: 6.5pt; text-transform: uppercase; color: var(--color-muted); }
+.small { font-size: 6.5pt; color: var(--color-muted); }
+
+/* Status words (never colour alone). */
+.tone-danger { color: var(--color-danger); font-weight: bold; }
+.tone-warning { color: var(--color-warning); font-weight: bold; }
+.tone-success { color: var(--color-success); font-weight: bold; }
+
+/* Individual crew pages. */
+.person { page-break-after: always; }
+.person:last-child { page-break-after: auto; }
+.person h2 { font-size: 12pt; margin: 0 0 2pt 0; color: var(--color-ink-strong); }
+.note { margin-top: 8pt; font-size: 7pt; color: var(--color-muted); }
+.empty { padding: 12pt; text-align: center; color: var(--color-muted); }

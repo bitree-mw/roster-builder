@@ -10,12 +10,12 @@ use Illuminate\Database\Eloquent\Factories\Factory;
 class RosterPeriodFactory extends Factory
 {
     /**
-     * Default attributes for a roster period.
+     * Default attributes for a draft roster week (Monday to Sunday).
      *
      * @return array<string, mixed>
      */
     public function definition(): array
     {
-        return ['month' => '2026-10-01', 'status' => 'draft', 'rules_snapshot' => RuleSet::factory()->make()->toArray()];
+        return ['starts_on' => '2026-10-05', 'ends_on' => '2026-10-11', 'status' => 'draft', 'rules_snapshot' => RuleSet::factory()->make()->toArray()];
     }
 }

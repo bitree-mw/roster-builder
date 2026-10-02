@@ -8,20 +8,20 @@ use Carbon\CarbonImmutable;
 /** Calendar-date expiry decisions, evaluated against today's base-local date (never the browser's timezone). */
 class ExpiryService
 {
-    /** Memoised for the request (the service is bound as scoped in AppServiceProvider). */
-    private ?CarbonImmutable $today = null;
+    /**
+     * The base's UTC offset, memoised for the request (the service is bound as scoped in AppServiceProvider).
+     * Only the offset is cached, so "today" still moves on in long-running processes.
+     */
+    private ?int $offset = null;
 
     /**
      * Today's calendar date at base, using the standard rule set's UTC offset (default +2:00, Malawi).
      */
     public function today(): CarbonImmutable
     {
-        if ($this->today === null) {
-            $offset = (int) (RuleSet::query()->whereKey(1)->value('utc_offset_minutes') ?? 120);
-            $this->today = CarbonImmutable::parse(CarbonImmutable::now('UTC')->addMinutes($offset)->format('Y-m-d'), 'UTC');
-        }
+        $this->offset ??= (int) (RuleSet::query()->whereKey(1)->value('utc_offset_minutes') ?? 120);
 
-        return $this->today;
+        return CarbonImmutable::parse(CarbonImmutable::now('UTC')->addMinutes($this->offset)->format('Y-m-d'), 'UTC');
     }
 
     /**

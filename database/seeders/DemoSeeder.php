@@ -31,10 +31,11 @@ class DemoSeeder extends Seeder
             $q400 = AircraftType::firstOrCreate(['code' => 'Q400'], ['cabin_crew_required' => 2, 'palette' => 'forest']);
             $b737 = AircraftType::firstOrCreate(['code' => 'B737'], ['cabin_crew_required' => 3, 'palette' => 'gold']);
             // Crew: every 4th person is based at BLZ; pilots alternate Q400/B737 ratings; cabin crew are all-aircraft.
+            // Contracted working hours: 40 a week for pilots, 38 for cabin crew (the generator never exceeds them).
             // Crew #1 of each rank has a medical expiring mid-month, #2 leave, #3 a simulator session, #4 a standby.
             foreach (['CPT' => 12, 'FO' => 12, 'CC' => 24] as $rank => $count) {
                 for ($number = 1; $number <= $count; $number++) {
-                    $crew = CrewMember::firstOrCreate(['email' => strtolower($rank).$number.'@example.com'], ['name' => $rank.' Demo '.str_pad((string) $number, 2, '0', STR_PAD_LEFT), 'rank' => $rank, 'base_airport' => $number % 4 === 0 ? 'BLZ' : 'LLW', 'all_aircraft' => $rank === 'CC', 'active' => true]);
+                    $crew = CrewMember::firstOrCreate(['email' => strtolower($rank).$number.'@example.com'], ['name' => $rank.' Demo '.str_pad((string) $number, 2, '0', STR_PAD_LEFT), 'rank' => $rank, 'base_airport' => $number % 4 === 0 ? 'BLZ' : 'LLW', 'all_aircraft' => $rank === 'CC', 'weekly_hours' => $rank === 'CC' ? 38 : 40, 'active' => true]);
                     if (! $crew->wasRecentlyCreated) {
                         continue;
                     }

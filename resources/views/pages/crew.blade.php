@@ -46,6 +46,8 @@
         <label>Position<select name="rank"><option value="CPT">Captain</option><option value="FO">First officer</option><option value="CC">Cabin crew</option></select></label>
         <label>Base<select name="base_airport" required></select></label>
         <label>Aircraft ratings<select name="rating_ids" multiple aria-describedby="ratings-help"></select><span id="ratings-help" class="field-hint">Hold Ctrl / Command to select several types.</span></label>
+        {{-- Contracted working hours: the weekly roster generator never plans more duty than this in a Monday–Sunday week. --}}
+        <label>Weekly working hours<input name="weekly_hours" type="number" min="1" max="168" step="1" inputmode="numeric" aria-describedby="hours-help"><span id="hours-help" class="field-hint">Duty hours per week the roster generator may plan. Leave blank to apply only the duty rules.</span></label>
         <div class="flex flex-col gap-3 justify-center"><label class="check-label"><input name="all_aircraft" type="checkbox">Rated on all aircraft (cabin crew only)</label><label class="check-label"><input name="active" type="checkbox" checked>Active crew member</label></div>
         @foreach(['licence' => 'Licence', 'medical' => 'Medical', 'recurrent' => 'Recurrent training'] as $kind => $label)
         <label>{{ $label }} expiry<input name="{{ $kind }}" type="date"><span class="field-hint">Leave blank if not recorded.</span></label>

@@ -60,14 +60,17 @@
     .topbar-actions { display: flex; align-items: center; gap: .625rem; }
     .alert-pill { display: inline-flex; align-items: center; gap: .5rem; min-height: 40px; padding: .375rem .75rem; border: 1px solid var(--color-danger); border-radius: 4px; background: var(--color-danger-soft); color: var(--color-danger); font-family: var(--font-mono); font-size: .6875rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; text-decoration: none; }
     .alert-pill[data-tone="warning"] { border-color: var(--color-warning-accent); background: var(--color-warning-soft); color: var(--color-warning); }
-    .user-chip { display: flex; align-items: center; gap: .625rem; padding: .25rem .375rem .25rem .75rem; border: 1px solid var(--color-line); border-radius: 6px; background: var(--color-surface-muted); }
+    .user-chip { display: flex; align-items: center; gap: .625rem; padding: .25rem .375rem .25rem .75rem; border: 1px solid var(--color-line); border-radius: 6px; background: var(--color-surface-muted); color: inherit; font: inherit; text-align: left; }
+    /* The user chip is the "My account" button. */
+    .user-chip:hover { border-color: var(--color-ink); }
+    .account-dialog { width: min(100% - 2rem, 34rem); }
     .user-chip-text { display: flex; flex-direction: column; text-align: right; line-height: 1.2; }
     .user-chip-name { font-size: .8125rem; font-weight: 700; max-width: 14rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .user-chip-role { font-family: var(--font-mono); font-size: .625rem; letter-spacing: .05em; text-transform: uppercase; color: var(--color-muted); }
     .avatar { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: var(--color-brand); color: var(--color-brand-contrast); font-family: var(--font-mono); font-size: .75rem; font-weight: 700; flex: none; }
     .avatar-sm { width: 30px; height: 30px; font-size: .6875rem; }
     .tabs { display: flex; gap: .25rem; overflow-x: auto; padding: 0 1.75rem; scrollbar-width: none; }
-    .tab { display: inline-flex; align-items: center; gap: .5rem; min-height: 46px; padding: 0 .875rem; border-bottom: 3px solid transparent; color: var(--color-muted); font-size: .875rem; font-weight: 500; text-decoration: none; white-space: nowrap; }
+    .tab { display: inline-flex; align-items: center; gap: .4375rem; min-height: 46px; padding: 0 .625rem; border-bottom: 3px solid transparent; color: var(--color-muted); font-size: .875rem; font-weight: 500; text-decoration: none; white-space: nowrap; }
     .tab:hover { color: var(--color-ink); }
     .tab[aria-current="page"] { border-bottom-color: var(--color-ink); color: var(--color-ink-strong); font-weight: 700; }
     .tab-count { padding: .125rem .375rem; border-radius: 3px; background: var(--color-brand-soft); color: var(--color-info); font-family: var(--font-mono); font-size: .6875rem; font-weight: 600; }
@@ -252,6 +255,16 @@
     .confirm-dialog[data-tone="danger"] .confirm-icon { background: var(--color-danger-soft); color: var(--color-danger); }
     .confirm-title { font-size: 1.0625rem; }
     .confirm-message { margin-top: .375rem; color: var(--color-muted); font-size: .875rem; line-height: 1.5; }
+
+    /* Seat coverage bar (resources/js/common/roster.js coverageBar): a native <progress> plus "filled/seats". */
+    .coverage { display: flex; align-items: center; gap: .625rem; }
+    .coverage-bar { flex: 1; height: 8px; min-width: 4rem; border: 0; border-radius: 4px; background: var(--color-surface-sunken); overflow: hidden; appearance: none; }
+    .coverage-bar::-webkit-progress-bar { background: var(--color-surface-sunken); border-radius: 4px; }
+    .coverage-bar::-webkit-progress-value { background: var(--color-warning-accent); border-radius: 4px; }
+    .coverage-bar::-moz-progress-bar { background: var(--color-warning-accent); border-radius: 4px; }
+    .coverage-bar[data-full="true"]::-webkit-progress-value { background: var(--color-success); }
+    .coverage-bar[data-full="true"]::-moz-progress-bar { background: var(--color-success); }
+    .coverage-text { font-size: .75rem; font-weight: 700; white-space: nowrap; }
 
     /* Detail lists. */
     .detail-list { display: grid; grid-template-columns: auto 1fr; gap: .5rem 1rem; font-size: .8125rem; }

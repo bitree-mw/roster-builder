@@ -6,7 +6,7 @@
 <section class="panel rules-panel" aria-labelledby="rules-title">
     <div class="panel-heading">
         <div class="panel-title"><x-icon name="sliders" /><h2 id="rules-title">Standard rule set</h2></div>
-        <span class="chip" data-tone="{{ auth()->user()->role === 'scheduler' ? 'success' : 'info' }}">{{ auth()->user()->role === 'scheduler' ? 'Editable by you' : 'Read only · scheduler-managed' }}</span>
+        <span class="chip" data-tone="{{ in_array(auth()->user()->role, ['admin', 'scheduler'], true) ? 'success' : 'info' }}">{{ in_array(auth()->user()->role, ['admin', 'scheduler'], true) ? 'Editable by you' : 'Read only · scheduler-managed' }}</span>
     </div>
     <form id="rules-form" class="panel-body rules-form" novalidate>
         <label class="rules-name">Rule set name<input name="name" required maxlength="100"></label>
@@ -41,7 +41,7 @@
         </fieldset>
         @endforeach
         <div class="status" data-form-status role="alert"></div>
-        @if(auth()->user()->role === 'scheduler')
+        @if(in_array(auth()->user()->role, ['admin', 'scheduler'], true))
         <div class="form-actions"><button type="submit" class="button"><x-icon name="check" class="icon-sm" />Save duty rules</button></div>
         @else
         <p class="small muted">Crew control can view these rules. A scheduler account is required to change them.</p>

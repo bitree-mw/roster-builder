@@ -8,10 +8,11 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
- * Delivery log for a roster email to one crew member (queued, sent or failed). Not yet used: email delivery
- * is a future milestone.
+ * Delivery log for one roster email to one crew member: the address used, who asked for it, and whether it
+ * is queued, sent (with the time) or failed (with the reason). Written by RosterEmailService and
+ * the SendRosterEmail job.
  */
-#[Fillable(['crew_member_id', 'roster_period_id', 'sent_at', 'status'])]
+#[Fillable(['crew_member_id', 'roster_period_id', 'email', 'requested_by', 'sent_at', 'status', 'error'])]
 class EmailLog extends Model
 {
     use HasFactory;

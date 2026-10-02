@@ -46,7 +46,9 @@
     --color-neutral: #5b6673;
     --color-neutral-soft: #eceff2;
     --color-sim: #5b4b9a;
+    --color-sim-soft: #ece8f7;
     --color-standby: #1f7a7a;
+    --color-standby-soft: #e0f2f1;
 }
 
 :root {

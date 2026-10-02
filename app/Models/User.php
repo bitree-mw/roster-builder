@@ -38,11 +38,40 @@ class User extends Authenticatable
     }
 
     /**
-     * Schedulers and crew control manage operational data; crew accounts do not.
+     * Account roles and their labels. Pilots and cabin crew both use the "crew" role (read-only access to
+     * their own published roster); which one they are comes from the linked crew member's position.
+     */
+    public const ROLES = ['admin' => 'Administrator', 'scheduler' => 'Scheduler', 'crew_control' => 'Crew control', 'crew' => 'Crew member'];
+
+    /**
+     * Administrators, schedulers and crew control manage operational data; crew accounts do not.
      */
     public function isStaff(): bool
     {
-        return in_array($this->role, ['scheduler', 'crew_control'], true);
+        return in_array($this->role, ['admin', 'scheduler', 'crew_control'], true);
+    }
+
+    /**
+     * Administrators manage every account, including other administrators.
+     */
+    public function isAdmin(): bool
+    {
+        return $this->role === 'admin';
+    }
+
+    /**
+     * Roles this user may give to accounts they create or edit: administrators any role, schedulers only
+     * pilot and cabin crew accounts (role crew), everyone else none.
+     *
+     * @return array<int, string>
+     */
+    public function assignableRoles(): array
+    {
+        return match ($this->role) {
+            'admin' => array_keys(self::ROLES),
+            'scheduler' => ['crew'],
+            default => [],
+        };
     }
 
     /**
@@ -54,15 +83,15 @@ class User extends Authenticatable
     }
 
     /**
-     * Human-readable role for the header and status bar; unknown roles read as having no access.
+     * Human-readable role for the header, status bar and account list: crew accounts read as "Pilot" or
+     * "Cabin crew" from their crew profile; unknown roles read as having no access.
      */
     public function roleLabel(): string
     {
-        return match ($this->role) {
-            'scheduler' => 'Scheduler',
-            'crew_control' => 'Crew control',
-            'crew' => 'Crew member',
-            default => 'No access',
-        };
+        if ($this->role === 'crew' && $this->crew_member_id !== null) {
+            return $this->loadMissing('crewMember')->crewMember?->rank === 'CC' ? 'Cabin crew' : 'Pilot';
+        }
+
+        return self::ROLES[$this->role] ?? 'No access';
     }
 }

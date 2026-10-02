@@ -74,8 +74,50 @@ return [
             'updated' => 'Duty rules saved. Existing roster periods keep their original snapshot.',
         ],
         'roster_period' => [
-            'created' => 'Draft roster period for :label created.',
-            'exists' => 'A roster period for :label already exists.',
+            'created' => 'Draft roster for :label created.',
+            'exists' => 'A roster for :label already exists.',
+            'built' => 'Roster built for :label: all :seats seats filled.',
+            'built_with_open' => 'Roster built for :label: :filled of :seats seats filled, :open left open because no legal crew member was available.',
+            'published' => 'Roster for :label published. Crew can now see their duties.',
+            'reopened' => 'Roster for :label reopened as a draft. Crew no longer see it until it is published again.',
+        ],
+        'account' => [
+            'created' => ':label can now sign in (:type account).',
+            'updated' => 'Account for :label updated.',
+            'deleted' => 'Account for :label deleted. They can no longer sign in.',
+            'password_changed' => 'Your password has been changed. Other devices have been signed out.',
+        ],
+        'activity' => [
+            'created' => ':label planned for :crew.',
+            'deleted' => ':label for :crew removed.',
+        ],
+        'exclusion' => [
+            'created' => ':crew will not be assigned to :label again, and the seat is open.',
+            'deleted' => ':crew can be assigned to :label again.',
+        ],
+        'email' => [
+            'queued' => 'Roster emails queued for :count crew members.',
+            'queued_with_missing' => 'Roster emails queued for :count crew members. :missing have no email address on file.',
+            'none' => 'No crew member in this week has an email address on file.',
+        ],
+        'password' => [
+            'link_sent' => 'If an account with an email address matches, a reset link is on its way. It expires in :minutes minutes.',
+            'reset' => 'Your password has been reset. Sign in with your new password.',
+        ],
+        'import' => [
+            'preview' => 'Checked :count rows. Review them, then import.',
+            'preview_errors' => 'Checked :count rows: :errors need fixing in the file before it can be imported.',
+            'committed' => 'Import complete: :count :kind records changed.',
+        ],
+        'backup' => [
+            'inspected' => 'Backup checked. Compare the record counts, then confirm the restore.',
+            'restored' => 'Backup restored: :count records. Accounts and passwords were not changed.',
+        ],
+        'assignment' => [
+            'undone' => 'Last change to :label undone.',
+            'assigned' => ':crew assigned to :label. The seat is locked for rebuilds.',
+            'overridden' => ':crew assigned to :label with a recorded override.',
+            'cleared' => ':label is open again. The next build can fill it.',
         ],
     ],
 

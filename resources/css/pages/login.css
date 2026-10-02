@@ -67,3 +67,6 @@ body[data-page="login"] { height: 100dvh; overflow: hidden; }
 @media (max-width: 480px) {
     .login-card { padding-left: 1.25rem; padding-right: 1.25rem; }
 }
+
+/* "Forgot your password?" link in the help line. */
+.login-help a { color: var(--color-info); font-weight: 600; }

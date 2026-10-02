@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * Append-only record of an operational change (who, what, before/after). Written inside the same
@@ -24,5 +25,13 @@ class AuditLog extends Model
     protected function casts(): array
     {
         return ['before' => 'array', 'after' => 'array', 'created_at' => 'immutable_datetime'];
+    }
+
+    /**
+     * Who made the change (null once that account has been deleted).
+     */
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
     }
 }

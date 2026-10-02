@@ -17,7 +17,7 @@
 {{-- Top bar: logo, header alert pills (filled by resources/js/common/shell.js for staff), user chip and sign-out. --}}
 <header class="topbar">
     <div class="topbar-inner">
-        <a class="brand" href="{{ route('roster') }}" aria-label="Malawi Airlines Roster Builder home">
+        <a class="brand" href="{{ route('home') }}" aria-label="Malawi Airlines Roster Builder home">
             <span class="brand-logo"><img src="{{ asset('images/malawi-airlines-logo.png') }}" alt="Malawi Airlines"></span>
             <span class="brand-text">
                 <span class="brand-title">Roster Builder</span>
@@ -29,26 +29,36 @@
             <a class="alert-pill" href="{{ route('maintenance') }}" data-alert-pill="maintenance" hidden><x-icon name="wrench" class="icon-sm" /><span data-alert-pill-text></span></a>
             <a class="alert-pill" href="{{ route('crew') }}" data-alert-pill="documents" data-tone="warning" hidden><x-icon name="id-card" class="icon-sm" /><span data-alert-pill-text></span></a>
             @endif
-            <div class="user-chip">
+            {{-- The user chip opens "My account" (change your own password); resources/js/common/account.js. --}}
+            <button id="my-account" class="user-chip" type="button" aria-haspopup="dialog" title="My account">
                 <span class="user-chip-text"><span class="user-chip-name">{{ auth()->user()->name }}</span><span class="user-chip-role">{{ auth()->user()->roleLabel() }}</span></span>
                 <span class="avatar" aria-hidden="true">{{ auth()->user()->initials() }}</span>
-            </div>
+            </button>
             <button id="logout" class="icon-button" type="button" aria-label="Sign out" title="Sign out"><x-icon name="logout" /></button>
         </div>
     </div>
     {{-- Main navigation. Crew accounts only see the roster; data-tab-count badges are filled from /api/v1/overview. --}}
     <nav class="tabs" aria-label="Main navigation">
-        <a class="tab" href="{{ route('roster') }}" @if($page === 'roster') aria-current="page" @endif><x-icon name="calendar" class="icon-sm" />Roster</a>
+        @if($staff)
+        <a class="tab" href="{{ route('dashboard') }}" @if($page === 'dashboard') aria-current="page" @endif><x-icon name="layout" class="icon-sm" />Dashboard</a>
+        @endif
+        <a class="tab" href="{{ route('roster') }}" @if($page === 'roster') aria-current="page" @endif><x-icon name="calendar" class="icon-sm" />{{ $staff ? 'Weekly roster' : 'My roster' }}</a>
         @if($staff)
         @foreach([
             'flights' => ['Flights & routes', 'route'],
             'aircraft' => ['Fleet', 'plane'],
             'maintenance' => ['Maintenance', 'wrench'],
             'crew' => ['Crew', 'users'],
+            'hours' => ['Crew hours', 'gauge'],
+            'reports' => ['Reports', 'clipboard'],
             'rules' => ['Duty rules', 'sliders'],
+            'data' => ['Import & backup', 'copy'],
         ] as $key => [$label, $icon])
         <a class="tab" href="{{ route($key) }}" @if($page === $key) aria-current="page" @endif><x-icon :name="$icon" class="icon-sm" />{{ $label }}<span class="tab-count" data-tab-count="{{ $key }}" hidden></span></a>
         @endforeach
+        @endif
+        @if(auth()->user()->assignableRoles() !== [])
+        <a class="tab" href="{{ route('accounts') }}" @if($page === 'accounts') aria-current="page" @endif><x-icon name="lock" class="icon-sm" />Accounts</a>
         @endif
     </nav>
 </header>
@@ -63,5 +73,17 @@
     <span>Pattern times: base local · Dated instants: UTC</span>
     <span>Development build · not an approved scheduling system</span>
 </footer>
+{{-- "My account": change your own password (every signed-in user). Wired by resources/js/common/account.js. --}}
+<dialog id="account-dialog" class="dialog account-dialog" aria-labelledby="account-dialog-title"><form id="account-form" novalidate>
+    <div class="dialog-heading"><div><h2 id="account-dialog-title">My account</h2><p>{{ auth()->user()->name }} · {{ auth()->user()->roleLabel() }}@if(auth()->user()->username) · {{ auth()->user()->username }}@endif</p></div><button type="button" class="icon-button" data-close aria-label="Close"><x-icon name="x" /></button></div>
+    <div class="form-grid">
+        <label class="span-2">Current password<input name="current_password" type="password" autocomplete="current-password" required></label>
+        <label>New password<input name="password" type="password" autocomplete="new-password" minlength="12" required aria-describedby="new-password-help"><span id="new-password-help" class="field-hint">At least 12 characters.</span></label>
+        <label>Repeat new password<input name="password_confirmation" type="password" autocomplete="new-password" minlength="12" required></label>
+    </div>
+    <p class="field-hint">Changing your password signs you out on every other device.</p>
+    <div class="status" data-form-status role="alert"></div>
+    <div class="form-actions"><button class="button button-secondary" type="button" data-close-secondary>Cancel</button><button class="button" type="submit">Change password</button></div>
+</form></dialog>
 </body>
 </html>

@@ -23,12 +23,13 @@ const controller = editor({
     read: () => ({
         name: form.elements.name.value, email: form.elements.email.value || null, rank: form.elements.rank.value,
         base_airport: form.elements.base_airport.value, active: form.elements.active.checked, all_aircraft: form.elements.all_aircraft.checked,
+        weekly_hours: form.elements.weekly_hours.value ? Number(form.elements.weekly_hours.value) : null,
         rating_ids: [...form.elements.rating_ids.selectedOptions].map(option => Number(option.value)),
         documents: KINDS.filter(kind => form.elements[kind].value).map(kind => ({ kind, expires_on: form.elements[kind].value })),
     }),
     fill: record => {
         if (!record) return;
-        for (const key of ['name', 'email', 'rank', 'base_airport']) form.elements[key].value = record[key] || '';
+        for (const key of ['name', 'email', 'rank', 'base_airport', 'weekly_hours']) form.elements[key].value = record[key] ?? '';
         for (const key of ['active', 'all_aircraft']) form.elements[key].checked = record[key];
         for (const option of form.elements.rating_ids.options) option.selected = record.rating_ids.includes(Number(option.value));
         for (const document of record.documents) form.elements[document.kind].value = document.expires_on;
@@ -61,7 +62,7 @@ function render() {
         const identity = element('div', null, 'crew-identity'); const text = element('div');
         text.append(element('strong', record.name), element('span', record.email || 'No email recorded', 'small muted'));
         identity.append(element('span', initials(record.name), 'avatar avatar-sm'), text); cell(row).append(identity);
-        cell(row).append(chip(record.rank, record.rank === 'CC' ? 'info' : 'brand'), element('div', RANKS[record.rank], 'small muted'));
+        cell(row).append(chip(record.rank, record.rank === 'CC' ? 'info' : 'brand'), element('div', RANKS[record.rank], 'small muted'), element('div', record.weekly_hours ? `${record.weekly_hours} h / week` : 'No weekly hours', 'small muted mono'));
         cell(row, record.base_airport, 'mono');
         const ratings = element('div', null, 'chip-list');
         if (record.all_aircraft) ratings.append(chip('All aircraft', 'info'));

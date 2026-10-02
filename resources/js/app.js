@@ -1,7 +1,8 @@
 /**
- * Shared script loaded on every signed-in page (layouts/app.blade.php): sign-out, dialog cancel buttons,
+ * Shared script loaded on every signed-in page (layouts/app.blade.php): sign-out, "My account", dialog cancel buttons,
  * connection notices and the navigation counts / header alerts.
  */
+import { initAccountDialog } from './common/account';
 import { api, csrf } from './common/api';
 import { refreshShell } from './common/shell';
 import { flash, toast } from './common/toast';
@@ -29,3 +30,6 @@ window.addEventListener('online', () => toast('Connection restored.', { type: 'i
 
 // Fill navigation badges and header alert pills for staff (a no-op for crew accounts).
 refreshShell().catch(() => {});
+
+// "My account": change your own password from the user chip.
+initAccountDialog();

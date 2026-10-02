@@ -27,8 +27,10 @@ class ManagementTest extends TestCase
         $crew->ratings()->attach($aircraft);
         $crew->documents()->create(['kind' => 'licence', 'expires_on' => '2027-01-01']);
         Sanctum::actingAs(User::factory()->create(['role' => 'crew_control']), ['*']);
-        $this->putJson('/api/v1/crew-members/'.$crew->id, ['name' => 'Cabin Example', 'email' => null, 'rank' => 'CC', 'base_airport' => $base->code, 'active' => true, 'all_aircraft' => true, 'rating_ids' => [], 'documents' => []])
-            ->assertOk()->assertJsonPath('data.all_aircraft', true)->assertJsonCount(0, 'data.documents');
+        $this->putJson('/api/v1/crew-members/'.$crew->id, ['name' => 'Cabin Example', 'email' => null, 'rank' => 'CC', 'base_airport' => $base->code, 'active' => true, 'all_aircraft' => true, 'weekly_hours' => 38, 'rating_ids' => [], 'documents' => []])
+            ->assertOk()->assertJsonPath('data.all_aircraft', true)->assertJsonPath('data.weekly_hours', 38)->assertJsonCount(0, 'data.documents');
+        $this->putJson('/api/v1/crew-members/'.$crew->id, ['name' => 'Cabin Example', 'rank' => 'CC', 'base_airport' => $base->code, 'active' => true, 'all_aircraft' => true, 'weekly_hours' => 169, 'rating_ids' => [], 'documents' => []])
+            ->assertUnprocessable()->assertJsonValidationErrors('weekly_hours');
         $this->assertDatabaseCount('crew_ratings', 0);
         $this->assertDatabaseCount('crew_documents', 0);
         $this->getJson('/api/v1/crew-members?rank=CPT')->assertJsonCount(0, 'data');

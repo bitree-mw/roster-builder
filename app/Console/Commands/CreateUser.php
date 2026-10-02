@@ -31,7 +31,7 @@ class CreateUser extends Command
         $validator = Validator::make($data, [
             'email' => ['required', 'email', 'unique:users,email'], 'name' => ['required', 'string', 'max:150'],
             'username' => ['nullable', 'string', 'min:3', 'max:50', 'regex:/^[a-z0-9._-]+$/', 'unique:users,username'],
-            'role' => ['required', Rule::in(['scheduler', 'crew_control', 'crew'])],
+            'role' => ['required', Rule::in(array_keys(User::ROLES))],
             'crew_member_id' => ['nullable', 'required_if:role,crew', Rule::exists(CrewMember::class, 'id'), 'unique:users,crew_member_id'],
             'password' => ['required', Password::min(12)],
         ]);

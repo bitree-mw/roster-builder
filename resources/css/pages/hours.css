@@ -1,0 +1,20 @@
+/*
+ * Crew hours page (pages/hours.blade.php). Colours come from tokens.css via var(); no values here.
+ */
+
+/* Hours table: a sticky crew column and stacked figures in each window cell. */
+.hours-table { min-width: 900px; }
+.hours-table th span { display: block; }
+.hours-range { margin-top: .125rem; font-weight: 500; letter-spacing: 0; text-transform: none; }
+.hours-crew { position: sticky; left: 0; z-index: 1; min-width: 12rem; background: var(--color-surface); font-family: var(--font-sans); font-size: .8125rem; letter-spacing: 0; text-transform: none; color: var(--color-ink); white-space: normal; }
+.hours-crew strong, .hours-crew span { display: block; }
+.hours-cell { vertical-align: top; }
+.hours-cell > * { display: block; }
+.hours-cell strong { font-size: .9375rem; color: var(--color-ink-strong); }
+.hours-scheduled { color: var(--color-info); }
+.hours-limit { width: 100%; margin-top: .375rem; }
+.hours-limit::-webkit-progress-value { background: var(--color-info); }
+.hours-limit::-moz-progress-bar { background: var(--color-info); }
+.hours-limit[data-near="true"]::-webkit-progress-value { background: var(--color-warning-accent); }
+.hours-limit[data-near="true"]::-moz-progress-bar { background: var(--color-warning-accent); }
+#hours-totals th, #hours-totals td { border-top: 2px solid var(--color-line-strong); background: var(--color-surface-muted); }

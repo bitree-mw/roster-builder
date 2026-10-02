@@ -46,7 +46,7 @@
                 <div id="login-status" class="status" role="alert"></div>
                 <button class="button button-block login-submit" type="submit"><x-icon name="lock" class="icon-sm" /><span data-submit-label>Sign in</span></button>
             </form>
-            <p class="login-help"><x-icon name="shield" class="icon-sm" />Sessions are protected and every operational change is audited. Forgotten passwords are reset by your administrator.</p>
+            <p class="login-help"><x-icon name="shield" class="icon-sm" /><span>Sessions are protected and every operational change is audited. <a href="{{ route('password.request') }}">Forgot your password?</a></span></p>
         </div>
         <p class="login-footer">Malawi Airlines · Crew Control · Kamuzu International Airport (LLW)</p>
     </section>

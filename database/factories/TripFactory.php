@@ -17,6 +17,6 @@ class TripFactory extends Factory
      */
     public function definition(): array
     {
-        return ['roster_period_id' => RosterPeriod::factory(), 'flight_id' => Flight::factory(), 'start_date' => '2026-10-01', 'schedule_snapshot' => ['code' => 'LB1', 'periods' => []]];
+        return ['roster_period_id' => RosterPeriod::factory(), 'flight_id' => Flight::factory(), 'start_date' => '2026-10-05', 'schedule_snapshot' => ['code' => 'LB1', 'duties' => []]];
     }
 }

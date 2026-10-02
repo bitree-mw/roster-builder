@@ -11,9 +11,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * A pilot (CPT/FO) or cabin crew member (CC). Inactive crew stay on file for history but are not rostered;
+ * weekly_hours is the contracted working time per Monday–Sunday week that the roster generator respects;
  * only cabin crew may be rated on all aircraft.
  */
-#[Fillable(['name', 'email', 'rank', 'base_airport', 'all_aircraft', 'active'])]
+#[Fillable(['name', 'email', 'rank', 'base_airport', 'all_aircraft', 'weekly_hours', 'active'])]
 class CrewMember extends Model
 {
     use HasFactory;
@@ -23,7 +24,7 @@ class CrewMember extends Model
      */
     protected function casts(): array
     {
-        return ['all_aircraft' => 'boolean', 'active' => 'boolean'];
+        return ['all_aircraft' => 'boolean', 'weekly_hours' => 'integer', 'active' => 'boolean'];
     }
 
     /**

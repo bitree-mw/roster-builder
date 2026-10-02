@@ -1,0 +1,9 @@
+/*
+ * Accounts page (pages/accounts.blade.php). Colours come from tokens.css via var(); no values here.
+ */
+
+/* Account type cards: three staff types (administrators only) and the two crew types. */
+.account-types { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+#account-edit-dialog { width: min(100% - 2rem, 46rem); }
+#account-rows td:first-child .chip { margin-top: .25rem; }
+#account-rows td .chip + .chip { margin-left: .25rem; }

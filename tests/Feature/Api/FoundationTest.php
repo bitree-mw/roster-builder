@@ -28,7 +28,7 @@ class FoundationTest extends TestCase
      */
     public static function protectedEndpoints(): array
     {
-        return array_map(fn (string $path): array => [$path], ['aircraft-types', 'aircraft', 'maintenance-records', 'maintenance-alerts', 'overview', 'crew-members', 'flights', 'rules', 'roster-periods', 'lookups', 'me']);
+        return array_map(fn (string $path): array => [$path], ['aircraft-types', 'aircraft', 'maintenance-records', 'maintenance-alerts', 'overview', 'crew-members', 'flights', 'rules', 'roster-periods', 'roster-periods/1', 'assignments/1/candidates', 'dashboard', 'accounts', 'crew-hours', 'my-hours', 'roster-periods/1/export.csv', 'roster-periods/1/roster.pdf', 'reports', 'reports/coverage', 'imports/templates/crew', 'backups/download', 'lookups', 'me']);
     }
 
     #[DataProvider('protectedEndpoints')]

@@ -18,7 +18,7 @@ class SecurityTest extends TestCase
 
     public static function roles(): array
     {
-        return [['scheduler', true, true], ['crew_control', true, false], ['crew', false, false]];
+        return [['admin', true, true], ['scheduler', true, true], ['crew_control', true, false], ['crew', false, false]];
     }
 
     #[DataProvider('roles')]

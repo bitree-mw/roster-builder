@@ -21,7 +21,7 @@ class PageTest extends TestCase
      */
     public static function pages(): array
     {
-        return [['roster'], ['aircraft'], ['maintenance'], ['crew'], ['flights'], ['rules']];
+        return [['dashboard'], ['roster'], ['hours'], ['reports'], ['data'], ['accounts'], ['aircraft'], ['maintenance'], ['crew'], ['flights'], ['rules']];
     }
 
     #[DataProvider('pages')]
@@ -35,7 +35,19 @@ class PageTest extends TestCase
     public function test_crew_cannot_open_management_pages(): void
     {
         $this->actingAs(User::factory()->create(['role' => 'crew']));
+        $this->get('/dashboard')->assertForbidden();
         $this->get('/aircraft')->assertForbidden();
         $this->get('/maintenance')->assertForbidden();
+        $this->get('/accounts')->assertForbidden();
+        $this->get('/hours')->assertForbidden();
+        $this->get('/reports')->assertForbidden();
+        $this->get('/data')->assertForbidden();
+    }
+
+    public function test_only_admins_and_schedulers_open_the_accounts_page(): void
+    {
+        $this->withoutVite();
+        $this->actingAs(User::factory()->create(['role' => 'crew_control']))->get('/accounts')->assertForbidden();
+        $this->actingAs(User::factory()->create(['role' => 'admin']))->get('/accounts')->assertOk()->assertSee('Administrator');
     }
 }

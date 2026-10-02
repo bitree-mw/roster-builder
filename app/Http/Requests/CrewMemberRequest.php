@@ -20,7 +20,7 @@ class CrewMemberRequest extends FormRequest
     }
 
     /**
-     * Base must be a crew base; at most one document per kind.
+     * Base must be a crew base; at most one document per kind; weekly hours, when given, fit in a week.
      *
      * @return array<string, array<int, mixed>>
      */
@@ -33,6 +33,8 @@ class CrewMemberRequest extends FormRequest
             'base_airport' => ['required', Rule::exists('airports', 'code')->where('is_base', true)],
             'active' => ['required', 'boolean'],
             'all_aircraft' => ['required', 'boolean'],
+            // Contracted working hours per week; blank leaves only the duty rules' seven-day limit.
+            'weekly_hours' => ['nullable', 'integer', 'between:1,168'],
             'rating_ids' => ['present', 'array', 'max:100'],
             'rating_ids.*' => ['integer', 'distinct', 'exists:aircraft_types,id'],
             'documents' => ['present', 'array', 'max:3'],

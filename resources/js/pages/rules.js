@@ -6,7 +6,7 @@ import { busy, showError, status } from '../common/ui';
 
 const form = document.querySelector('#rules-form');
 const formStatus = form.querySelector('[data-form-status]');
-const canEdit = document.body.dataset.role === 'scheduler';
+const canEdit = ['admin', 'scheduler'].includes(document.body.dataset.role);
 const inputs = [...form.querySelectorAll('input')];
 // Inputs stay disabled until the current values load, then only schedulers can edit them.
 for (const input of inputs) input.disabled = true;

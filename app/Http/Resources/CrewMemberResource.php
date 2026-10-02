@@ -23,6 +23,7 @@ class CrewMemberResource extends JsonResource
             'rank' => $this->rank,
             'base_airport' => $this->base_airport,
             'all_aircraft' => $this->all_aircraft,
+            'weekly_hours' => $this->weekly_hours,
             'active' => $this->active,
             'rating_ids' => $this->whenLoaded('ratings', fn (): array => $this->ratings->pluck('id')->all()),
             'ratings' => AircraftTypeResource::collection($this->whenLoaded('ratings')),

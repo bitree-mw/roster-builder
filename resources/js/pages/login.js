@@ -35,7 +35,7 @@ function markInvalid(fields) {
     for (const input of [form.elements.login, password]) input.setAttribute('aria-invalid', String(fields.includes(input.name)));
 }
 
-// Validate locally, fetch the CSRF cookie, sign in, then open the roster. Errors stay inline on this page.
+// Validate locally, fetch the CSRF cookie, sign in, then open the landing page (dashboard for staff, roster for crew). Errors stay inline.
 form.addEventListener('submit', async event => {
     event.preventDefault();
     const missing = [form.elements.login, password].filter(input => !input.value.trim() || !input.checkValidity()).map(input => input.name);
@@ -54,7 +54,7 @@ form.addEventListener('submit', async event => {
         const response = await api('/login', { method: 'POST', notify: false, body: { login: form.elements.login.value.trim(), password: password.value } });
         flash(response.message, { type: 'success', title: 'Signed in' });
         submit.querySelector('[data-submit-label]').textContent = 'Opening workspace…';
-        window.location.assign('/roster');
+        window.location.assign('/');
     } catch (error) {
         markInvalid(['login', 'password']);
         showError(error.status === 429 ? { message: 'Too many sign-in attempts. Wait a minute and try again.' } : error, target);
