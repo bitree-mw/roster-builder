@@ -4,50 +4,77 @@ namespace App\Mail;
 
 use App\Models\CrewMember;
 use App\Models\RosterPeriod;
+use App\Support\ThemeTokens;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Attachment;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
+use Symfony\Component\Mime\Email;
+use TijsVerkoyen\CssToInlineStyles\CssToInlineStyles;
 
 /**
- * A crew member's published roster for one week: a summary of their duties in the message body and an
- * .ics calendar attachment, signed by crew control (config('roster.mail_signature')).
+ * A crew member's published roster (1 week, 2 weeks or a month), styled like the app: a navy header with the
+ * airline logo, totals, and every day with their flights (local and GMT times, legs, and the captain, first
+ * officer and cabin crew they fly with), night stops and planned days; plus an .ics calendar attachment.
+ *
+ * Mail clients ignore CSS variables and most <style> blocks, so resources/css/mail/roster.css is resolved
+ * against the app's colour tokens (ThemeTokens) and inlined into the HTML. The logo is embedded (cid:) because
+ * Gmail blocks data: images; ROSTER_MAIL_LOGO=false leaves it out.
  */
 class RosterMail extends Mailable
 {
     use Queueable, SerializesModels;
 
-    /**
-     * @param  array<int, array{date: string, code: string, route: string, seat: string, report_local: string, release_local: string}>  $duties  base-local duty lines for the body
-     * @param  string  $calendar  iCalendar file contents
-     */
-    public function __construct(public RosterPeriod $period, public CrewMember $crew, public array $duties, public string $calendar) {}
+    /** Content id of the embedded logo, referenced as cid:… in the HTML. */
+    private const LOGO_CID = 'malawi-airlines-logo';
 
     /**
-     * Subject line, e.g. "Your roster: week 41 (05–11 Oct 2026)".
+     * @param  array<string, mixed>  $roster  RosterEmailService::roster() for this crew member and period
+     * @param  string  $calendar  iCalendar file contents
+     */
+    public function __construct(public RosterPeriod $period, public CrewMember $crew, public array $roster, public string $calendar) {}
+
+    /**
+     * Subject line, e.g. "Your roster: Weeks 41–42 (05–18 Oct 2026)", with the logo embedded when enabled.
      */
     public function envelope(): Envelope
     {
-        return new Envelope(subject: 'Your roster: '.$this->period->label());
+        return new Envelope(subject: 'Your roster: '.$this->roster['label'], using: [function (Email $message): void {
+            if ($this->logoPath() !== null) {
+                $message->embedFromPath($this->logoPath(), self::LOGO_CID, 'image/png');
+            }
+        }]);
     }
 
     /**
-     * HTML and plain-text bodies.
+     * The HTML body with the stylesheet inlined, and the plain-text version.
      */
     public function content(): Content
     {
-        return new Content(view: 'mail.roster', text: 'mail.roster-text', with: ['signature' => config('roster.mail_signature')]);
+        $styles = ThemeTokens::resolve((string) file_get_contents(resource_path('css/mail/roster.css')));
+        $data = ['roster' => $this->roster, 'crew' => $this->crew, 'signature' => config('roster.mail_signature')];
+        $html = view('mail.roster', [...$data, 'styles' => $styles, 'logo' => $this->logoPath() !== null ? 'cid:'.self::LOGO_CID : null])->render();
+
+        return new Content(htmlString: (new CssToInlineStyles)->convert($html, $styles), text: 'mail.roster-text', with: $data);
     }
 
     /**
-     * The week as a calendar file for the crew member's phone or mail app.
+     * The roster as a calendar file for the crew member's phone or mail app.
      *
      * @return array<int, Attachment>
      */
     public function attachments(): array
     {
-        return [Attachment::fromData(fn (): string => $this->calendar, 'roster-week-'.$this->period->starts_on->isoWeek.'.ics')->withMime('text/calendar')];
+        return [Attachment::fromData(fn (): string => $this->calendar, 'roster-'.$this->period->starts_on->format('Y-m-d').'.ics')->withMime('text/calendar')];
+    }
+
+    /** The logo file when logos are enabled for email and the file exists. */
+    private function logoPath(): ?string
+    {
+        $path = public_path('images/malawi-airlines-logo.png');
+
+        return config('roster.mail_logo') && is_file($path) ? $path : null;
     }
 }

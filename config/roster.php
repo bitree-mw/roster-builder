@@ -56,6 +56,9 @@ return [
      */
     'trusted_proxies' => env('TRUSTED_PROXIES'),
 
+    /** Show the airline logo in roster emails (defaults to the PDF setting; confirm usage rights first). */
+    'mail_logo' => (bool) env('ROSTER_MAIL_LOGO', env('ROSTER_PDF_LOGO', true)),
+
     /** Signature used at the end of roster emails to crew. */
     'mail_signature' => env('ROSTER_MAIL_SIGNATURE', 'Crew Control, Malawi Airlines'),
 ];

@@ -81,7 +81,7 @@ Conflict codes: inactive, rank, base, rating, document_missing, document_expired
 - Assigning a flight to someone with standby on its days clears that standby in the same transaction (candidates report clears_standby).
 - GET /roster-periods/{id}/export.csv — staff: every seat; crew: own seats of a published week (404 otherwise). Cells starting with = + - @ are prefixed with an apostrophe.
 - GET /roster-periods/{id}/calendar.ics?crew_member_id= — one crew member's duties (UTC events, base-local times in the description) and activities. Crew always get their own; staff must name the crew member.
-- POST /roster-periods/{id}/email — published weeks only: queues one email (duties + .ics) per crew member with a seat, logged in email_logs (queued → sent | failed). Crew without an email address are counted as missing. A queue worker must run (php artisan queue:work).
+- POST /roster-periods/{id}/email — published rosters only: queues one email (day-by-day roster with the crew on each flight, planned days and night stops, plus an .ics file) per crew member with a seat, logged in email_logs (queued → sent | failed). Crew without an email address are counted as missing. A queue worker must run (php artisan queue:work).
 - GET /roster-periods/{id}/email-logs — delivery status per crew member.
 
 ## Day planning

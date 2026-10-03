@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Mail\RosterMail;
 use App\Models\EmailLog;
+use App\Services\RosterEmailService;
 use App\Services\RosterExportService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -26,9 +27,10 @@ class SendRosterEmail implements ShouldQueue
     public function __construct(public int $emailLogId) {}
 
     /**
-     * Build the duty summary and calendar from the published week, send, and log the result.
+     * Build the crew member's roster (days, flights with their crewmates, planned days) and calendar from the
+     * published roster, send, and log the result.
      */
-    public function handle(RosterExportService $exports): void
+    public function handle(RosterExportService $exports, RosterEmailService $emails): void
     {
         $log = EmailLog::query()->with(['crewMember', 'rosterPeriod'])->find($this->emailLogId);
         if ($log === null || $log->status !== 'queued') {
@@ -37,15 +39,7 @@ class SendRosterEmail implements ShouldQueue
         try {
             $period = $log->rosterPeriod;
             $crew = $log->crewMember;
-            $duties = [];
-            foreach ($period->trips()->whereHas('assignments', fn ($query) => $query->where('crew_member_id', $crew->id))->with('assignments')->orderBy('start_date')->get() as $trip) {
-                $seat = $trip->assignments->firstWhere('crew_member_id', $crew->id);
-                foreach ($trip->schedule_snapshot['duties'] ?? [] as $duty) {
-                    $duties[] = ['date' => $duty['date'], 'code' => $trip->schedule_snapshot['code'] ?? '', 'route' => $trip->schedule_snapshot['route'] ?? '',
-                        'seat' => $seat->rank === 'CC' ? 'CC'.$seat->seat_number : $seat->rank, 'report_local' => $duty['report_local'], 'release_local' => $duty['release_local']];
-                }
-            }
-            Mail::to($log->email, $crew->name)->send(new RosterMail($period, $crew, $duties, $exports->calendar($period, $crew)));
+            Mail::to($log->email, $crew->name)->send(new RosterMail($period, $crew, $emails->roster($period, $crew), $exports->calendar($period, $crew)));
             $log->forceFill(['status' => 'sent', 'sent_at' => now(), 'error' => null])->save();
         } catch (Throwable $exception) {
             $log->forceFill(['status' => 'failed', 'error' => Str::limit($exception->getMessage(), 480)])->save();

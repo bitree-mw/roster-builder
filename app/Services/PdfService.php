@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Support\ThemeTokens;
 use Dompdf\Dompdf;
 use Dompdf\Options;
 
@@ -9,8 +10,8 @@ use Dompdf\Options;
  * Renders Blade views under resources/views/pdf to PDF files with dompdf (A4, landscape by default).
  *
  * Styling comes from resources/css/pdf/document.css. dompdf cannot resolve CSS custom properties, so every
- * var(--token) in that file is replaced with its value from resources/css/common/tokens.css — colours stay
- * defined in one place. Remote resources are disabled; the airline logo is embedded as a data URI. Every
+ * var(--token) in that file is replaced with its value from resources/css/common/tokens.css (ThemeTokens,
+ * shared with roster emails) — colours stay defined in one place. Remote resources are disabled; the airline logo is embedded as a data URI. Every
  * page is numbered "Page X of Y" in the footer.
  */
 class PdfService
@@ -23,8 +24,8 @@ class PdfService
      */
     public function render(string $view, array $data, string $orientation = 'landscape'): string
     {
-        $tokens = $this->tokens();
-        $html = view($view, [...$data, 'pdfStyles' => $this->stylesheet($tokens), 'logo' => $this->logo(), 'generatedAt' => now('UTC')->format('d M Y H:i').' UTC'])->render();
+        $tokens = ThemeTokens::values();
+        $html = view($view, [...$data, 'pdfStyles' => ThemeTokens::resolve((string) file_get_contents(resource_path('css/pdf/document.css'))), 'logo' => $this->logo(), 'generatedAt' => now('UTC')->format('d M Y H:i').' UTC'])->render();
         $options = new Options;
         $options->setIsRemoteEnabled(false);
         $options->setIsPhpEnabled(false);
@@ -47,36 +48,6 @@ class PdfService
         $canvas->page_text($canvas->get_width() - 110, $canvas->get_height() - 24, 'Page {PAGE_NUM} of {PAGE_COUNT}', $font, 7, $this->rgb($tokens['color-muted'] ?? '#56677a'));
 
         return $dompdf->output();
-    }
-
-    /**
-     * The PDF stylesheet with var(--name) replaced by the token values.
-     *
-     * @param  array<string, string>  $tokens
-     */
-    private function stylesheet(array $tokens): string
-    {
-        $css = (string) file_get_contents(resource_path('css/pdf/document.css'));
-
-        return preg_replace_callback('/var\(--([a-z0-9-]+)\)/i', fn (array $match): string => $tokens[$match[1]] ?? 'inherit', $css) ?? $css;
-    }
-
-    /**
-     * Every custom property defined in tokens.css (name without the leading dashes => value).
-     *
-     * @return array<string, string>
-     */
-    private function tokens(): array
-    {
-        preg_match_all('/--([a-z0-9-]+)\s*:\s*([^;]+);/i', (string) file_get_contents(resource_path('css/common/tokens.css')), $matches, PREG_SET_ORDER);
-
-        // First definition wins, and light-dark(light, dark) pairs resolve to the light value: PDFs are always light.
-        $tokens = [];
-        foreach ($matches as [, $name, $value]) {
-            $tokens[$name] ??= preg_match('/^light-dark\(\s*([^,]+),/', trim($value), $pair) ? trim($pair[1]) : trim($value);
-        }
-
-        return $tokens;
     }
 
     /** The airline logo as a data URI (or null when the file is missing or disabled). */

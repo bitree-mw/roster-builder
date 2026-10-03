@@ -8,7 +8,6 @@ use App\Models\CrewMember;
 use App\Models\EmailLog;
 use App\Models\RosterPeriod;
 use App\Models\User;
-use App\Services\RosterExportService;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Queue;
@@ -84,8 +83,15 @@ class RosterExportTest extends TestCase
 
         Mail::fake();
         $log = EmailLog::query()->with('crewMember')->firstOrFail();
-        (new SendRosterEmail($log->id))->handle(app(RosterExportService::class));
-        Mail::assertSent(RosterMail::class, fn (RosterMail $mail): bool => $mail->hasTo($log->email) && count($mail->attachments()) === 1 && count($mail->duties) === 1);
+        app()->call([new SendRosterEmail($log->id), 'handle']);
+        // The captain's email lists the Monday flight with everyone on it, and the calendar file.
+        Mail::assertSent(RosterMail::class, function (RosterMail $mail) use ($log): bool {
+            $monday = collect($mail->roster['days'])->firstWhere('date', '2026-10-05');
+            $mail->assertSeeInOrderInHtml(['Your published roster', 'LB1', 'Captain', '(you)', 'First officer', 'Charlie Officer', 'Cabin crew 1', 'Delta Cabin'])
+                ->assertSeeInText('Flying with: Captain')->assertDontSeeInHtml('var(--');
+
+            return $mail->hasTo($log->email) && count($mail->attachments()) === 1 && $monday['entries'][0]['code'] === 'LB1' && $mail->roster['totals']['flights'] === 1;
+        });
         $this->assertSame('sent', $log->fresh()->status);
         $this->getJson("/api/v1/roster-periods/{$this->period->id}/email-logs")->assertOk()->assertJsonCount(2, 'data');
     }
