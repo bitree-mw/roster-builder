@@ -65,11 +65,30 @@ class RosterExportController extends Controller
     }
 
     /**
-     * POST /roster-periods/{id}/email — queue roster emails for everyone with a seat (published weeks only).
+     * POST /roster-periods/{id}/email — email everyone with a seat (published rosters only). By default the emails
+     * are sent straight away in this request (config roster.mail_delivery "direct", for hosts without a queue
+     * worker such as cPanel); the reply says how many were sent, and 422 with the mail server's reason when none
+     * could be. With "queue" they are queued for a worker instead.
      */
     public function email(Request $request, RosterPeriod $rosterPeriod, RosterEmailService $emails): JsonResponse
     {
         Gate::authorize('manage-operations');
+        if (config('roster.mail_delivery') !== 'queue') {
+            // Sending to every crew member can take longer than the usual 30 seconds on a large roster.
+            if ((int) ini_get('max_execution_time') !== 0 && function_exists('set_time_limit')) {
+                set_time_limit((int) config('roster.build_time_limit'));
+            }
+            $result = $emails->send($rosterPeriod, $request->user());
+            if ($result['sent'] === 0 && $result['failed'] === 0) {
+                return ApiResponse::success('email.none', [], ['data' => $result]);
+            }
+            if ($result['sent'] === 0) {
+                return ApiResponse::error(ApiResponse::message('email.all_failed', ['reason' => $result['error'] ?? 'unknown error']), 422, 'email_failed', [], ['data' => $result]);
+            }
+            $key = $result['failed'] > 0 ? 'email.sent_with_failed' : ($result['missing'] > 0 ? 'email.sent_with_missing' : 'email.sent');
+
+            return ApiResponse::success($key, ['count' => $result['sent'], 'failed' => $result['failed'], 'missing' => $result['missing']], ['data' => $result]);
+        }
         $result = $emails->queue($rosterPeriod, $request->user());
         if ($result['queued'] === 0) {
             return ApiResponse::success('email.none', [], ['data' => $result]);

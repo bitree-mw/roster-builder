@@ -81,7 +81,7 @@ Conflict codes: inactive, rank, base, rating, document_missing, document_expired
 - Assigning a flight to someone with standby on its days clears that standby in the same transaction (candidates report clears_standby).
 - GET /roster-periods/{id}/export.csv — staff: every seat; crew: own seats of a published week (404 otherwise). Cells starting with = + - @ are prefixed with an apostrophe.
 - GET /roster-periods/{id}/calendar.ics?crew_member_id= — one crew member's duties (UTC events, base-local times in the description) and activities. Crew always get their own; staff must name the crew member.
-- POST /roster-periods/{id}/email — published rosters only: queues one email (day-by-day roster with the crew on each flight, planned days and night stops, plus an .ics file) per crew member with a seat, logged in email_logs (queued → sent | failed). Crew without an email address are counted as missing. A queue worker must run (php artisan queue:work).
+- POST /roster-periods/{id}/email — published rosters only: emails each crew member with a seat their day-by-day roster (with the crew on each flight, planned days and night stops) and an .ics file, logged in email_logs (sent | failed with the reason). By default (ROSTER_MAIL_DELIVERY=direct) the emails are sent in the request — no queue worker, suits cPanel — and the reply gives {sent, failed, missing}; 422 code email_failed with the mail server's reason when none could be sent. A log row left "queued" by an earlier attempt is reused, so nobody gets the roster twice. With ROSTER_MAIL_DELIVERY=queue they are queued for a worker (php artisan queue:work). Crew without an email address are counted as missing.
 - GET /roster-periods/{id}/email-logs — delivery status per crew member.
 
 ## Day planning

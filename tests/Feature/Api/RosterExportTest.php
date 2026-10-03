@@ -12,12 +12,14 @@ use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Queue;
 use Laravel\Sanctum\Sanctum;
+use RuntimeException;
 use Tests\Feature\Api\Concerns\RosterScenario;
 use Tests\TestCase;
 
 /**
  * Week outputs: CSV (formula-safe, own rows for crew), iCalendar (UTC events, escaped text) and roster
- * emails (published weeks only, logged per crew member, crew without an address skipped).
+ * emails (published rosters only, sent directly by default or queued, logged per crew member, crew without an
+ * address skipped, a stuck queued email sent once, and the mail server's reason shown when every send fails).
  */
 class RosterExportTest extends TestCase
 {
@@ -70,29 +72,63 @@ class RosterExportTest extends TestCase
         $this->assertStringEndsWith("END:VCALENDAR\r\n", $ics);
     }
 
-    public function test_roster_emails_are_queued_for_published_weeks_and_logged_per_crew_member(): void
+    public function test_roster_emails_are_sent_directly_and_logged_per_crew_member(): void
     {
-        Queue::fake();
+        Mail::fake();
         $this->postJson("/api/v1/roster-periods/{$this->period->id}/email")->assertUnprocessable()->assertJsonPath('errors.period.0', 'Publish this roster before emailing it to crew.');
         $this->postJson("/api/v1/roster-periods/{$this->period->id}/publish")->assertOk();
 
+        // No queue worker needed: both crew members with an address get their email in this request.
         $this->postJson("/api/v1/roster-periods/{$this->period->id}/email")->assertOk()
-            ->assertJsonPath('message', 'Roster emails queued for 2 crew members. 1 have no email address on file.')->assertJsonPath('data.missing', 1);
-        Queue::assertPushed(SendRosterEmail::class, 2);
-        $this->assertSame(2, EmailLog::where('status', 'queued')->count());
-
-        Mail::fake();
-        $log = EmailLog::query()->with('crewMember')->firstOrFail();
-        app()->call([new SendRosterEmail($log->id), 'handle']);
+            ->assertJsonPath('message', 'Roster emails sent to 2 crew members. 1 have no email address on file.')->assertJsonPath('data.sent', 2)->assertJsonPath('data.missing', 1);
+        $this->assertSame(2, EmailLog::where('status', 'sent')->count());
+        Mail::assertSent(RosterMail::class, 2);
         // The captain's email lists the Monday flight with everyone on it, and the calendar file.
-        Mail::assertSent(RosterMail::class, function (RosterMail $mail) use ($log): bool {
+        $captain = CrewMember::firstWhere('rank', 'CPT');
+        Mail::assertSent(RosterMail::class, function (RosterMail $mail) use ($captain): bool {
+            if (! $mail->hasTo($captain->email)) {
+                return false;
+            }
             $monday = collect($mail->roster['days'])->firstWhere('date', '2026-10-05');
             $mail->assertSeeInOrderInHtml(['Your published roster', 'LB1', 'Captain', '(you)', 'First officer', 'Charlie Officer', 'Cabin crew 1', 'Delta Cabin'])
                 ->assertSeeInText('Flying with: Captain')->assertDontSeeInHtml('var(--');
 
-            return $mail->hasTo($log->email) && count($mail->attachments()) === 1 && $monday['entries'][0]['code'] === 'LB1' && $mail->roster['totals']['flights'] === 1;
+            return count($mail->attachments()) === 1 && $monday['entries'][0]['code'] === 'LB1' && $mail->roster['totals']['flights'] === 1;
         });
-        $this->assertSame('sent', $log->fresh()->status);
         $this->getJson("/api/v1/roster-periods/{$this->period->id}/email-logs")->assertOk()->assertJsonCount(2, 'data');
+    }
+
+    public function test_an_email_left_queued_earlier_is_sent_once_not_duplicated(): void
+    {
+        Mail::fake();
+        $this->postJson("/api/v1/roster-periods/{$this->period->id}/publish")->assertOk();
+        $captain = CrewMember::firstWhere('rank', 'CPT');
+        $stuck = EmailLog::query()->create(['crew_member_id' => $captain->id, 'roster_period_id' => $this->period->id, 'email' => $captain->email, 'status' => 'queued']);
+
+        $this->postJson("/api/v1/roster-periods/{$this->period->id}/email")->assertOk()->assertJsonPath('data.sent', 2);
+        $this->assertSame('sent', $stuck->fresh()->status);
+        $this->assertSame(1, EmailLog::where('crew_member_id', $captain->id)->count());
+    }
+
+    public function test_when_the_mail_server_refuses_every_email_the_reason_is_shown(): void
+    {
+        $this->postJson("/api/v1/roster-periods/{$this->period->id}/publish")->assertOk();
+        Mail::shouldReceive('to')->andThrow(new RuntimeException('535 Incorrect authentication data'));
+
+        $this->postJson("/api/v1/roster-periods/{$this->period->id}/email")->assertUnprocessable()->assertJsonPath('code', 'email_failed')
+            ->assertJsonPath('message', 'No roster email could be sent. The mail server said: 535 Incorrect authentication data');
+        $this->assertSame(2, EmailLog::where('status', 'failed')->where('error', '535 Incorrect authentication data')->count());
+    }
+
+    public function test_with_queued_delivery_emails_wait_for_a_worker(): void
+    {
+        config(['roster.mail_delivery' => 'queue']);
+        Queue::fake();
+        $this->postJson("/api/v1/roster-periods/{$this->period->id}/publish")->assertOk();
+
+        $this->postJson("/api/v1/roster-periods/{$this->period->id}/email")->assertOk()
+            ->assertJsonPath('message', 'Roster emails queued for 2 crew members. 1 have no email address on file.');
+        Queue::assertPushed(SendRosterEmail::class, 2);
+        $this->assertSame(2, EmailLog::where('status', 'queued')->count());
     }
 }

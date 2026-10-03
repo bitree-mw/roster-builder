@@ -27,10 +27,17 @@ return [
     'max_trip_days' => (int) env('ROSTER_MAX_TRIP_DAYS', 14),
 
     /**
-     * Seconds a roster build may run (monthly rosters check every crew member for hundreds of seats). Shared
-     * hosts often stop requests after 30 seconds; the build asks for this much where the host allows it.
+     * Seconds a roster build, or sending roster emails directly, may run (monthly rosters check every crew
+     * member for hundreds of seats; emails go out one by one). Shared hosts often stop requests after 30
+     * seconds; these requests ask for this much where the host allows it.
      */
     'build_time_limit' => (int) env('ROSTER_BUILD_TIME_LIMIT', 180),
+
+    /**
+     * How roster emails are delivered: "direct" sends them straight away when crew control clicks "Email crew"
+     * (no queue worker needed, e.g. on cPanel); "queue" queues them for a worker (php artisan queue:work).
+     */
+    'mail_delivery' => env('ROSTER_MAIL_DELIVERY', 'direct'),
 
     /** Most weeks returned by one GET /roster-periods?from=&to= request (the week timeline). */
     'max_weeks_listed' => 60,

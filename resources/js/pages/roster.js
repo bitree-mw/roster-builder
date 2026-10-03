@@ -1061,7 +1061,7 @@ async function loadEmailLog() {
     const tones = { queued: 'info', sent: 'success', failed: 'danger' };
     rows.replaceChildren(...data.map(log => {
         const row = element('tr');
-        const status = element('td'); status.append(chip(log.status === 'queued' ? 'Waiting for queue' : log.status === 'sent' ? 'Sent' : 'Failed', tones[log.status]));
+        const status = element('td'); status.append(chip(log.status === 'queued' ? 'Waiting to send' : log.status === 'sent' ? 'Sent' : 'Failed', tones[log.status]));
         if (log.error) status.append(element('div', log.error, 'small muted'));
         row.append(element('td', log.name), element('td', log.email, 'small mono'), status, element('td', log.sent_at ? formatInstant(log.sent_at) : '—', 'small mono'));
         return row;
@@ -1069,7 +1069,7 @@ async function loadEmailLog() {
 }
 if (staff) {
     buttons.email.addEventListener('click', event => busy(event.currentTarget, async () => {
-        const confirmed = await confirmAction({ title: `Email ${state.week.label} to crew?`, message: 'Each crew member with a seat in this roster receives their duties and a calendar file at the email address on their crew profile.', confirmLabel: 'Send emails', tone: 'info' });
+        const confirmed = await confirmAction({ title: `Email ${state.week.label} to crew?`, message: 'Each crew member with a seat in this roster is emailed their roster (with the crew they fly with) and a calendar file at the address on their crew profile. Sending can take a minute for a large roster.', confirmLabel: 'Send emails', tone: 'info' });
         if (!confirmed) return;
         try { await api(`/api/v1/roster-periods/${state.week.id}/email`, { method: 'POST' }); }
         catch (error) { showError(error); }

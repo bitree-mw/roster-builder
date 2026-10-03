@@ -12,9 +12,11 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Queues roster emails for a published week: one email (with a calendar attachment) per crew member who
- * holds a seat in it, each tracked by an email log row (queued → sent or failed). Crew without an email
- * address are skipped and counted. Nothing is ever sent for drafts or by the demo seeder.
+ * Roster emails for a published roster: one email (with a calendar attachment) per crew member who holds a
+ * seat in it, each tracked by an email log row (queued → sent or failed). They are sent straight away by
+ * default (send(), for hosts such as cPanel without a queue worker) or queued with ROSTER_MAIL_DELIVERY=queue
+ * (queue()). Crew without an email address are skipped and counted. Nothing is ever sent for drafts or by
+ * the demo seeder.
  */
 class RosterEmailService
 {
@@ -54,6 +56,53 @@ class RosterEmailService
 
             return ['queued' => $queued, 'missing' => $missing];
         });
+    }
+
+    /**
+     * Send the roster emails straight away, in this request, for hosts without a queue worker (e.g. cPanel).
+     * Each recipient still gets an email log row (sent, or failed with the reason). A row left "queued" by an
+     * earlier queued attempt is reused, so nobody receives the same roster twice when it is finally sent.
+     *
+     * @return array{sent: int, failed: int, missing: int, error: string|null} error: the first failure reason
+     *
+     * @throws ValidationException when the roster is not published
+     */
+    public function send(RosterPeriod $period, User $actor): array
+    {
+        if ($period->status !== 'published') {
+            throw ValidationException::withMessages(['period' => 'Publish this roster before emailing it to crew.']);
+        }
+        [$logs, $missing] = DB::transaction(function () use ($period, $actor): array {
+            $crews = CrewMember::query()->whereHas('assignments.trip', fn ($query) => $query->where('roster_period_id', $period->id))->orderBy('name')->get();
+            $logs = [];
+            $missing = 0;
+            foreach ($crews as $crew) {
+                if (blank($crew->email)) {
+                    $missing++;
+
+                    continue;
+                }
+                $log = EmailLog::query()->where('roster_period_id', $period->id)->where('crew_member_id', $crew->id)->where('status', 'queued')->first()
+                    ?? new EmailLog(['crew_member_id' => $crew->id, 'roster_period_id' => $period->id, 'status' => 'queued']);
+                $log->fill(['email' => $crew->email, 'requested_by' => $actor->id])->save();
+                $logs[] = $log;
+            }
+            $this->audit->record($actor, 'emailed', $period, null, ['direct' => count($logs), 'missing' => $missing]);
+
+            return [$logs, $missing];
+        });
+        // Sent one by one after the log rows are committed; SendRosterEmail records sent or failed on each row.
+        foreach ($logs as $log) {
+            SendRosterEmail::dispatchSync($log->id);
+        }
+        $results = EmailLog::query()->whereKey(array_map(fn (EmailLog $log): int => $log->id, $logs))->get();
+
+        return [
+            'sent' => $results->where('status', 'sent')->count(),
+            'failed' => $results->where('status', 'failed')->count(),
+            'missing' => $missing,
+            'error' => $results->firstWhere('status', 'failed')?->error,
+        ];
     }
 
     /**

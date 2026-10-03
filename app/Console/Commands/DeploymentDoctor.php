@@ -166,8 +166,13 @@ class DeploymentDoctor extends Command
         if ($mailer === 'smtp' && $placeholders !== []) {
             $this->result('FAIL', 'Mail settings', 'MAIL_HOST / MAIL_USERNAME / MAIL_FROM_ADDRESS still contain the your-domain.com placeholders. Enter your cPanel mailbox details.');
         }
+        // Roster emails only need a queue worker when ROSTER_MAIL_DELIVERY=queue; "direct" sends them in the request.
         $queue = (string) config('queue.default');
-        $this->result($queue === 'sync' ? 'OK' : 'WARN', 'Queue', $queue === 'sync' ? 'sync: emails are sent during the request.' : $queue.': keep a worker running (php artisan queue:work) or emails stay queued.');
+        if (config('roster.mail_delivery') !== 'queue' || $queue === 'sync') {
+            $this->result('OK', 'Roster emails', 'Sent directly when crew control clicks "Email crew" (no queue worker needed).');
+        } else {
+            $this->result('WARN', 'Roster emails', 'ROSTER_MAIL_DELIVERY=queue on the '.$queue.' queue: keep a worker running (php artisan queue:work) or emails stay queued.');
+        }
     }
 
     /** Whether a table exists (false when the database cannot be reached). */

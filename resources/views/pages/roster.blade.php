@@ -154,7 +154,7 @@
 
 {{-- Delivery status of this week's roster emails. --}}
 <dialog id="email-dialog" class="dialog" aria-labelledby="email-dialog-title"><form method="dialog">
-    <div class="dialog-heading"><div><h2 id="email-dialog-title">Roster email status</h2><p>Emails are sent by the queue worker; refresh to see progress.</p></div><button type="submit" class="icon-button" aria-label="Close"><x-icon name="x" /></button></div>
+    <div class="dialog-heading"><div><h2 id="email-dialog-title">Roster email status</h2><p>Delivery of each crew member's roster email. Emails are sent when you click "Email crew"; failed ones show the mail server's reason.</p></div><button type="submit" class="icon-button" aria-label="Close"><x-icon name="x" /></button></div>
     <div class="table-wrap"><table><thead><tr><th scope="col">Crew member</th><th scope="col">Address</th><th scope="col">Status</th><th scope="col">Sent</th></tr></thead><tbody id="email-rows"></tbody></table></div>
     <div class="form-actions"><button id="email-refresh" class="button button-secondary" type="button">Refresh</button><button class="button" type="submit">Close</button></div>
 </form></dialog>

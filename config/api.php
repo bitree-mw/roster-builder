@@ -102,6 +102,10 @@ return [
             'deleted' => ':crew can be assigned to :label again.',
         ],
         'email' => [
+            'sent' => 'Roster emails sent to :count crew members.',
+            'sent_with_missing' => 'Roster emails sent to :count crew members. :missing have no email address on file.',
+            'sent_with_failed' => 'Roster emails sent to :count crew members; :failed could not be sent. Open "Email status" to see why.',
+            'all_failed' => 'No roster email could be sent. The mail server said: :reason',
             'queued' => 'Roster emails queued for :count crew members.',
             'queued_with_missing' => 'Roster emails queued for :count crew members. :missing have no email address on file.',
             'none' => 'No crew member in this week has an email address on file.',
