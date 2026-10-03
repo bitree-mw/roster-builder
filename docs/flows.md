@@ -17,13 +17,13 @@ Flights page switch → PATCH /flights/{id}/status → FlightService::setActive 
 Page loads API list and lookup data. Form sends explicit fields; Form Request rejects malformed input. Services synchronize child records in a transaction and record audit changes. API Resource returns a deliberate response. UI rerenders using text nodes and displays validation messages.
 FlightTimelineService checks connectivity, return to base, day boundaries and configured duty/rest limits; UTC snapshots are calculated on the server.
 
-## Weekly roster
-Roster window → GET /roster-periods?from&to (timeline) → GET /roster-periods/{id} → RosterLegalityService::context (rules snapshot, crew with ratings/documents/activities, the week's trips and seats, neighbouring weeks' seats, fleet availability) → RosterConflictService → RosterWeekResource (filtered to own seats for crew).
-Create: POST /roster-periods {week_start} → RosterPeriodRequest (Monday, planning window) → RosterPeriodService::create (rules snapshot, audit).
-Build: POST /roster-periods/{id}/build → lock the week row → RosterPeriodService::assertEditable → expand enabled patterns from today (FlightTimelineService::validate against the snapshot rules → UTC schedule snapshot) and ensure seats → release automatic seats (manual seats and operated trips kept) → hardest seats first → RosterLegalityService::issues + score for every active crew member of the position → assign the lowest legal score or leave open, writing decision_log → built_at/built_by and audit, all in one transaction.
+## Roster (1 week, 2 weeks or a month)
+Roster window → GET /roster-periods?from&to (timeline of rosters overlapping the range; gaps are shown as "No roster") → GET /roster-periods/{id} → RosterLegalityService::context (rules snapshot, crew with ratings/documents/activities, the roster's trips and seats, seats in neighbouring rosters reaching back up to roster.max_trip_days for long rotations, fleet availability) → RosterConflictService → RosterWeekResource (filtered to own seats for crew).
+Create: POST /roster-periods {starts_on, length} → RosterPeriodRequest (Monday for week/fortnight, the 1st for a month, planning window) → RosterPeriodService::create (overlap check, rules snapshot, audit).
+Build: POST /roster-periods/{id}/build → lock the roster row → RosterPeriodService::assertEditable → expand enabled patterns from today (FlightTimelineService::validate against the snapshot rules → UTC schedule snapshot) and ensure seats → release automatic seats (manual seats and operated trips kept) → hardest seats first → RosterLegalityService::issues + score for every active crew member of the position → assign the lowest legal score or leave open, writing decision_log → built_at/built_by and audit, all in one transaction.
 Edit: seat editor → GET /assignments/{id}/candidates → PUT /assignments/{id} → AssignmentRequest → AssignmentService::assign (lock week, editable and not operated, hard problems refused, reason required for other problems, flag_reasons, decision_log, audit).
 Publish: POST /roster-periods/{id}/publish → built and no blocking conflict → status published (audited). Reopen: POST /roster-periods/{id}/reopen → draft (audited).
-Crew see only published weeks and their own seats; drafts return 404.
+Crew see only published rosters and their own seats; drafts return 404. The individual view (grid crew name, or ?crew=) shows one person's days, including layover days of a multi-day rotation.
 
 ## Accounts
 Accounts page → GET /accounts (filtered to roles the caller may assign) → AccountRequest (authorize: manage-accounts and, on edit, the target's role; rules: role in assignableRoles, crew link for pilot/cabin) → AccountService::save (lock, last-admin guard, explicit role/username/crew link, revoke sessions and tokens on a password set by someone else, audit) → AccountResource. DELETE → delete-accounts gate → AccountService::delete. "My account" → PUT /me/password → AccountService::changeOwnPassword.
@@ -50,7 +50,7 @@ GET /backups/download → BackupService::export (audited). POST /backups/inspect
 /forgot-password → POST /forgot-password → PasswordResetService::sendLink (email or username; broker token; branded ResetPassword mail) → emailed link → /reset-password/{token} → POST /reset-password → PasswordResetService::reset (password, remember token, revoke tokens and sessions, audit).
 
 ## Dashboard
-Dashboard page → GET /dashboard → DashboardService (OverviewService counts, the four weeks around today with RosterConflictService summaries, conflicts for this and next week, today's trips, fleet issues, MaintenanceService alerts, crew documents within the warning window) → DashboardResource.
+Dashboard page → GET /dashboard → DashboardService (OverviewService counts, the last, current and next two rosters around today with RosterConflictService summaries, conflicts for this and next week, today's trips, fleet issues, MaintenanceService alerts, crew documents within the warning window) → DashboardResource.
 
 ## Future exports / imports
 Exports use the same authorized roster query and selected range. CSV/ICS escaping and timezone edge cases need tests.

@@ -1,5 +1,7 @@
 {{--
-    Weekly roster window. Staff build, review and edit a week; crew see only their own published duties.
+    Roster window. Rosters run for 1 week, 2 weeks or a calendar month. Staff create, build, review and edit
+    them, plan leave/day off/standby/SIM by clicking an empty day, and open any crew member's individual
+    roster; crew see only their own published duties.
     Data and interactions: resources/js/pages/roster.js (API: /api/v1/roster-periods, /api/v1/assignments).
     data-today is today's base-local date so the week timeline never depends on the browser's timezone.
 --}}
@@ -7,10 +9,9 @@
 @section('content')
 @php($staff = auth()->user()->isStaff())
 <div id="roster-root" data-today="{{ $today }}" hidden></div>
-<x-page-heading :eyebrow="$staff ? 'Crew control / Weekly roster' : 'My roster'" :heading="$staff ? 'Weekly roster' : 'My weekly roster'" :description="$staff ? 'Rosters run Monday to Sunday. The generator fills every seat with legal crew, balancing each person\'s weekly working hours; you can then change any seat. Past weeks are kept as read-only history.' : 'Your published duties week by week. Only weeks released by crew control are shown.'">
+<x-page-heading :eyebrow="$staff ? 'Crew control / Roster' : 'My roster'" :heading="$staff ? 'Roster' : 'My roster'" :description="$staff ? 'Rosters run for one week, two weeks or a calendar month. The generator fills every seat with legal crew, balancing each person\'s working hours; you can then change any seat, and click an empty day to plan leave, a day off, standby or SIM. Past rosters are kept as read-only history.' : 'Your published duties day by day. Only rosters released by crew control are shown.'">
     @if($staff)
-    {{-- Week actions; roster.js shows only those that apply to the selected week. --}}
-    <button id="create-week" class="button" type="button" hidden><x-icon name="plus" class="icon-sm" />Create &amp; build week</button>
+    {{-- Roster actions; roster.js shows only those that apply. New rosters are created from the "No roster" view. --}}
     <button id="build-week" class="button" type="button" hidden><x-icon name="zap" class="icon-sm" /><span data-label>Build roster</span></button>
     <button id="publish-week" class="button button-secondary" type="button" hidden><x-icon name="send" class="icon-sm" />Publish to crew</button>
     <button id="reopen-week" class="button button-secondary" type="button" hidden><x-icon name="rotate" class="icon-sm" />Reopen as draft</button>
@@ -18,29 +19,29 @@
     @endif
 </x-page-heading>
 
-{{-- Week timeline: past and upcoming weeks with their status. --}}
+{{-- Timeline: past and upcoming rosters (any length) and the gaps between them. --}}
 <section class="panel" aria-labelledby="timeline-title">
     <div class="panel-heading">
-        <div class="panel-title"><x-icon name="calendar" /><h2 id="timeline-title">Roster weeks</h2></div>
+        <div class="panel-title"><x-icon name="calendar" /><h2 id="timeline-title">Rosters</h2></div>
         <div class="toolbar">
-            <button id="timeline-earlier" class="icon-button" type="button" aria-label="Earlier weeks" title="Earlier weeks"><x-icon name="chevron-left" /></button>
-            <button id="timeline-today" class="button button-sm button-quiet" type="button">This week</button>
-            <button id="timeline-later" class="icon-button" type="button" aria-label="Later weeks" title="Later weeks"><x-icon name="chevron-right" /></button>
+            <button id="timeline-earlier" class="icon-button" type="button" aria-label="Earlier" title="Earlier"><x-icon name="chevron-left" /></button>
+            <button id="timeline-today" class="button button-sm button-quiet" type="button">Today</button>
+            <button id="timeline-later" class="icon-button" type="button" aria-label="Later" title="Later"><x-icon name="chevron-right" /></button>
         </div>
     </div>
-    <div id="week-strip" class="week-strip" role="list" aria-label="Roster weeks" aria-busy="true"><p class="loading-block">Loading weeks…</p></div>
+    <div id="week-strip" class="week-strip" role="list" aria-label="Rosters" aria-busy="true"><p class="loading-block">Loading rosters…</p></div>
 </section>
 
-{{-- KPIs for the selected week (staff: coverage and conflicts; crew: their own totals). --}}
+{{-- KPIs for the selected roster (staff: coverage and conflicts; crew: their own totals). --}}
 <div class="kpi-grid">
     @if($staff)
     <x-kpi label="Seat coverage" icon="users" value="week.coverage" meta="Filled of required seats" />
     <x-kpi label="Open seats" icon="alert" value="week.open" meta="No legal crew available" />
     <x-kpi label="Rule conflicts" icon="shield" value="week.conflicts" meta="Must be resolved to publish" />
     <x-kpi label="Crew on duty" icon="users" value="week.crew" meta="With at least one duty" />
-    <x-kpi label="Duty hours" icon="clock" value="week.hours" meta="All crew this week" />
+    <x-kpi label="Duty hours" icon="clock" value="week.hours" meta="All crew in this roster" />
     @else
-    <x-kpi label="My duties" icon="calendar" value="week.duties" meta="Trips this week" />
+    <x-kpi label="My duties" icon="calendar" value="week.duties" meta="Trips in this roster" />
     <x-kpi label="Duty time" icon="clock" value="week.duty" meta="Report to release" />
     <x-kpi label="Block time" icon="plane" value="week.block" meta="Flying time" />
     @endif
@@ -55,14 +56,15 @@
 @endunless
 
 <div class="split roster-split">
-    {{-- The selected week: crew grid, trips or conflicts. --}}
+    {{-- The selected roster: crew grid, individual roster, trips or conflicts. --}}
     <section class="panel roster-panel" aria-labelledby="week-title">
         <div class="panel-heading">
-            <div class="panel-title"><h2 id="week-title">Week</h2><span id="week-state" class="chip">Loading</span></div>
+            <div class="panel-title"><h2 id="week-title">Roster</h2><span id="week-state" class="chip">Loading</span></div>
             @if($staff)
             <div class="toolbar">
                 <div class="segmented" id="view-switch" role="group" aria-label="Roster view">
                     <button type="button" data-value="grid" aria-pressed="true">Crew grid</button>
+                    <button type="button" data-value="individual" aria-pressed="false">Individual</button>
                     <button type="button" data-value="trips" aria-pressed="false">Trips</button>
                     <button type="button" data-value="conflicts" aria-pressed="false">Conflicts <span id="conflict-tab-count"></span></button>
                 </div>

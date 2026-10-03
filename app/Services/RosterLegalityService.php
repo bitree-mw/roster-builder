@@ -27,6 +27,15 @@ class RosterLegalityService
     /** Problems a manual override can never accept (the seat would be meaningless or the data inconsistent). */
     public const HARD = ['inactive', 'rank', 'already_on_trip'];
 
+    /** Plain-language names for rejection codes, used when explaining open seats. */
+    public const REASON_LABELS = [
+        'inactive' => 'inactive', 'rank' => 'other position', 'base' => 'based elsewhere', 'rating' => 'not rated on the aircraft',
+        'document_missing' => 'document not on record', 'document_expired' => 'document expired', 'excluded' => 'excluded',
+        'already_on_trip' => 'already on the trip', 'unavailable' => 'on leave, day off, SIM or standby', 'overlap' => 'already on duty',
+        'rest' => 'not enough rest', 'duty_7d' => '7-day duty limit', 'block_month' => 'monthly block limit',
+        'consecutive_days' => 'consecutive duty days', 'days_off_month' => 'monthly days off', 'weekly_hours' => 'weekly working hours',
+    ];
+
     /** Every rostered crew member needs all three documents valid for the whole duty. */
     private const DOCUMENTS = ['licence' => 'Licence', 'medical' => 'Medical', 'recurrent' => 'Recurrent training'];
 
@@ -44,7 +53,8 @@ class RosterLegalityService
     {
         $rules = $period->rules_snapshot;
         $from = $period->starts_on->startOfMonth()->min($period->starts_on->subDays(7));
-        $to = $period->ends_on->endOfMonth()->max($period->ends_on->addDays(7));
+        // Far enough ahead for the longest rotation that starts in this roster.
+        $to = $period->ends_on->endOfMonth()->max($period->ends_on->addDays(max(7, (int) config('roster.max_trip_days'))));
         $crews = CrewMember::query()
             ->with(['ratings', 'documents', 'activities' => fn ($query) => $query->whereBetween('date', [$from->format('Y-m-d'), $to->format('Y-m-d')])])
             ->orderBy('id')->get()->keyBy('id');
@@ -71,9 +81,10 @@ class RosterLegalityService
                 }
             }
         }
-        // Seats held in other weeks (trips can start up to three days before the range and still overlap it).
+        // Seats held in other rosters (a rotation can start up to max_trip_days - 1 days before the range and
+        // still overlap it, since its crew stay with it until it is back at base).
         $history = Assignment::query()->whereNotNull('crew_member_id')
-            ->whereHas('trip', fn ($query) => $query->where('roster_period_id', '!=', $period->id)->whereBetween('start_date', [$from->subDays(3)->format('Y-m-d'), $to->format('Y-m-d')]))
+            ->whereHas('trip', fn ($query) => $query->where('roster_period_id', '!=', $period->id)->whereBetween('start_date', [$from->subDays((int) config('roster.max_trip_days') - 1)->format('Y-m-d'), $to->format('Y-m-d')]))
             ->with('trip')->get();
         foreach ($history as $assignment) {
             $duty = Duty::fromSnapshot('assignment:'.$assignment->id, $assignment->trip_id, $assignment->trip->schedule_snapshot);
@@ -113,7 +124,8 @@ class RosterLegalityService
             return $issues;
         }
         $schedule = $context->schedule($crew->id);
-        foreach ($duty->dates() as $date) {
+        // Every day away from base counts, including layover days at an outstation without flying.
+        foreach ($duty->awayDates() as $date) {
             if (isset($schedule->unavailable[$date])) {
                 $issues[] = ['code' => 'unavailable', 'message' => self::ACTIVITIES[$schedule->unavailable[$date]].' on '.CarbonImmutable::parse($date)->format('d M').'.'];
             }
@@ -132,7 +144,7 @@ class RosterLegalityService
     {
         $schedule = $context->schedule($crew->id);
         $issues = [];
-        foreach ($duty->dates() as $date) {
+        foreach ($duty->awayDates() as $date) {
             if (isset($schedule->unavailable[$date])) {
                 $issues[] = ['code' => 'unavailable', 'message' => self::ACTIVITIES[$schedule->unavailable[$date]].' on '.CarbonImmutable::parse($date)->format('d M').'.'];
             }
@@ -177,8 +189,12 @@ class RosterLegalityService
         $lastDate = $duty ? max($duty->dates()) : $trip->start_date->format('Y-m-d');
         foreach (self::DOCUMENTS as $kind => $label) {
             $document = $crew->documents->firstWhere('kind', $kind);
+            // Missing records block only when the rules say so (policy "block"); with "warn" they are reported by
+            // documentWarnings() instead. Rule snapshots from before the policy existed count as "warn".
             if ($document === null) {
-                $issues[] = ['code' => 'document_missing', 'message' => 'No '.strtolower($label).' expiry on record.'];
+                if (($context->rules['missing_documents'] ?? 'warn') === 'block') {
+                    $issues[] = ['code' => 'document_missing', 'message' => 'No '.strtolower($label).' expiry on record.'];
+                }
             } elseif ($document->expires_on->format('Y-m-d') < $lastDate) {
                 $issues[] = ['code' => 'document_expired', 'message' => $label.' expires '.$document->expires_on->format('d M Y').', before this duty ends.'];
             }
@@ -188,6 +204,22 @@ class RosterLegalityService
         }
 
         return $issues;
+    }
+
+    /**
+     * Documents not on record for a crew member when the rules' missing-documents policy is "warn": the
+     * seat may be held, but crew control is told which records to complete.
+     *
+     * @return array<int, string>
+     */
+    public function documentWarnings(PlanningContext $context, CrewMember $crew): array
+    {
+        if (($context->rules['missing_documents'] ?? 'warn') === 'block') {
+            return [];
+        }
+
+        return collect(self::DOCUMENTS)->reject(fn (string $label, string $kind): bool => $crew->documents->contains('kind', $kind))
+            ->map(fn (string $label): string => 'No '.strtolower($label).' expiry on record.')->values()->all();
     }
 
     /**

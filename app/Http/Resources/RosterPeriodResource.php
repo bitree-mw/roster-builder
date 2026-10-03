@@ -24,6 +24,8 @@ class RosterPeriodResource extends JsonResource
             'starts_on' => $this->starts_on->format('Y-m-d'),
             'ends_on' => $this->ends_on->format('Y-m-d'),
             'iso_week' => $this->starts_on->isoWeek,
+            'length' => $this->length,
+            'days' => count($this->dates()),
             'label' => ucfirst($this->label()),
             'status' => $this->status,
             'built_at' => $this->built_at?->toIso8601String(),

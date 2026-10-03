@@ -195,3 +195,40 @@
     .roster-grid thead th, .roster-grid .roster-crew { position: static; }
     .panel, .kpi, .page-heading { break-inside: avoid; }
 }
+
+/* Longer rosters: the grid widens with the number of days and scrolls sideways; Mondays get a stronger rule. */
+.roster-grid[data-days="14"] { min-width: 1700px; }
+.roster-grid[data-days="28"], .roster-grid[data-days="29"], .roster-grid[data-days="30"], .roster-grid[data-days="31"] { min-width: 3200px; }
+.roster-grid[data-days="28"] .duty-route, .roster-grid[data-days="29"] .duty-route, .roster-grid[data-days="30"] .duty-route, .roster-grid[data-days="31"] .duty-route { display: none; }
+.roster-grid .roster-day[data-week-start="true"] { border-left: 2px solid var(--color-line-strong); }
+.week-chip[data-length="fortnight"] { width: 14rem; }
+.week-chip[data-length="month"] { width: 16rem; }
+.week-chip[data-length="gap"] { width: 9.5rem; }
+
+/* Empty day in the grid: a quiet "+" that opens day planning (leave, day off, standby, SIM). */
+.plan-cell { display: grid; place-items: center; width: 100%; min-height: 2.25rem; border: 1px dashed transparent; border-radius: 4px; background: none; color: transparent; }
+.roster-cell:hover .plan-cell, .plan-cell:focus-visible, .individual-entries .plan-cell { border-color: var(--color-line-strong); color: var(--color-muted); }
+.plan-cell:hover { border-style: solid; color: var(--color-ink); }
+button.activity { width: 100%; font: inherit; cursor: pointer; }
+/* Layover day of a multi-day trip: away at an outstation with no flying (not a free day). */
+.activity.layover { border: 1px solid var(--color-info); background: var(--color-info-soft); color: var(--color-info); }
+.individual-entries button.activity { width: auto; }
+
+/* Creating a roster from the "No roster" view. */
+.create-roster { display: flex; flex-direction: column; align-items: center; padding-bottom: 1.5rem; }
+.create-roster-form { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: .75rem; padding: 0 1rem; }
+.create-roster-form .field-hint { flex-basis: 100%; text-align: center; }
+.inline-field { flex-direction: row; align-items: center; gap: .375rem; font-size: .8125rem; }
+.inline-field input, .inline-field select { width: auto; min-height: 38px; }
+
+/* Individual roster: one crew member's days. */
+.individual { display: flex; flex-direction: column; }
+.individual-head { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; padding: .875rem 1.125rem; border-bottom: 1px solid var(--color-line); }
+.individual-head .row-actions { margin-left: auto; }
+.individual-days { margin: 0; padding: 0; list-style: none; }
+.individual-day { display: grid; grid-template-columns: 7.5rem minmax(0, 1fr); gap: .75rem; align-items: start; padding: .5rem 1.125rem; border-bottom: 1px solid var(--color-line); }
+.individual-day[data-today="true"] { background: var(--color-brand-soft); }
+.individual-date { padding-top: .375rem; font-size: .8125rem; font-weight: 700; }
+.individual-entries { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
+.individual-duty { width: auto; min-width: 14rem; }
+.individual-entries .plan-cell { width: 2.25rem; }

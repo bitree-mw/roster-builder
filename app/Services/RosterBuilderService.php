@@ -10,14 +10,16 @@ use App\Models\RosterPeriod;
 use App\Models\RuleSet;
 use App\Models\Trip;
 use App\Models\User;
+use App\Support\Roster\CrewSchedule;
 use App\Support\Roster\Duty;
 use App\Support\Roster\PlanningContext;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 /**
- * The roster generator. For one draft week it:
+ * The roster generator. For one draft period (a week, two weeks or a month) it:
  *
  *  1. expands every enabled flight pattern into dated trips for its operating days (with a UTC schedule
  *     snapshot) and makes sure each trip has its CPT, FO and cabin seats;
@@ -47,7 +49,7 @@ class RosterBuilderService
     /**
      * Build (or rebuild) a draft week and return what happened.
      *
-     * @return array{trips: int, seats: int, filled: int, open: int, kept: int, rebalanced: int, standby: int, skipped: array<int, string>}
+     * @return array{trips: int, planned_trips: int, seats: int, filled: int, open: int, kept: int, rebalanced: int, standby: int, skipped: array<int, string>, reasons: array<string, int>}
      *
      * @throws ValidationException when the week is published or has ended
      */
@@ -105,7 +107,18 @@ class RosterBuilderService
 
             $seats = $context->trips->sum(fn (Trip $trip): int => $trip->assignments->count());
             $filled = $context->trips->sum(fn (Trip $trip): int => $trip->assignments->whereNotNull('crew_member_id')->count());
-            $summary = ['trips' => $context->trips->count(), 'seats' => $seats, 'filled' => $filled, 'open' => $seats - $filled, 'kept' => $kept, 'rebalanced' => $rebalanced, 'standby' => $standby, 'skipped' => $skipped];
+            // Why seats stayed open: rejection counts summed over the open seats planned in this build.
+            $reasons = [];
+            foreach ($open as $item) {
+                if ($item['seat']->crew_member_id === null) {
+                    foreach ($item['seat']->decision_log['reason_counts'] ?? [] as $code => $count) {
+                        $reasons[$code] = ($reasons[$code] ?? 0) + $count;
+                    }
+                }
+            }
+            arsort($reasons);
+            $summary = ['trips' => $context->trips->count(), 'planned_trips' => $context->trips->reject(fn (Trip $trip): bool => $context->operated($trip))->count(), 'seats' => $seats, 'filled' => $filled, 'open' => $seats - $filled,
+                'kept' => $kept, 'rebalanced' => $rebalanced, 'standby' => $standby, 'skipped' => $skipped, 'reasons' => array_slice($reasons, 0, 3, true)];
             $before = $period->toArray();
             $period->built_at = now();
             $period->built_by = $actor->id;
@@ -204,10 +217,11 @@ class RosterBuilderService
 
                 continue;
             }
-            // starts_on is a Monday, so the day offset is the pattern weekday (Monday = 0).
-            foreach ($flight->days->pluck('weekday') as $weekday) {
-                $date = $period->starts_on->addDays($weekday);
-                if ($date->lt($today)) {
+            // Every date of the period (a week, two weeks or a month) on which the pattern operates (Monday = 0).
+            $weekdays = $flight->days->pluck('weekday')->all();
+            foreach ($period->dates() as $day) {
+                $date = CarbonImmutable::parse($day, 'UTC');
+                if ($date->lt($today) || ! in_array($date->dayOfWeekIso - 1, $weekdays, true)) {
                     continue;
                 }
                 $key = $flight->id.'|'.$date->format('Y-m-d');
@@ -306,13 +320,15 @@ class RosterBuilderService
 
     /**
      * Even out workload after the greedy fill: up to three passes over the automatic seats, busiest holder
-     * first, each seat moving to the legal crew member with the lowest share of their weekly capacity when
-     * the move lowers the larger of the two shares. Returns how many seats moved.
+     * first, each seat moving to the legal crew member with the lowest share of their capacity for the
+     * period (weekly capacity × weeks in the period) when the move lowers the larger of the two shares.
+     * Returns how many seats moved.
      */
     private function rebalance(PlanningContext $context): int
     {
-        $monday = $context->period->starts_on->format('Y-m-d');
-        $share = fn (CrewMember $crew, int $extra = 0): float => ($context->schedule($crew->id)->weekMinutes($monday) + $extra) / max($this->legality->capacity($context, $crew), 1);
+        [$from, $to] = [$context->period->starts_on->format('Y-m-d'), $context->period->ends_on->format('Y-m-d')];
+        $weeks = count($context->period->dates()) / 7;
+        $share = fn (CrewMember $crew, int $extra = 0): float => ($context->schedule($crew->id)->minutesBetween($from, $to) + $extra) / max($this->legality->capacity($context, $crew) * $weeks, 1);
         $moves = 0;
         for ($pass = 0; $pass < 3; $pass++) {
             $seats = [];
@@ -363,11 +379,12 @@ class RosterBuilderService
     }
 
     /**
-     * Plan standby on free days (from today) for active crew who would otherwise have more days off this
-     * week than the rules allow. The allowance is prorated: max_days_off_week × available days / 7, where
-     * leave days are not available. Protected days off count as off but never receive standby. Each standby
-     * is checked like any duty (rest, limits, working hours) and skipped when it would break a rule.
-     * A max_days_off_week of 7 turns this off. Returns how many standby days were planned.
+     * Plan standby on free days (from today) for active crew who would otherwise have more days off in a
+     * Monday–Sunday week than the rules allow. Each week of the period is handled on its own; the allowance is
+     * prorated: max_days_off_week × available days / 7, where leave days are not available. Standby is only
+     * planned on days when flights leave the crew member's base (it is a reserve for flying days), never on
+     * protected days off, and only when legal (rest, limits, working hours). A max_days_off_week of 7 turns
+     * this off. Returns how many standby days were planned.
      */
     private function planStandby(PlanningContext $context, CarbonImmutable $today): int
     {
@@ -379,45 +396,64 @@ class RosterBuilderService
         $start = (string) config('roster.standby_start_local');
         $startMinutes = (int) substr($start, 0, 2) * 60 + (int) substr($start, 3, 2) + (int) config('roster.standby_hours') * 60;
         $end = sprintf('%02d:%02d', intdiv($startMinutes % 1440, 60), $startMinutes % 60);
-        $days = [];
-        for ($date = $context->period->starts_on->max($today); $date->lte($context->period->ends_on); $date = $date->addDay()) {
-            $days[] = $date->format('Y-m-d');
+        // Remaining days of the period, grouped by Monday-week, and the days flights leave each base.
+        $weeks = collect($context->period->dates())->filter(fn (string $date): bool => $date >= $today->format('Y-m-d'))->groupBy(fn (string $date): string => Duty::weekOf($date));
+        $flyingDays = [];
+        foreach ($context->trips as $trip) {
+            $flyingDays[$trip->schedule_snapshot['base'] ?? ''][$trip->start_date->format('Y-m-d')] = true;
         }
         $planned = 0;
         foreach ($context->crews as $crew) {
-            if (! $crew->active || $days === []) {
+            if (! $crew->active) {
                 continue;
             }
             $schedule = $context->schedule($crew->id);
             $activities = $crew->activities->keyBy(fn (CrewActivity $activity): string => $activity->date->format('Y-m-d'));
-            $dutyDates = array_flip(array_merge([], ...array_map(fn (Duty $duty): array => $duty->dates(), array_values($schedule->duties))));
-            $available = count(array_filter($days, fn (string $date): bool => $activities->get($date)?->type !== 'leave'));
-            if ($available === 0) {
+            foreach ($weeks as $days) {
+                $planned += $this->standbyForWeek($context, $crew, $schedule, $activities, $days->values()->all(), $flyingDays[$crew->base_airport] ?? [], $maxOff, $start, $end, $offset);
+            }
+        }
+
+        return $planned;
+    }
+
+    /**
+     * Standby for one crew member in one week of the period (see planStandby()).
+     *
+     * @param  Collection<string, CrewActivity>  $activities  keyed by date
+     * @param  array<int, string>  $days  remaining dates of this week inside the period
+     * @param  array<string, bool>  $flyingDays  dates with flights from the crew member's base
+     */
+    private function standbyForWeek(PlanningContext $context, CrewMember $crew, CrewSchedule $schedule, Collection $activities, array $days, array $flyingDays, int $maxOff, string $start, string $end, int $offset): int
+    {
+        $planned = 0;
+        $dutyDates = array_flip(array_merge([], ...array_map(fn (Duty $duty): array => $duty->dates(), array_values($schedule->duties))));
+        $available = count(array_filter($days, fn (string $date): bool => $activities->get($date)?->type !== 'leave'));
+        if ($available === 0) {
+            return 0;
+        }
+        $free = array_values(array_filter($days, fn (string $date): bool => ! isset($dutyDates[$date]) && ! $activities->has($date)));
+        $protected = count(array_filter($days, fn (string $date): bool => $activities->get($date)?->type === 'day_off'));
+        $excess = count($free) + $protected - (int) round($maxOff * $available / 7);
+        foreach (array_filter($free, fn (string $date): bool => isset($flyingDays[$date])) as $date) {
+            if ($excess <= 0) {
+                break;
+            }
+            [$startsAt, $endsAt] = $this->activities->instants(CarbonImmutable::parse($date, 'UTC'), $start, $end, $offset);
+            $duty = new Duty('standby:'.$date, 'Standby on '.CarbonImmutable::parse($date)->format('d M'), null, [[
+                'start' => intdiv(CarbonImmutable::parse($startsAt, 'UTC')->getTimestamp(), 60),
+                'end' => intdiv(CarbonImmutable::parse($endsAt, 'UTC')->getTimestamp(), 60),
+                'block' => 0, 'date' => $date, 'dates' => [$date],
+            ]]);
+            if ($this->legality->dutyIssues($context, $crew, $duty) !== []) {
                 continue;
             }
-            $free = array_values(array_filter($days, fn (string $date): bool => ! isset($dutyDates[$date]) && ! $activities->has($date)));
-            $protected = count(array_filter($days, fn (string $date): bool => $activities->get($date)?->type === 'day_off'));
-            $excess = count($free) + $protected - (int) round($maxOff * $available / 7);
-            foreach ($free as $date) {
-                if ($excess <= 0) {
-                    break;
-                }
-                [$startsAt, $endsAt] = $this->activities->instants(CarbonImmutable::parse($date, 'UTC'), $start, $end, $offset);
-                $duty = new Duty('standby:'.$date, 'Standby on '.CarbonImmutable::parse($date)->format('d M'), null, [[
-                    'start' => intdiv(CarbonImmutable::parse($startsAt, 'UTC')->getTimestamp(), 60),
-                    'end' => intdiv(CarbonImmutable::parse($endsAt, 'UTC')->getTimestamp(), 60),
-                    'block' => 0, 'date' => $date, 'dates' => [$date],
-                ]]);
-                if ($this->legality->dutyIssues($context, $crew, $duty) !== []) {
-                    continue;
-                }
-                $activity = new CrewActivity(['crew_member_id' => $crew->id, 'date' => $date, 'type' => 'standby', 'starts_at' => $startsAt, 'ends_at' => $endsAt, 'note' => 'Planned standby (workload)']);
-                $activity->roster_period_id = $context->period->id;
-                $activity->save();
-                $schedule->add($duty->withKey('activity:'.$activity->id));
-                $excess--;
-                $planned++;
-            }
+            $activity = new CrewActivity(['crew_member_id' => $crew->id, 'date' => $date, 'type' => 'standby', 'starts_at' => $startsAt, 'ends_at' => $endsAt, 'note' => 'Planned standby (workload)']);
+            $activity->roster_period_id = $context->period->id;
+            $activity->save();
+            $schedule->add($duty->withKey('activity:'.$activity->id));
+            $excess--;
+            $planned++;
         }
 
         return $planned;

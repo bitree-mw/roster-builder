@@ -12,7 +12,8 @@ class FlightTimelineService
 {
     /**
      * Check a pattern's legs for connectivity, base return, day boundaries and the configured duty/rest limits,
-     * and compute each trip day's duty period.
+     * and compute each trip day's duty period. A new trip day means a night stop, which must be at an
+     * outstation: one rotation keeps the same crew from leaving base until it is back there.
      *
      * @param  array<int, array{trip_day: int, from_airport: string, to_airport: string, departs_local: string, arrives_local: string}>  $legs
      * @return array{base: string, periods: array<int, array<string, mixed>>, warnings: array<int, string>}
@@ -31,8 +32,12 @@ class FlightTimelineService
         }
         foreach ($legs as $index => $leg) {
             $day = (int) $leg['trip_day'];
-            if (($index === 0 && $day !== 1) || $day < $previousDay || $day > $previousDay + 1) {
-                $this->fail('Trip days must start at 1, stay in order, and have no gaps.');
+            // A jump of more than one day is a multi-night layover at the outstation (no flying in between).
+            if (($index === 0 && $day !== 1) || $day < $previousDay) {
+                $this->fail('Trip days must start at 1 and stay in order.');
+            }
+            if ($day > (int) config('roster.max_trip_days')) {
+                $this->fail('A rotation can last at most '.config('roster.max_trip_days').' days.');
             }
             if ($leg['from_airport'] === $leg['to_airport']) {
                 $this->fail('A leg must arrive at a different airport.');
@@ -52,6 +57,11 @@ class FlightTimelineService
             $arrival = intdiv($departure, 1440) * 1440 + $this->minutes($leg['arrives_local']);
             if ($arrival <= $departure) {
                 $arrival += 1440;
+            }
+            // Crew change only at base, so a night stop is always at an outstation; flying after a night at
+            // base is a new rotation (a separate route) with possibly different crew.
+            if ($previous && $day !== $previousDay && $previous['to'] === $base) {
+                $this->fail('A night stop must be at an outstation. The trip ends when it is back at base (crew change there), so add later flying as a separate route.');
             }
             if ($previous && $day !== $previousDay && $departure <= $previous['arrival']) {
                 $this->fail('The next trip day must start after the previous arrival.');
@@ -91,6 +101,17 @@ class FlightTimelineService
     public function instant(string $startDate, int $localMinutes, int $offsetMinutes): string
     {
         return CarbonImmutable::parse($startDate, 'UTC')->startOfDay()->addMinutes($localMinutes - $offsetMinutes)->toIso8601String();
+    }
+
+    /**
+     * Move a wall-clock "HH:MM" by an offset in minutes, wrapping round midnight. Used to convert between GMT
+     * and base-local times with the rules' explicit offset (never the server or browser timezone).
+     */
+    public function shiftClock(string $time, int $offset): string
+    {
+        $minutes = (($this->minutes($time) + $offset) % 1440 + 1440) % 1440;
+
+        return sprintf('%02d:%02d', intdiv($minutes, 60), $minutes % 60);
     }
 
     /**

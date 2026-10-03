@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<html lang="en">
+{{-- data-theme comes from the "theme" cookie (light or dark); without it the system preference applies. --}}
+<html lang="en" @if(in_array(request()->cookie('theme'), ['light', 'dark'], true)) data-theme="{{ request()->cookie('theme') }}" @endif>
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -26,9 +27,10 @@
         </a>
         <div class="topbar-actions">
             @if($staff)
-            <a class="alert-pill" href="{{ route('maintenance') }}" data-alert-pill="maintenance" hidden><x-icon name="wrench" class="icon-sm" /><span data-alert-pill-text></span></a>
             <a class="alert-pill" href="{{ route('crew') }}" data-alert-pill="documents" data-tone="warning" hidden><x-icon name="id-card" class="icon-sm" /><span data-alert-pill-text></span></a>
             @endif
+            {{-- Light / dark theme switch (resources/js/common/theme.js). --}}
+            <button id="theme-toggle" class="icon-button" type="button" aria-label="Switch to dark theme" title="Switch theme"><x-icon name="moon" data-theme-icon="moon" /><x-icon name="sun" data-theme-icon="sun" /></button>
             {{-- The user chip opens "My account" (change your own password); resources/js/common/account.js. --}}
             <button id="my-account" class="user-chip" type="button" aria-haspopup="dialog" title="My account">
                 <span class="user-chip-text"><span class="user-chip-name">{{ auth()->user()->name }}</span><span class="user-chip-role">{{ auth()->user()->roleLabel() }}</span></span>
@@ -37,22 +39,22 @@
             <button id="logout" class="icon-button" type="button" aria-label="Sign out" title="Sign out"><x-icon name="logout" /></button>
         </div>
     </div>
-    {{-- Main navigation. Crew accounts only see the roster; data-tab-count badges are filled from /api/v1/overview. --}}
+    {{-- Main navigation: Dashboard, Roster, Flight routes, Fleet, Crew, Crew hours, Duty rules, Import, Accounts.
+         Crew accounts only see their roster. Reports open from the Dashboard; the maintenance log from Fleet.
+         data-tab-count badges are filled from /api/v1/overview. --}}
     <nav class="tabs" aria-label="Main navigation">
         @if($staff)
         <a class="tab" href="{{ route('dashboard') }}" @if($page === 'dashboard') aria-current="page" @endif><x-icon name="layout" class="icon-sm" />Dashboard</a>
         @endif
-        <a class="tab" href="{{ route('roster') }}" @if($page === 'roster') aria-current="page" @endif><x-icon name="calendar" class="icon-sm" />{{ $staff ? 'Weekly roster' : 'My roster' }}</a>
+        <a class="tab" href="{{ route('roster') }}" @if($page === 'roster') aria-current="page" @endif><x-icon name="calendar" class="icon-sm" />{{ $staff ? 'Roster' : 'My roster' }}</a>
         @if($staff)
         @foreach([
-            'flights' => ['Flights & routes', 'route'],
+            'flights' => ['Flight routes', 'route'],
             'aircraft' => ['Fleet', 'plane'],
-            'maintenance' => ['Maintenance', 'wrench'],
             'crew' => ['Crew', 'users'],
             'hours' => ['Crew hours', 'gauge'],
-            'reports' => ['Reports', 'clipboard'],
             'rules' => ['Duty rules', 'sliders'],
-            'data' => ['Import & backup', 'copy'],
+            'data' => ['Import', 'copy'],
         ] as $key => [$label, $icon])
         <a class="tab" href="{{ route($key) }}" @if($page === $key) aria-current="page" @endif><x-icon :name="$icon" class="icon-sm" />{{ $label }}<span class="tab-count" data-tab-count="{{ $key }}" hidden></span></a>
         @endforeach

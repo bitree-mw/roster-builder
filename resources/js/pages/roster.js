@@ -1,5 +1,5 @@
 /**
- * Weekly roster window (pages/roster.blade.php).
+ * Roster window (pages/roster.blade.php): rosters of 1 week, 2 weeks or a calendar month.
  *
  * Staff: a timeline of past and upcoming weeks; for the selected week a crew × day grid, a trips view and a
  * conflicts view; a duty inspector explaining each seat; and actions to create, build (the server-side
@@ -17,13 +17,14 @@
  */
 import { api, download } from '../common/api';
 import { confirmAction } from '../common/confirm';
-import { ACTIVITIES, RANKS, WEEKDAYS, addDays, conflictRow, isoWeek, mondayOf, shortDate, weekRange, weekState } from '../common/roster';
+import { ACTIVITIES, RANKS, WEEKDAYS, addDays, conflictRow, mondayOf, parseDay, shortDate, weekState } from '../common/roster';
 import { busy, chip, element, emptyState, formatDate, formatInstant, formatMinutes, icon, iconButton, plural, segmented, setKpi, setKpiTone, showError, status, toast } from '../common/ui';
 
 const staff = ['admin', 'scheduler', 'crew_control'].includes(document.body.dataset.role);
 const today = document.querySelector('#roster-root').dataset.today;
-const thisMonday = mondayOf(today);
-const STRIP_WEEKS = 9;
+// The timeline shows 13 weeks at a time; rosters are 1 week, 2 weeks or a calendar month.
+const WINDOW_DAYS = 7 * 13;
+const LENGTHS = { week: '1 week', fortnight: '2 weeks', month: 'Month' };
 // Plain-language labels for the generator's rejection codes (shown for open seats).
 const REASONS = {
     inactive: 'inactive', rank: 'other position', base: 'other base', rating: 'not rated', document_missing: 'document missing',
@@ -32,15 +33,18 @@ const REASONS = {
     consecutive_days: 'consecutive duty days', days_off_month: 'monthly days off', weekly_hours: 'weekly working hours',
 };
 
-// Page state. "week" is the full roster window for the selected week (null when the week does not exist).
+// Page state. "slot" is the selected timeline entry (a roster or a gap without one); "week" is the full
+// roster for it (null when there is none). ?start= (or the older ?week=) selects the slot containing a date.
 const query = new URLSearchParams(window.location.search);
-const requestedWeek = /^\d{4}-\d{2}-\d{2}$/.test(query.get('week') || '') ? mondayOf(query.get('week')) : thisMonday;
+const requested = [query.get('start'), query.get('week')].find(value => /^\d{4}-\d{2}-\d{2}$/.test(value || '')) ?? today;
 const state = {
-    selected: requestedWeek,
-    anchor: addDays(requestedWeek, -7 * 3),
-    periods: new Map(),
+    windowStart: addDays(mondayOf(requested), -28),
+    periods: [],
+    slots: [],
+    slot: null,
     week: null,
-    view: 'grid',
+    crewId: Number(query.get('crew')) || null,
+    view: query.get('crew') ? 'individual' : 'grid',
     rank: '',
     search: '',
     dutiesOnly: false,
@@ -53,7 +57,6 @@ const strip = document.querySelector('#week-strip');
 const inspector = document.querySelector('#inspector');
 const notice = document.querySelector('#week-notice');
 const buttons = {
-    create: document.querySelector('#create-week'),
     build: document.querySelector('#build-week'),
     publish: document.querySelector('#publish-week'),
     reopen: document.querySelector('#reopen-week'),
@@ -79,83 +82,145 @@ function viewerState(period) {
     const status = weekState(period);
     return !staff && status.key === 'missing' ? { ...status, label: 'Not published' } : status;
 }
-/** Whether the week has ended (its Sunday is before today at base). */
-function ended(monday) { return addDays(monday, 6) < today; }
+/** Whether a slot (roster or gap) has ended: its last day is before today at base. */
+function ended(slot) { return Boolean(slot) && slot.end < today; }
 /** Whether seats on a trip can still be changed by the scheduler. */
 function changeable(trip) { return staff && state.week?.editable && !trip.operated; }
 /** The duty periods of a trip that touch a date (a night stop has one per day). */
 function dutiesOn(trip, date) { return trip.duties.filter(duty => duty.dates.includes(date)); }
+/**
+ * Where a trip's crew are staying on a day without flying between two of its duty periods (a multi-night
+ * layover), or null. The crew are away from base, so the day is not free to plan.
+ */
+function layoverOn(trip, date) {
+    if (dutiesOn(trip, date).length || !trip.duties.some(duty => duty.dates[0] > date)) return null;
+    const before = trip.duties.filter(duty => duty.dates[duty.dates.length - 1] < date);
+    const legs = before[before.length - 1]?.legs ?? [];
+    return legs[legs.length - 1]?.to_airport ?? null;
+}
+/** "Night stop · MZU" tag for a layover day; selecting it opens the trip like a duty does. */
+function layoverTag(trip, airport) {
+    const tag = element('button', null, 'activity layover'); tag.type = 'button';
+    tag.append(element('strong', 'Night stop'), element('span', `${trip.code} · ${airport}`, 'mono'));
+    tag.title = `Away at ${airport} with ${trip.code}; the crew stay with the trip until it is back at base`;
+    tag.addEventListener('click', () => selectTrip(trip.id));
+    return tag;
+}
 /** First report and last release, base local. */
 function tripTimes(trip) {
     if (!trip.duties.length) return '';
     return `${trip.duties[0].report_local}–${trip.duties[trip.duties.length - 1].release_local} LT`;
 }
 
-/* ---------------------------------------------------------------- Week timeline */
+/* ---------------------------------------------------------------- Roster timeline */
 
-/** Load the weeks shown in the timeline (anchor + STRIP_WEEKS) and render the strip. */
+/**
+ * Timeline slots for the visible window: one per existing roster (whatever its length), and "no roster"
+ * gaps between them, each gap at most one Monday–Sunday week long.
+ */
+function buildSlots() {
+    const slots = [];
+    const last = addDays(state.windowStart, WINDOW_DAYS - 1);
+    let date = state.windowStart;
+    while (date <= last) {
+        const period = state.periods.find(item => item.starts_on <= date && item.ends_on >= date);
+        if (period) { slots.push({ key: period.starts_on, start: period.starts_on, end: period.ends_on, period }); date = addDays(period.ends_on, 1); continue; }
+        const next = state.periods.find(item => item.starts_on > date);
+        let end = addDays(mondayOf(date), 6);
+        if (next && addDays(next.starts_on, -1) < end) end = addDays(next.starts_on, -1);
+        slots.push({ key: date, start: date, end, period: null });
+        date = addDays(end, 1);
+    }
+    return slots;
+}
+
+/** Load the rosters overlapping the visible window and redraw the strip. */
 async function loadTimeline() {
-    const to = addDays(state.anchor, 7 * (STRIP_WEEKS - 1));
-    const { data } = await api(`/api/v1/roster-periods?from=${state.anchor}&to=${to}`);
-    state.periods = new Map(data.map(period => [period.starts_on, period]));
+    const to = addDays(state.windowStart, WINDOW_DAYS - 1);
+    const { data } = await api(`/api/v1/roster-periods?from=${state.windowStart}&to=${to}`);
+    state.periods = data;
+    state.slots = buildSlots();
     renderTimeline();
 }
 
-/** One button per week: ISO week, dates, status, and for staff the open seats. The selected week is pressed. */
+/** "05–11 Oct" or "28 Sep–04 Oct" for a slot. */
+function slotRange(slot) {
+    if (slot.start === slot.end) return shortDate(slot.start);
+    const sameMonth = slot.start.slice(0, 7) === slot.end.slice(0, 7);
+    return `${sameMonth ? slot.start.slice(8) : shortDate(slot.start)}–${shortDate(slot.end)}`;
+}
+
+/** Every date of the selected slot (a week, two weeks, a month or a gap). */
+function slotDates() {
+    const dates = [];
+    for (let date = state.slot.start; date <= state.slot.end; date = addDays(date, 1)) dates.push(date);
+    return dates;
+}
+
+/** One button per slot: length, dates, status and (staff) open seats. The selected slot is pressed. */
 function renderTimeline() {
     strip.setAttribute('aria-busy', 'false');
-    const items = [];
-    for (let index = 0; index < STRIP_WEEKS; index++) {
-        const monday = addDays(state.anchor, 7 * index);
-        const period = state.periods.get(monday);
-        const status = viewerState(period);
+    strip.replaceChildren(...state.slots.map(slot => {
+        const status = viewerState(slot.period);
         const item = element('div', null, 'week-item'); item.setAttribute('role', 'listitem');
         const button = element('button', null, 'week-chip'); button.type = 'button';
-        button.dataset.state = status.key; button.setAttribute('aria-pressed', String(monday === state.selected));
-        if (monday === thisMonday) button.dataset.current = 'true';
-        if (ended(monday)) button.dataset.past = 'true';
+        button.dataset.state = status.key; button.dataset.length = slot.period?.length ?? 'gap';
+        button.setAttribute('aria-pressed', String(slot.key === state.slot?.key));
+        if (slot.start <= today && slot.end >= today) button.dataset.current = 'true';
+        if (ended(slot)) button.dataset.past = 'true';
         const top = element('span', null, 'week-chip-top');
-        top.append(element('span', `WK ${isoWeek(monday)}`, 'label-caps'), element('span', monday === thisMonday ? 'This week' : ended(monday) ? 'Past' : 'Upcoming', 'week-chip-when'));
-        button.append(top, element('span', weekRange(monday), 'week-chip-range mono'));
+        const when = slot.start <= today && slot.end >= today ? 'Now' : ended(slot) ? 'Past' : 'Upcoming';
+        top.append(element('span', slot.period ? LENGTHS[slot.period.length] : 'No roster', 'label-caps'), element('span', when, 'week-chip-when'));
+        button.append(top, element('span', slot.period?.length === 'month' ? slot.period.label : `${slotRange(slot)} ${slot.end.slice(0, 4)}`, 'week-chip-range mono'));
         const chips = element('span', null, 'chip-list'); chips.append(chip(status.label, status.tone, { dot: true }));
-        if (staff && period?.open_seats_count) chips.append(chip(`${period.open_seats_count} open`, 'warning'));
+        if (staff && slot.period?.open_seats_count) chips.append(chip(`${slot.period.open_seats_count} open`, 'warning'));
         button.append(chips);
-        button.addEventListener('click', () => selectWeek(monday));
-        item.append(button); items.push(item);
-    }
-    strip.replaceChildren(...items);
+        button.addEventListener('click', () => selectSlot(slot.key).catch(showError));
+        item.append(button); return item;
+    }));
     strip.querySelector('[aria-pressed="true"]')?.scrollIntoView({ block: 'nearest', inline: 'center' });
 }
 
-/** Select a week, keep it visible in the strip, record it in the URL and load it. */
-async function selectWeek(monday, { tripId = null } = {}) {
-    state.selected = monday; state.tripId = tripId;
-    const last = addDays(state.anchor, 7 * (STRIP_WEEKS - 1));
-    if (monday < state.anchor || monday > last) { state.anchor = addDays(monday, -7 * 3); await loadTimeline(); } else renderTimeline();
-    const url = new URL(window.location.href); url.searchParams.set('week', monday);
+/**
+ * Select the slot containing a date (moving the window when needed), record it in the URL and load it.
+ */
+async function selectSlot(date, { tripId = null } = {}) {
+    state.tripId = tripId;
+    if (date < state.windowStart || date > addDays(state.windowStart, WINDOW_DAYS - 1)) {
+        state.windowStart = addDays(mondayOf(date), -28);
+        await loadTimeline();
+    }
+    state.slot = state.slots.find(slot => slot.start <= date && slot.end >= date) ?? state.slots[0];
+    renderTimeline();
+    const url = new URL(window.location.href); url.searchParams.set('start', state.slot.start); url.searchParams.delete('week');
     if (tripId) url.searchParams.set('trip', tripId); else url.searchParams.delete('trip');
     window.history.replaceState(null, '', url);
     await loadWeek();
 }
 
-/* ---------------------------------------------------------------- Selected week */
+/* ---------------------------------------------------------------- Selected roster */
 
-/** Load the roster window for the selected week, or show the "not created" state. */
+/** Load the roster for the selected slot, or show the "no roster" state. */
 async function loadWeek() {
     view.setAttribute('aria-busy', 'true');
-    const period = state.periods.get(state.selected);
+    const period = state.slot?.period;
     if (!period) { state.week = null; state.index = null; renderMissing(); return; }
     const { data } = await api(`/api/v1/roster-periods/${period.id}`);
     applyWeek(data);
 }
 
 /**
- * Store a week returned by the API (after loading, building, publishing or reopening) and redraw
+ * Store a roster returned by the API (after loading, building, publishing or reopening) and redraw
  * everything that depends on it.
  */
 function applyWeek(week) {
     state.week = week;
-    state.periods.set(week.starts_on, { ...state.periods.get(week.starts_on), ...week, open_seats_count: week.summary.open });
+    const index = state.periods.findIndex(period => period.id === week.id);
+    const summary = { ...week, open_seats_count: week.summary.open };
+    if (index >= 0) state.periods[index] = { ...state.periods[index], ...summary }; else state.periods.push(summary);
+    state.periods.sort((a, b) => a.starts_on.localeCompare(b.starts_on));
+    state.slots = buildSlots();
+    state.slot = state.slots.find(slot => slot.period?.id === week.id) ?? state.slot;
     state.index = buildIndex(week);
     if (state.tripId && !week.trips.some(trip => trip.id === state.tripId)) state.tripId = null;
     renderTimeline(); renderHeader(); renderNotice(); renderKpis(); renderActions(); renderView(); renderInspector();
@@ -176,24 +241,24 @@ function buildIndex(week) {
     return { seatsByCrew, seatConflicts, tripConflicts };
 }
 
-/** Week title and status chip. */
+/** Roster title and status chip. */
 function renderHeader() {
-    const monday = state.selected;
-    document.querySelector('#week-title').textContent = `Week ${isoWeek(monday)} · ${weekRange(monday)}`;
+    document.querySelector('#week-title').textContent = state.week ? state.week.label : `No roster · ${slotRange(state.slot)} ${state.slot.end.slice(0, 4)}`;
     const status = viewerState(state.week);
     const target = document.querySelector('#week-state');
-    target.textContent = ended(monday) && state.week ? `${status.label} · ended` : status.label;
+    target.textContent = ended(state.slot) && state.week ? `${status.label} · ended` : status.label;
     if (status.tone) target.dataset.tone = status.tone; else delete target.dataset.tone;
 }
 
-/** One-line explanation of what can be done with the selected week. */
+/** One-line explanation of what can be done with the selected roster. */
 function renderNotice() {
     const week = state.week;
     let message = null; let tone = 'info';
-    if (week && ended(state.selected)) message = 'This week has ended. It is kept as read-only history.';
+    if (week && ended(state.slot)) message = 'This roster has ended. It is kept as read-only history.';
     else if (week?.status === 'published') message = staff ? 'Published to crew. Reopen it as a draft to rebuild or change seats.' : null;
-    else if (week && staff && !week.built_at) { message = 'This draft has not been built yet. Build it to fill every seat automatically from crew working hours and the duty rules.'; tone = 'warning'; }
-    else if (week && staff && week.summary.blocking) { message = `${plural(week.summary.blocking, 'rule conflict')} must be changed or accepted with an override reason before this week can be published.`; tone = 'danger'; }
+    else if (week && staff && !week.built_at) { message = 'This draft has not been built yet. Build it to fill every seat automatically from crew working hours and the duty rules. Click an empty day in the grid to plan leave, a day off, standby or SIM first.'; tone = 'warning'; }
+    else if (week && staff && !week.trips.length) { message = 'No trips in this roster: no enabled flight operates on its remaining days. Check Flight routes, then rebuild.'; tone = 'warning'; }
+    else if (week && staff && week.summary.blocking) { message = `${plural(week.summary.blocking, 'rule conflict')} must be changed or accepted with an override reason before this roster can be published.`; tone = 'danger'; }
     notice.hidden = !message;
     if (message) { notice.dataset.tone = tone; notice.replaceChildren(icon(tone === 'danger' ? 'shield' : tone === 'warning' ? 'alert' : 'clipboard'), element('span', message)); }
 }
@@ -219,13 +284,13 @@ function renderKpis() {
     setKpi('week.conflicts', summary.blocking, `${summary.acknowledged} accepted with override · ${plural(summary.warnings, 'warning')}`);
     setKpiTone('week.conflicts', summary.blocking ? 'danger' : 'success');
     setKpi('week.crew', state.index.seatsByCrew.size, `of ${week.crew.filter(crew => crew.active).length} active crew`);
-    const minutes = week.crew.reduce((total, crew) => total + crew.week_duty_minutes, 0);
+    const minutes = week.crew.reduce((total, crew) => total + crew.period_duty_minutes, 0);
     setKpi('week.hours', formatMinutes(minutes), 'Duty incl. timed SIM / standby');
 }
 
 /**
- * Show only the week actions that apply: create, build/rebuild, publish, reopen or email; and enable the
- * downloads once the week exists.
+ * Show only the roster actions that apply: build/rebuild, publish, reopen or email; and enable the
+ * downloads once the roster exists.
  */
 function renderActions() {
     const week = state.week;
@@ -233,10 +298,9 @@ function renderActions() {
         const button = document.querySelector(id); if (button) button.disabled = !week;
     }
     if (!staff) return;
-    const past = ended(state.selected);
+    const past = ended(state.slot);
     buttons.email.hidden = week?.status !== 'published';
     document.querySelector('#email-log').hidden = week?.status !== 'published';
-    buttons.create.hidden = Boolean(week) || past;
     buttons.build.hidden = !week?.editable;
     buttons.build.querySelector('[data-label]').textContent = week?.built_at ? 'Rebuild roster' : 'Build roster';
     buttons.publish.hidden = !(week?.editable && week.built_at);
@@ -245,31 +309,70 @@ function renderActions() {
     buttons.reopen.hidden = !(week?.status === 'published' && !past);
 }
 
-/** The selected week does not exist yet (or, for crew, is not published). */
+/**
+ * First valid start for a new roster of a length inside the selected gap: a Monday for one or two weeks,
+ * the 1st of a month for a month (the gap's own date when it already is one).
+ */
+function suggestedStart(length) {
+    const start = state.slot.start < today ? mondayOf(today) : state.slot.start;
+    if (length === 'month') return start.slice(8) === '01' ? start : addDays(`${start.slice(0, 8)}01`, 40).slice(0, 8) + '01';
+    return parseDay(start).getUTCDay() === 1 ? start : addDays(mondayOf(start), 7);
+}
+
+/** No roster for the selected slot: explain, and let staff create one (1 week, 2 weeks or a month) and build it. */
 function renderMissing() {
     view.setAttribute('aria-busy', 'false');
     renderHeader(); renderNotice(); renderKpis(); renderActions(); renderInspector();
     document.querySelector('#conflict-tab-count')?.replaceChildren();
-    const past = ended(state.selected);
-    const empty = !staff
-        ? emptyState('No published roster for this week', 'Your duties appear here once crew control publishes the week.', 'calendar')
-        : past
-            ? emptyState('No roster was made for this week', 'This week has ended, so a roster can no longer be created for it.', 'calendar')
-            : emptyState(`No roster for week ${isoWeek(state.selected)} yet`, 'Create the week to freeze the current duty rules for it, then the generator fills every seat from enabled flights, crew working hours, leave and documents. You can change any seat afterwards.', 'calendar');
-    view.replaceChildren(empty);
+    if (!staff) return view.replaceChildren(emptyState('No published roster for these dates', 'Your duties appear here once crew control publishes the roster.', 'calendar'));
+    if (ended(state.slot)) return view.replaceChildren(emptyState('No roster was made for these dates', 'These dates have passed, so a roster can no longer be created for them.', 'calendar'));
+    const wrap = element('div', null, 'create-roster');
+    wrap.append(emptyState('No roster for these dates yet', 'Choose how long the roster runs and when it starts. Creating it freezes the current duty rules, then the generator fills every seat from enabled flights, crew working hours, leave and documents. You can change any seat afterwards.', 'calendar'));
+    const form = element('form', null, 'create-roster-form'); form.noValidate = true;
+    const lengths = element('div', null, 'segmented'); lengths.setAttribute('role', 'group'); lengths.setAttribute('aria-label', 'Roster length');
+    let length = (() => { try { return localStorage.getItem('roster.length') || 'fortnight'; } catch { return 'fortnight'; } })();
+    for (const [value, label] of Object.entries(LENGTHS)) {
+        const option = element('button', label); option.type = 'button'; option.dataset.value = value; option.setAttribute('aria-pressed', String(value === length)); lengths.append(option);
+    }
+    const startLabel = element('label', 'Starts on', 'inline-field'); const start = element('input'); start.type = 'date'; start.name = 'starts_on'; start.required = true; start.value = suggestedStart(length); startLabel.append(start);
+    const hint = element('span', length === 'month' ? 'A month starts on the 1st.' : 'One- and two-week rosters start on a Monday.', 'field-hint');
+    const submit = element('button', null, 'button'); submit.type = 'submit'; submit.append(icon('zap', 'icon-sm'), 'Create & build roster');
+    segmented(lengths, value => {
+        length = value; start.value = suggestedStart(value);
+        hint.textContent = value === 'month' ? 'A month starts on the 1st.' : 'One- and two-week rosters start on a Monday.';
+        try { localStorage.setItem('roster.length', value); } catch { /* remembering the choice is optional */ }
+    });
+    form.append(lengths, startLabel, submit, hint);
+    form.addEventListener('submit', event => { event.preventDefault(); busy(submit, () => createPeriod(start.value, length)); });
+    wrap.append(form);
+    view.replaceChildren(wrap);
+}
+
+/** Create a roster of a length from a date, select it and build it straight away. */
+async function createPeriod(startsOn, length) {
+    try {
+        const { data } = await api('/api/v1/roster-periods', { method: 'POST', body: { starts_on: startsOn, length }, notify: false });
+        await loadTimeline();
+        state.slot = state.slots.find(slot => slot.period?.id === data.id) ?? state.slot;
+        state.week = { ...data, built_at: null };
+        await build();
+    } catch (error) { showError(error); }
 }
 
 /* ---------------------------------------------------------------- Views */
 
-/** Draw the active view: crew grid, trips or conflicts (crew accounts always see their trips). */
+/** Draw the active view: crew grid, trips, conflicts or one person's roster (crew accounts see their own). */
 function renderView() {
     view.setAttribute('aria-busy', 'false');
     const counter = document.querySelector('#conflict-tab-count');
     if (counter) counter.textContent = state.week.summary.conflicts ? `(${state.week.summary.blocking}/${state.week.summary.conflicts})` : '';
-    if (!state.week.trips.length) {
-        return view.replaceChildren(emptyState(staff ? 'No trips this week' : 'No duties this week', staff ? (state.week.built_at ? 'No enabled flight pattern operates this week. Enable flights on the Flights & routes page, then rebuild.' : 'Build the roster to create this week\'s trips from the enabled flight patterns.') : 'You have no rostered duties in this published week.', 'calendar'));
+    // Keep the view switch in step with the view (it can change from a crew name or a ?crew= link).
+    for (const button of document.querySelectorAll('#view-switch button[data-value]')) button.setAttribute('aria-pressed', String(button.dataset.value === state.view));
+    if (!staff || state.view === 'individual') return view.replaceChildren(individualView());
+    if (!state.week.trips.length && state.view !== 'grid') {
+        return view.replaceChildren(emptyState('No trips in this roster', state.week.built_at ? 'No enabled flight operates on its remaining days. Check Flight routes, then rebuild.' : 'Build the roster to create its trips from the enabled flight routes.', 'calendar'));
     }
-    if (!staff || state.view === 'trips') return view.replaceChildren(tripsView());
+    if (state.view === 'trips') return view.replaceChildren(tripsView());
     if (state.view === 'conflicts') return view.replaceChildren(conflictsView());
     view.replaceChildren(gridView());
 }
@@ -287,20 +390,23 @@ function visibleCrew() {
 }
 
 /**
- * Crew × day grid (like the uibuilder roster matrix): an "Open time" row for unfilled seats, then one row per
- * crew member with duties and activities per day, and their week hours against their working hours.
+ * Crew × day grid (like the uibuilder roster matrix) for every day of the roster: an "Open time" row for
+ * unfilled seats, then one row per crew member with duties and activities per day, and their hours for the
+ * period against their working hours. Staff click an empty day to plan leave, a day off, standby or SIM, an
+ * activity to change it, and a name to open that person's individual roster.
  */
 function gridView() {
-    const days = WEEKDAYS.map((name, index) => ({ name, date: addDays(state.selected, index) }));
-    const table = element('table', null, 'roster-grid');
+    const days = slotDates().map(date => ({ date, name: WEEKDAYS[(parseDay(date).getUTCDay() + 6) % 7] }));
+    const table = element('table', null, 'roster-grid'); table.dataset.days = String(days.length);
     const head = element('tr'); head.append(element('th', 'Crew member'));
     for (const day of days) {
         const th = element('th', null, 'roster-day'); th.scope = 'col';
         if (day.date === today) th.dataset.today = 'true';
+        if (day.name === 'Mon') th.dataset.weekStart = 'true';
         th.append(element('span', day.name), element('strong', shortDate(day.date), 'mono'));
         head.append(th);
     }
-    head.append(element('th', 'Week hours'));
+    head.append(element('th', 'Hours'));
     const thead = element('thead'); thead.append(head);
     const body = element('tbody');
 
@@ -331,13 +437,11 @@ function gridView() {
     for (const crew of crews) {
         const row = element('tr');
         const name = element('th', null, 'roster-crew'); name.scope = 'row';
-        // Staff open day planning (leave, day off, SIM, standby) from the crew member's name.
-        if (staff) {
-            const open = element('button', null, 'crew-plan-button'); open.type = 'button';
-            open.append(element('strong', crew.name)); open.title = `Plan leave, days off, SIM or standby for ${crew.name}`;
-            open.addEventListener('click', () => openPlan(crew));
-            name.append(open);
-        } else name.append(element('strong', crew.name));
+        // The name opens the crew member's individual roster.
+        const open = element('button', null, 'crew-plan-button'); open.type = 'button';
+        open.append(element('strong', crew.name)); open.title = `Open ${crew.name}'s individual roster`;
+        open.addEventListener('click', () => showIndividual(crew.id));
+        name.append(open);
         const meta = element('span', `${crew.rank} · ${crew.base_airport}`, 'small muted mono'); name.append(meta);
         if (!crew.active) name.append(chip('Inactive', 'danger'));
         row.append(name);
@@ -346,15 +450,19 @@ function gridView() {
             const td = element('td', null, 'roster-cell');
             for (const { trip, seat } of seats) {
                 for (const duty of dutiesOn(trip, day.date)) td.append(dutyButton(trip, seat, duty, day.date));
+                const away = layoverOn(trip, day.date);
+                if (away) td.append(layoverTag(trip, away));
             }
-            for (const activity of crew.activities.filter(item => item.date === day.date)) td.append(activityTag(activity));
+            for (const activity of crew.activities.filter(item => item.date === day.date)) td.append(activityTag(activity, crew));
+            // An empty day: staff can plan leave, a day off, standby or SIM from here.
+            if (staff && !td.childElementCount) td.append(planButton(crew, day.date));
             row.append(td);
         }
         row.append(hoursCell(crew));
         body.append(row);
     }
     if (!crews.length) {
-        const row = element('tr'); const td = element('td', null, 'roster-cell'); td.colSpan = 9;
+        const row = element('tr'); const td = element('td', null, 'roster-cell'); td.colSpan = days.length + 2;
         td.append(emptyState('No crew match this view', 'Change the position filter or search.', 'users')); row.append(td); body.append(row);
     }
     table.append(thead, body);
@@ -362,12 +470,22 @@ function gridView() {
     return wrap;
 }
 
+/** The (nearly invisible until hovered or focused) "plan this day" button in an empty grid cell. */
+function planButton(crew, date) {
+    const button = element('button', null, 'plan-cell'); button.type = 'button';
+    button.append(icon('plus', 'icon-sm'));
+    button.setAttribute('aria-label', `Plan leave, day off, standby or SIM for ${crew.name} on ${formatDate(date)}`);
+    button.title = 'Plan leave, day off, standby or SIM';
+    button.addEventListener('click', () => openPlan(crew, date));
+    return button;
+}
+
 /** A duty in the grid: flight code, local times, lock for manual seats and a conflict marker. */
 function dutyButton(trip, seat, duty, date) {
     const conflicts = state.index.seatConflicts.get(seat.id) || [];
     const button = element('button', null, `duty accent-${trip.palette || 'sky'}`); button.type = 'button';
     if (trip.id === state.tripId) button.dataset.selected = 'true';
-    if (conflicts.some(conflict => !conflict.acknowledged)) button.dataset.conflict = 'danger';
+    if (conflicts.some(conflict => !conflict.acknowledged && conflict.severity === 'danger')) button.dataset.conflict = 'danger';
     else if (conflicts.length) button.dataset.conflict = 'accepted';
     if (seat.source === 'manual') button.dataset.manual = 'true';
     const top = element('span', null, 'duty-top'); top.append(element('span', trip.code, 'duty-code'));
@@ -380,10 +498,14 @@ function dutyButton(trip, seat, duty, date) {
     return button;
 }
 
-/** Leave, day off, SIM or standby in a grid cell (timed activities show local times). */
-function activityTag(activity) {
+/**
+ * Leave, day off, SIM or standby in a grid cell (timed activities show local times). For staff it is a
+ * button that opens day planning for that day, where the item can be removed or replaced.
+ */
+function activityTag(activity, crew = null) {
     const label = ACTIVITIES[activity.type];
-    const tag = element('span', null, 'activity'); tag.dataset.kind = label.tone;
+    const tag = element(staff && crew ? 'button' : 'span', null, 'activity'); tag.dataset.kind = label.tone;
+    if (staff && crew) { tag.type = 'button'; tag.addEventListener('click', () => openPlan(crew, activity.date)); }
     // Standby the generator planned (replaced on rebuild) is marked so it is not mistaken for a manual plan.
     if (activity.generated) tag.dataset.generated = 'true';
     tag.append(element('strong', activity.generated ? `${label.short} · auto` : label.short));
@@ -392,17 +514,87 @@ function activityTag(activity) {
     return tag;
 }
 
-/** Week duty hours against the crew member's weekly working hours (or the 7-day duty limit). */
+/** Duty hours in the period against working hours for the period (weekly hours × weeks, or the 7-day limit). */
 function hoursCell(crew) {
     const td = element('td', null, 'roster-total');
-    const capacity = crew.weekly_hours ? crew.weekly_hours * 60 : Math.round((state.week.rules?.max_duty_7d_h ?? 60) * 60);
-    const value = element('strong', formatMinutes(crew.week_duty_minutes), 'mono');
-    if (crew.week_duty_minutes > capacity) value.dataset.tone = 'danger';
-    const bar = element('progress', null, 'coverage-bar hours-bar'); bar.max = capacity; bar.value = Math.min(crew.week_duty_minutes, capacity);
-    bar.setAttribute('aria-label', `${formatMinutes(crew.week_duty_minutes)} of ${crew.weekly_hours ? `${crew.weekly_hours}h working hours` : '7-day duty limit'}`);
-    td.append(value, element('span', crew.weekly_hours ? `of ${crew.weekly_hours}h` : 'no hours set', 'small muted'), bar);
+    const weeks = slotDates().length / 7;
+    const capacity = Math.round((crew.weekly_hours ? crew.weekly_hours * 60 : (state.week.rules?.max_duty_7d_h ?? 60) * 60) * weeks);
+    const value = element('strong', formatMinutes(crew.period_duty_minutes), 'mono');
+    if (crew.period_duty_minutes > capacity) value.dataset.tone = 'danger';
+    const bar = element('progress', null, 'coverage-bar hours-bar'); bar.max = capacity; bar.value = Math.min(crew.period_duty_minutes, capacity);
+    bar.setAttribute('aria-label', `${formatMinutes(crew.period_duty_minutes)} of ${formatMinutes(capacity)} for the period`);
+    td.append(value, element('span', crew.weekly_hours ? `of ${formatMinutes(capacity)}` : 'no hours set', 'small muted'), bar);
     return td;
 }
+
+/** Switch to the individual view for a crew member. */
+function showIndividual(crewId) {
+    state.crewId = crewId; state.view = 'individual';
+    for (const button of document.querySelectorAll('#view-switch button[data-value]')) button.setAttribute('aria-pressed', String(button.dataset.value === 'individual'));
+    const url = new URL(window.location.href); url.searchParams.set('crew', crewId); window.history.replaceState(null, '', url);
+    renderView();
+}
+
+/**
+ * Individual roster: one crew member's whole period day by day — duties (local and GMT times, seat, route),
+ * leave, days off, SIM and standby — with totals, a printable PDF page and a calendar file. Staff pick the
+ * crew member; empty days can be planned from here.
+ */
+function individualView() {
+    const crews = state.week.crew;
+    const crew = crews.find(item => item.id === state.crewId) ?? crews[0];
+    const wrap = element('div', null, 'individual');
+    if (!crew) return emptyState('No crew', 'Add crew members on the Crew page.', 'users');
+    state.crewId = crew.id;
+    const head = element('div', null, 'individual-head');
+    const pick = element('label', 'Crew member', 'inline-field');
+    const select = element('select'); select.name = 'crew';
+    for (const item of crews) { const option = element('option', `${item.name} · ${item.rank} · ${item.base_airport}`); option.value = item.id; option.selected = item.id === crew.id; select.append(option); }
+    select.addEventListener('change', () => showIndividual(Number(select.value)));
+    pick.append(select);
+    pick.hidden = !staff; // Crew accounts only ever see themselves.
+    const seats = state.index.seatsByCrew.get(crew.id) || [];
+    const block = seats.reduce((total, { trip }) => total + trip.block_minutes, 0);
+    const totals = element('div', null, 'chip-list');
+    totals.append(chip(plural(seats.length, 'duty', 'duties'), 'info'), chip(`Block ${formatMinutes(block)}`, undefined), chip(`Duty ${formatMinutes(crew.period_duty_minutes)}`, undefined),
+        chip(`${plural(crew.activities.length, 'planned day')}`, undefined));
+    const tools = element('div', null, 'row-actions');
+    const pdf = element('button', 'PDF page', 'button button-sm button-secondary'); pdf.type = 'button';
+    pdf.addEventListener('click', event => busy(event.currentTarget, () => download(`/api/v1/roster-periods/${state.week.id}/roster.pdf?layout=crew&crew_member_ids[]=${crew.id}`, 'roster.pdf').catch(() => {})));
+    const ics = element('button', 'Calendar file', 'button button-sm button-secondary'); ics.type = 'button';
+    ics.addEventListener('click', event => busy(event.currentTarget, () => download(`/api/v1/roster-periods/${state.week.id}/calendar.ics?crew_member_id=${crew.id}`, 'roster.ics').catch(() => {})));
+    tools.append(pdf, ics);
+    head.append(pick, totals, tools);
+    wrap.append(head);
+
+    const list = element('ol', null, 'individual-days');
+    for (const date of slotDates()) {
+        const item = element('li', null, 'individual-day'); if (date === today) item.dataset.today = 'true';
+        item.append(element('span', `${WEEKDAYS[(parseDay(date).getUTCDay() + 6) % 7]} ${shortDate(date)}`, 'individual-date mono'));
+        const entries = element('div', null, 'individual-entries');
+        for (const { trip, seat } of seats) {
+            for (const duty of dutiesOn(trip, date)) {
+                const entry = dutyButton(trip, seat, duty, date); entry.classList.add('individual-duty');
+                const first = duty.legs[0]; const last = duty.legs[duty.legs.length - 1];
+                entry.append(element('span', `${seatName(seat)} · ${trip.aircraft_type || ''} · GMT ${first ? utcClock(first.departs) : ''}–${last ? utcClock(last.arrives) : ''}`, 'duty-route'));
+                entries.append(entry);
+            }
+            const away = layoverOn(trip, date);
+            if (away) entries.append(layoverTag(trip, away));
+        }
+        for (const activity of crew.activities.filter(activity => activity.date === date)) entries.append(activityTag(activity, crew));
+        if (!entries.childElementCount) {
+            entries.append(element('span', 'Off', 'muted small'));
+            if (staff && state.week) entries.append(planButton(crew, date));
+        }
+        item.append(entries); list.append(item);
+    }
+    wrap.append(list);
+    return wrap;
+}
+
+/** "HH:MM" GMT of an ISO instant. */
+function utcClock(instant) { const date = new Date(instant); return `${String(date.getUTCHours()).padStart(2, '0')}:${String(date.getUTCMinutes()).padStart(2, '0')}`; }
 
 /**
  * Trips grouped by day, each as a flight strip with its seats. Crew accounts also see their own leave,
@@ -412,8 +604,8 @@ function tripsView() {
     const wrap = element('div', null, 'trip-days');
     const term = state.search.trim().toLowerCase();
     const own = staff ? null : state.week.crew[0];
-    for (let index = 0; index < 7; index++) {
-        const date = addDays(state.selected, index);
+    for (const date of slotDates()) {
+        const index = (parseDay(date).getUTCDay() + 6) % 7;
         const trips = state.week.trips.filter(trip => trip.start_date === date && (!term || trip.code.toLowerCase().includes(term) || trip.assignments.some(seat => seat.crew?.name.toLowerCase().includes(term))));
         const activities = own ? own.activities.filter(activity => activity.date === date) : [];
         if (!trips.length && !activities.length) continue;
@@ -708,12 +900,12 @@ const planStatus = planDialog?.querySelector('[data-form-status]');
 let planning = null;
 
 /** Open day planning for a crew member, defaulting the dates to the selected week (or today onwards). */
-function openPlan(crew) {
+function openPlan(crew, date = null) {
     planning = crew;
     planForm.reset(); status('', false, planStatus);
     document.querySelector('#plan-dialog-title').textContent = `Day planning · ${crew.name}`;
     document.querySelector('#plan-dialog-subtitle').textContent = `${RANKS[crew.rank]} · ${crew.base_airport}${crew.weekly_hours ? ` · ${crew.weekly_hours}h working hours a week` : ''}. Times are base local.`;
-    const first = state.selected < today && addDays(state.selected, 6) >= today ? today : state.selected;
+    const first = date ?? (state.slot.start < today && state.slot.end >= today ? today : state.slot.start);
     planForm.elements.date_from.value = first; planForm.elements.date_to.value = first;
     renderPlanTimes(); renderPlanExisting();
     planDialog.showModal();
@@ -804,7 +996,7 @@ async function loadEmailLog() {
 }
 if (staff) {
     buttons.email.addEventListener('click', event => busy(event.currentTarget, async () => {
-        const confirmed = await confirmAction({ title: `Email week ${state.week.iso_week} to crew?`, message: 'Each crew member with a seat this week receives their duties and a calendar file at the email address on their crew profile.', confirmLabel: 'Send emails', tone: 'info' });
+        const confirmed = await confirmAction({ title: `Email ${state.week.label} to crew?`, message: 'Each crew member with a seat in this roster receives their duties and a calendar file at the email address on their crew profile.', confirmLabel: 'Send emails', tone: 'info' });
         if (!confirmed) return;
         try { await api(`/api/v1/roster-periods/${state.week.id}/email`, { method: 'POST' }); }
         catch (error) { showError(error); }
@@ -839,7 +1031,7 @@ async function loadMyHours() {
 async function build() {
     const week = state.week;
     if (week.built_at) {
-        const confirmed = await confirmAction({ title: `Rebuild week ${week.iso_week}?`, message: 'Automatic seats from today onwards are planned again from current crew data. Locked (manually set) seats and trips that have already operated stay as they are.', confirmLabel: 'Rebuild', tone: 'info' });
+        const confirmed = await confirmAction({ title: `Rebuild ${week.label}?`, message: 'Automatic seats from today onwards are planned again from current crew data. Locked (manually set) seats and trips that have already operated stay as they are.', confirmLabel: 'Rebuild', tone: 'info' });
         if (!confirmed) return;
     }
     const { data } = await api(`/api/v1/roster-periods/${week.id}/build`, { method: 'POST' });
@@ -850,23 +1042,14 @@ async function build() {
 }
 
 if (staff) {
-    // Create the week (freezing the current rules) and build it straight away.
-    buttons.create.addEventListener('click', event => busy(event.currentTarget, async () => {
-        try {
-            const { data } = await api('/api/v1/roster-periods', { method: 'POST', body: { week_start: state.selected }, notify: false });
-            state.periods.set(data.starts_on, data); state.week = { ...data, built_at: null };
-            await build();
-        } catch (error) { showError(error); }
-        await loadTimeline().catch(showError);
-    }));
     buttons.build.addEventListener('click', event => busy(event.currentTarget, () => build().catch(showError)));
     buttons.publish.addEventListener('click', event => busy(event.currentTarget, async () => {
-        const confirmed = await confirmAction({ title: `Publish week ${state.week.iso_week}?`, message: `Crew will see their duties for ${weekRange(state.selected)}.${state.week.summary.open ? ` ${plural(state.week.summary.open, 'seat')} will show as open time.` : ''} To change it later, reopen it as a draft.`, confirmLabel: 'Publish', tone: 'info' });
+        const confirmed = await confirmAction({ title: `Publish ${state.week.label}?`, message: `Crew will see their duties for ${state.week.label}.${state.week.summary.open ? ` ${plural(state.week.summary.open, 'seat')} will show as open time.` : ''} To change it later, reopen it as a draft.`, confirmLabel: 'Publish', tone: 'info' });
         if (!confirmed) return;
         try { applyWeek((await api(`/api/v1/roster-periods/${state.week.id}/publish`, { method: 'POST' })).data); } catch (error) { showError(error); }
     }));
     buttons.reopen.addEventListener('click', event => busy(event.currentTarget, async () => {
-        const confirmed = await confirmAction({ title: `Reopen week ${state.week.iso_week} as a draft?`, message: 'Crew stop seeing this week until you publish it again.', confirmLabel: 'Reopen', tone: 'info' });
+        const confirmed = await confirmAction({ title: `Reopen ${state.week.label} as a draft?`, message: 'Crew stop seeing this week until you publish it again.', confirmLabel: 'Reopen', tone: 'info' });
         if (!confirmed) return;
         try { applyWeek((await api(`/api/v1/roster-periods/${state.week.id}/reopen`, { method: 'POST' })).data); } catch (error) { showError(error); }
     }));
@@ -877,14 +1060,14 @@ if (staff) {
 }
 
 // Timeline navigation: shift the strip by four weeks, or jump back to this week.
-document.querySelector('#timeline-earlier').addEventListener('click', () => { state.anchor = addDays(state.anchor, -28); loadTimeline().catch(showError); });
-document.querySelector('#timeline-later').addEventListener('click', () => { state.anchor = addDays(state.anchor, 28); loadTimeline().catch(showError); });
-document.querySelector('#timeline-today').addEventListener('click', () => { state.anchor = addDays(thisMonday, -21); selectWeek(thisMonday).catch(showError); });
+document.querySelector('#timeline-earlier').addEventListener('click', () => { state.windowStart = addDays(state.windowStart, -28); loadTimeline().catch(showError); });
+document.querySelector('#timeline-later').addEventListener('click', () => { state.windowStart = addDays(state.windowStart, 28); loadTimeline().catch(showError); });
+document.querySelector('#timeline-today').addEventListener('click', () => selectSlot(today).catch(showError));
 
-// Initial load: timeline first (it tells us whether the selected week exists), then the week itself.
+// Initial load: the timeline first (it tells us which roster covers the requested date), then that roster.
 (async () => {
     await loadTimeline();
-    await loadWeek();
+    await selectSlot(requested, { tripId: Number(query.get('trip')) || null });
     if (!staff) await loadMyHours().catch(error => { document.querySelector('#my-hours')?.replaceChildren(emptyState('Hours could not be loaded', error.message || 'Reload the page to try again.', 'alert')); });
 })().catch(error => {
     view.setAttribute('aria-busy', 'false'); strip.setAttribute('aria-busy', 'false');

@@ -40,11 +40,14 @@ class FlightRequest extends FormRequest
             'code' => ['required', 'string', 'max:20', 'regex:/^[A-Z0-9-]+$/', Rule::unique('flights')->ignore($this->route('flight'))],
             'aircraft_type_id' => ['required', 'integer', 'exists:aircraft_types,id'],
             'active' => ['required', 'boolean'],
+            // Zone of the leg times in this payload: "utc" (GMT, as the Flight routes page sends) or "local" (base time).
+            'time_zone' => ['sometimes', 'in:local,utc'],
             'weekdays' => ['required', 'array', 'min:1', 'max:7'],
             'weekdays.*' => ['required', 'integer', 'between:0,6', 'distinct'],
             'legs' => ['required', 'array', 'min:1', 'max:40'],
             'legs.*' => ['array:trip_day,from_airport,to_airport,departs_local,arrives_local'],
-            'legs.*.trip_day' => ['required', 'integer', 'between:1,4'],
+            // Trip day 2+ follows a night stop; rotations may run up to roster.max_trip_days.
+            'legs.*.trip_day' => ['required', 'integer', 'between:1,'.config('roster.max_trip_days')],
             'legs.*.from_airport' => ['required', 'exists:airports,code'],
             'legs.*.to_airport' => ['required', 'exists:airports,code'],
             'legs.*.departs_local' => ['required', 'date_format:H:i'],

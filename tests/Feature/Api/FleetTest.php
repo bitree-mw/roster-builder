@@ -43,18 +43,18 @@ class FleetTest extends TestCase
         $aircraft = Aircraft::factory()->create();
         Sanctum::actingAs(User::factory()->create(['role' => 'crew_control']), ['*']);
         $this->patchJson('/api/v1/aircraft/'.$aircraft->id.'/status', ['status' => 'grounded', 'reason' => 'Bird strike inspection'])
-            ->assertOk()->assertJsonPath('data.status', 'grounded')->assertJsonPath('data.status_label', 'Grounded (AOG)')->assertJsonPath('data.status_reason', 'Bird strike inspection');
+            ->assertOk()->assertJsonPath('data.status', 'grounded')->assertJsonPath('data.status_label', 'Not available (AOG)')->assertJsonPath('data.status_reason', 'Bird strike inspection');
         $this->assertDatabaseHas('aircraft', ['id' => $aircraft->id, 'status' => 'grounded', 'status_reason' => 'Bird strike inspection']);
         $this->assertDatabaseHas('audit_logs', ['entity' => 'aircraft', 'entity_id' => $aircraft->id, 'action' => 'status_changed']);
     }
 
-    public function test_unavailable_status_without_reason_returns_422(): void
+    public function test_aircraft_can_be_marked_not_available_without_a_reason(): void
     {
         $aircraft = Aircraft::factory()->create();
         Sanctum::actingAs(User::factory()->create(['role' => 'scheduler']), ['*']);
-        $this->patchJson('/api/v1/aircraft/'.$aircraft->id.'/status', ['status' => 'maintenance', 'reason' => ''])
-            ->assertUnprocessable()->assertJsonPath('errors.reason.0', 'Give a reason when an aircraft is not available.');
-        $this->assertDatabaseHas('aircraft', ['id' => $aircraft->id, 'status' => 'available']);
+        $this->patchJson('/api/v1/aircraft/'.$aircraft->id.'/status', ['status' => 'unavailable', 'reason' => ''])
+            ->assertOk()->assertJsonPath('data.status', 'unavailable')->assertJsonPath('data.status_reason', null);
+        $this->assertDatabaseHas('aircraft', ['id' => $aircraft->id, 'status' => 'unavailable', 'status_reason' => null]);
     }
 
     public function test_unknown_status_returns_422(): void

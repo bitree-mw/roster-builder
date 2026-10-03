@@ -28,8 +28,8 @@ class RosterWeekResource extends JsonResource
         $context = $this->resource['context'];
         $own = $this->resource['crew_member_id'];
         $period = $context->period;
-        $monday = $period->starts_on->format('Y-m-d');
-        $sunday = $period->ends_on->format('Y-m-d');
+        $first = $period->starts_on->format('Y-m-d');
+        $last = $period->ends_on->format('Y-m-d');
         $trips = $own === null ? $context->trips : $context->trips->filter(fn (Trip $trip): bool => $trip->assignments->contains('crew_member_id', $own));
         // Grid rows: active crew plus anyone (even inactive) holding a seat this week; crew accounts see only themselves.
         $seated = $context->trips->flatMap(fn (Trip $trip) => $trip->assignments->pluck('crew_member_id'))->filter()->flip();
@@ -52,9 +52,10 @@ class RosterWeekResource extends JsonResource
                     'base_airport' => $crew->base_airport,
                     'active' => $crew->active,
                     'weekly_hours' => $crew->weekly_hours,
-                    'week_duty_minutes' => $context->schedule($crew->id)->weekMinutes($monday),
-                    'week_block_minutes' => $context->schedule($crew->id)->weekBlockMinutes($monday),
-                    'activities' => $crew->activities->filter(fn ($activity): bool => $activity->date->format('Y-m-d') >= $monday && $activity->date->format('Y-m-d') <= $sunday)
+                    // Totals for the whole period (one week, two weeks or a month).
+                    'period_duty_minutes' => $context->schedule($crew->id)->minutesBetween($first, $last),
+                    'period_block_minutes' => $context->schedule($crew->id)->blockMinutesBetween($first, $last),
+                    'activities' => $crew->activities->filter(fn ($activity): bool => $activity->date->format('Y-m-d') >= $first && $activity->date->format('Y-m-d') <= $last)
                         ->sortBy('date')->values()->map(fn ($activity): array => [
                             'id' => $activity->id, 'date' => $activity->date->format('Y-m-d'), 'type' => $activity->type, 'generated' => $activity->roster_period_id !== null,
                             'starts_at' => $activity->starts_at?->toIso8601String(), 'ends_at' => $activity->ends_at?->toIso8601String(), 'note' => $activity->note,

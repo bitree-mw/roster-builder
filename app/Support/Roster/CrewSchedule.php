@@ -58,6 +58,40 @@ final class CrewSchedule
     }
 
     /**
+     * Duty minutes whose report date is between two dates (inclusive), e.g. a whole roster period.
+     */
+    public function minutesBetween(string $from, string $to): int
+    {
+        $total = 0;
+        foreach ($this->duties as $duty) {
+            foreach ($duty->periods as $period) {
+                if ($period['date'] >= $from && $period['date'] <= $to) {
+                    $total += $period['end'] - $period['start'];
+                }
+            }
+        }
+
+        return $total;
+    }
+
+    /**
+     * Block minutes whose report date is between two dates (inclusive).
+     */
+    public function blockMinutesBetween(string $from, string $to): int
+    {
+        $total = 0;
+        foreach ($this->duties as $duty) {
+            foreach ($duty->periods as $period) {
+                if ($period['date'] >= $from && $period['date'] <= $to) {
+                    $total += $period['block'];
+                }
+            }
+        }
+
+        return $total;
+    }
+
+    /**
      * Block minutes whose report date falls in the week starting on the given Monday.
      */
     public function weekBlockMinutes(string $monday): int

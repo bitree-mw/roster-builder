@@ -24,7 +24,7 @@
                     <label class="option-card"><input type="radio" name="mode" value="replace"><span><strong>Replace</strong><small data-replace-help>Also deactivate crew that are not in the file.</small></span></label>
                 </div>
             </fieldset>
-            <label id="times-field" hidden>Leg times in the file<select name="times"><option value="local">Base local time</option><option value="utc">UTC (convert to local)</option></select></label>
+            <label id="times-field" hidden>Leg times in the file<select name="times"><option value="utc">GMT / UTC</option><option value="local">Base local time</option></select></label>
         </div>
         <div class="form-actions">
             <button id="download-template" class="button button-secondary" type="button">Download template</button>

@@ -4,15 +4,16 @@
  * comes from GET /api/v1/dashboard in one request.
  */
 import { api } from '../common/api';
-import { conflictRow, coverageBar, RANKS, shortDate, weekRange, weekState } from '../common/roster';
-import { chip, dueSummary, element, emptyState, formatDate, icon, plural, setKpi, setKpiTone, showError } from '../common/ui';
+import { conflictRow, coverageBar, RANKS, shortDate, weekState } from '../common/roster';
+import { chip, element, emptyState, formatDate, icon, plural, setKpi, setKpiTone, showError } from '../common/ui';
 
-const SLOT_LABELS = { previous: 'Last week', current: 'This week', next: 'Next week', following: 'Week after' };
+const SLOT_LABELS = { previous: 'Last roster', current: 'Current roster', next: 'Next roster', following: 'After that' };
+const LENGTHS = { week: '1 week', fortnight: '2 weeks', month: 'Month' };
 const DOCUMENT_LABELS = { licence: 'Licence', medical: 'Medical', recurrent: 'Recurrent training' };
 
-/** Link into the roster window at a week (and optionally a trip). */
-function rosterLink(weekStartsOn, tripId) {
-    return `/roster?week=${weekStartsOn}${tripId ? `&trip=${tripId}` : ''}`;
+/** Link into the roster window at the roster containing a date (and optionally a trip). */
+function rosterLink(startsOn, tripId) {
+    return `/roster?start=${startsOn}${tripId ? `&trip=${tripId}` : ''}`;
 }
 /** A small secondary button-link. */
 function linkButton(href, label, iconName = 'chevron-right') {
@@ -33,12 +34,10 @@ function renderKpis(data) {
     const blocking = data.conflicts.filter(conflict => conflict.blocking).length;
     setKpi('roster.conflicts', data.conflict_total, blocking ? `${blocking} must be resolved before publishing` : 'Nothing blocks publishing');
     setKpiTone('roster.conflicts', blocking ? 'danger' : data.conflict_total ? 'warning' : 'success');
-    setKpi('fleet.available', `${overview.fleet.available}/${overview.fleet.total}`, `${overview.fleet.maintenance} in maintenance · ${overview.fleet.grounded} grounded`);
-    setKpiTone('fleet.available', overview.fleet.grounded ? 'danger' : 'success');
+    const notAvailable = overview.fleet.total - overview.fleet.available;
+    setKpi('fleet.available', `${overview.fleet.available}/${overview.fleet.total}`, `${notAvailable} not available`);
+    setKpiTone('fleet.available', notAvailable ? 'warning' : 'success');
     setKpi('flights.enabled', overview.flights.enabled, `${overview.flights.disabled} disabled`);
-    const maintenance = overview.maintenance.overdue + overview.maintenance.due_soon;
-    setKpi('maintenance.alerts', maintenance, `${overview.maintenance.overdue} overdue · ${overview.maintenance.due_soon} due soon`);
-    setKpiTone('maintenance.alerts', overview.maintenance.overdue ? 'danger' : maintenance ? 'warning' : 'success');
     const documents = overview.crew.documents_expired + overview.crew.documents_due_soon;
     setKpi('crew.documents', documents, `${overview.crew.documents_expired} expired · ${overview.crew.documents_due_soon} within window`);
     setKpiTone('crew.documents', overview.crew.documents_expired ? 'danger' : documents ? 'warning' : 'success');
@@ -51,7 +50,7 @@ function renderWeeks(weeks) {
         const state = weekState(week);
         const card = element('article', null, 'week-card'); card.dataset.state = state.key; if (week.slot === 'current') card.dataset.current = 'true';
         const head = element('div', null, 'week-card-head');
-        const title = element('div'); title.append(element('span', SLOT_LABELS[week.slot], 'label-caps muted'), element('strong', `Week ${week.iso_week}`, 'week-card-title'), element('span', weekRange(week.starts_on), 'small muted mono'));
+        const title = element('div'); title.append(element('span', SLOT_LABELS[week.slot], 'label-caps muted'), element('strong', week.label, 'week-card-title'), element('span', week.status === 'missing' ? 'Suggested dates' : LENGTHS[week.length], 'small muted mono'));
         head.append(title, chip(state.label, state.tone, { dot: true }));
         card.append(head);
         if (week.summary) {
@@ -62,7 +61,7 @@ function renderWeeks(weeks) {
             facts.append(chip(plural(week.summary.blocking, 'conflict'), week.summary.blocking ? 'danger' : 'success'));
             card.append(facts);
         } else {
-            card.append(element('p', week.slot === 'previous' ? 'No roster was made for this week.' : 'No roster yet. Create the week and let the generator build it from working hours and duty rules.', 'small muted'));
+            card.append(element('p', 'No roster yet. Create one (1 week, 2 weeks or a month) and let the generator build it from working hours and duty rules.', 'small muted'));
         }
         const action = week.slot === 'previous' || state.key === 'published' ? 'View roster' : state.key === 'missing' ? 'Create & build' : state.key === 'unbuilt' ? 'Build roster' : 'Review & edit';
         card.append(linkButton(rosterLink(week.starts_on), action));
@@ -98,21 +97,18 @@ function renderToday(data) {
     }));
 }
 
-/** Grounded/unavailable airframes, maintenance alerts and crew document alerts as attention rows. */
+/** Aircraft that are not available and crew document alerts as attention rows. */
 function renderAttention(data) {
     const list = document.querySelector('#attention-list'); list.setAttribute('aria-busy', 'false');
     const rows = [];
     for (const airframe of data.fleet_issues) {
-        rows.push(attentionRow(airframe.status === 'grounded' ? 'danger' : 'warning', 'plane', `${airframe.registration} · ${airframe.aircraft_type} · ${airframe.status_label}`, airframe.status_reason || 'No reason recorded', '/aircraft', 'Fleet'));
-    }
-    for (const item of data.maintenance_alerts) {
-        rows.push(attentionRow(item.state === 'overdue' ? 'danger' : 'warning', 'wrench', `${item.record.aircraft.registration} · ${item.record.kind_label} ${item.state === 'overdue' ? 'overdue' : 'due soon'}`, `${item.record.title} — ${dueSummary(item)}`, `/maintenance?aircraft=${item.record.aircraft_id}`, 'Maintenance'));
+        rows.push(attentionRow('warning', 'plane', `${airframe.registration} · ${airframe.aircraft_type} · ${airframe.status_label}`, airframe.status_reason || 'No reason recorded', '/aircraft', 'Fleet'));
     }
     for (const document of data.document_alerts) {
         const when = document.state === 'expired' ? `expired ${plural(-document.days_remaining, 'day')} ago` : document.days_remaining === 0 ? 'expires today' : `expires in ${plural(document.days_remaining, 'day')}`;
         rows.push(attentionRow(document.state === 'expired' ? 'danger' : 'warning', 'id-card', `${document.name} · ${RANKS[document.rank]}`, `${DOCUMENT_LABELS[document.kind]} ${when} (${shortDate(document.expires_on)})`, '/crew', 'Crew'));
     }
-    list.replaceChildren(...(rows.length ? rows : [emptyState('All clear', 'Every airframe is available, nothing is overdue or due soon, and no crew document is expiring.', 'shield')]));
+    list.replaceChildren(...(rows.length ? rows : [emptyState('All clear', 'Every aircraft is available and no crew document is expiring.', 'shield')]));
 }
 /** One "needs attention" row with a link to the page that resolves it. */
 function attentionRow(tone, iconName, title, detail, href, linkLabel) {

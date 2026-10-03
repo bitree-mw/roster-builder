@@ -35,6 +35,8 @@ class RuleSetRequest extends FormRequest
             'max_consecutive_days' => ['required', 'integer', 'between:1,31'],
             'min_days_off_month' => ['required', 'integer', 'between:0,28'],
             'max_days_off_week' => ['required', 'integer', 'between:0,7'],
+            // Crew with a document date not on record: roster with a warning, or never roster automatically.
+            'missing_documents' => ['required', 'in:warn,block'],
             'utc_offset_minutes' => ['required', 'integer', 'between:-720,840', 'multiple_of:15'],
         ];
     }

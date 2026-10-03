@@ -1,9 +1,10 @@
-{{-- Full weekly roster as a crew × day grid (landscape). Data from RosterExportService::pdf(). --}}
+{{-- Full roster as crew × day grids (landscape), one table per week of the period. Data from RosterExportService::pdf(). --}}
 @extends('pdf.layout')
 @section('body')
 @include('pdf.partials.summary', ['summary' => $summary])
-<table class="grid data">
-    <thead><tr><th>Crew member</th>@foreach($days as $day)<th>{{ $day['label'] }}</th>@endforeach<th>Week</th></tr></thead>
+@foreach($weeks as $weekIndex => $days)
+<table @class(['grid', 'data', 'page-break' => $weekIndex > 0])>
+    <thead><tr><th>Crew member</th>@foreach($days as $day)<th>{{ $day['label'] }}</th>@endforeach<th>Period</th></tr></thead>
     <tbody>
     {{-- Unfilled seats first so they are not overlooked on paper. --}}
     @if($open)
@@ -30,5 +31,6 @@
     @endforeach
     </tbody>
 </table>
-<p class="note">Duty times are base local (LT), report to release. "Week" is duty time this week including timed SIM and standby.</p>
+@endforeach
+<p class="note">Duty times are base local (LT), report to release. "Period" is duty time in the whole roster period, including timed SIM and standby.</p>
 @endsection

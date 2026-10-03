@@ -40,6 +40,19 @@
             </div>
         </fieldset>
         @endforeach
+        {{-- Policy for crew whose licence, medical or recurrent date is not on record (expired documents always block). --}}
+        <fieldset class="rules-group">
+            <legend class="label-caps">Crew documents</legend>
+            <div class="rules-grid">
+                <label>Crew with a document date not on record
+                    <select name="missing_documents" required>
+                        <option value="warn">Roster them and show a warning</option>
+                        <option value="block">Do not roster them automatically</option>
+                    </select>
+                    <span class="field-hint">Expired documents always stop automatic rostering.</span>
+                </label>
+            </div>
+        </fieldset>
         <div class="status" data-form-status role="alert"></div>
         @if(in_array(auth()->user()->role, ['admin', 'scheduler'], true))
         <div class="form-actions"><button type="submit" class="button"><x-icon name="check" class="icon-sm" />Save duty rules</button></div>

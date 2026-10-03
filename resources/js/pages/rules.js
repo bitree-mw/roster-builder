@@ -1,5 +1,6 @@
 /**
- * Duty rules page. Everyone on staff can view; only schedulers can edit (the API enforces this too).
+ * Duty rules page (including the missing-documents policy). Everyone on staff can view; administrators and
+ * schedulers can edit (the API enforces this too).
  */
 import { api } from '../common/api';
 import { busy, showError, status } from '../common/ui';
@@ -7,7 +8,7 @@ import { busy, showError, status } from '../common/ui';
 const form = document.querySelector('#rules-form');
 const formStatus = form.querySelector('[data-form-status]');
 const canEdit = ['admin', 'scheduler'].includes(document.body.dataset.role);
-const inputs = [...form.querySelectorAll('input')];
+const inputs = [...form.querySelectorAll('input, select')];
 // Inputs stay disabled until the current values load, then only schedulers can edit them.
 for (const input of inputs) input.disabled = true;
 

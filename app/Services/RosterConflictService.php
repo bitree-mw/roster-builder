@@ -50,6 +50,10 @@ class RosterConflictService
                     $acknowledged = in_array($issue['message'], $seat->flag_reasons ?? [], true);
                     $conflicts[] = [...$base, ...$seatBase, 'crew_member_id' => $crew->id, 'crew_name' => $crew->name, 'severity' => 'danger', 'code' => $issue['code'], 'message' => $issue['message'], 'blocking' => ! $acknowledged, 'acknowledged' => $acknowledged];
                 }
+                // Missing document records under the "warn" policy: shown, never blocking.
+                foreach ($this->legality->documentWarnings($context, $crew) as $message) {
+                    $conflicts[] = $warning('document_missing', $message, [...$seatBase, 'crew_member_id' => $crew->id, 'crew_name' => $crew->name]);
+                }
             }
         }
 

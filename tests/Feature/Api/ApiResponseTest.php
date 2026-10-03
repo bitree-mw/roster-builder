@@ -73,9 +73,10 @@ class ApiResponseTest extends TestCase
     public function test_validation_error_uses_first_field_message_and_keeps_field_errors(): void
     {
         Sanctum::actingAs(User::factory()->create(['role' => 'scheduler']), ['*']);
-        $response = $this->patchJson('/api/v1/aircraft/'.Aircraft::factory()->create()->id.'/status', ['status' => 'grounded']);
+        $response = $this->patchJson('/api/v1/aircraft/'.Aircraft::factory()->create()->id.'/status', ['status' => 'scrapped', 'reason' => str_repeat('x', 256)]);
         $response->assertUnprocessable()->assertJsonPath('success', false)->assertJsonPath('code', 'validation_failed')
-            ->assertJsonPath('message', 'Give a reason when an aircraft is not available.')->assertJsonPath('errors.reason.0', 'Give a reason when an aircraft is not available.');
+            ->assertJsonPath('message', 'The selected status is invalid.')->assertJsonPath('errors.status.0', 'The selected status is invalid.')
+            ->assertJsonPath('errors.reason.0', 'The reason field must not be greater than 255 characters.');
     }
 
     public function test_throttled_login_returns_429_code_with_retry_after_header(): void

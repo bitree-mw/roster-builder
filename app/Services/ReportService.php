@@ -108,7 +108,7 @@ class ReportService
         $crews = CrewMember::query()->whereIn('rank', $ranks)->orderByRaw("case rank when 'CPT' then 0 when 'FO' then 1 else 2 end")->orderBy('name')->get();
         $totals = $crews->mapWithKeys(fn (CrewMember $crew): array => [$crew->id => ['trips' => 0, 'block' => 0, 'duty' => 0, 'scheduled' => 0]])->all();
         $assignments = Assignment::query()->whereIn('crew_member_id', $crews->pluck('id'))
-            ->whereHas('trip', fn ($query) => $query->whereBetween('start_date', [$from->subDays(3)->format('Y-m-d'), $end])->whereHas('rosterPeriod', fn ($query) => $query->where('status', 'published')))
+            ->whereHas('trip', fn ($query) => $query->whereBetween('start_date', [$from->subDays((int) config('roster.max_trip_days') - 1)->format('Y-m-d'), $end])->whereHas('rosterPeriod', fn ($query) => $query->where('status', 'published')))
             ->with('trip')->get();
         foreach ($assignments as $assignment) {
             $duty = Duty::fromSnapshot('a', $assignment->trip_id, $assignment->trip->schedule_snapshot);

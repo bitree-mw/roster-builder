@@ -8,9 +8,9 @@ use App\Models\RosterPeriod;
 use Carbon\CarbonImmutable;
 
 /**
- * Everything the operations dashboard shows at a glance: the overview counts, the roster state of last,
- * this and the next two weeks, live roster conflicts for this and next week, today's trips, and the fleet,
- * maintenance and crew document items that need attention.
+ * Everything the operations dashboard shows at a glance: the overview counts, the state of the last,
+ * current and next two rosters (each 1 week, 2 weeks or a month), live conflicts for rosters that can still
+ * change, today's trips, and the fleet, maintenance and crew document items that need attention.
  */
 class DashboardService
 {
@@ -23,24 +23,39 @@ class DashboardService
     ) {}
 
     /**
-     * Build the dashboard payload. Weeks that have not been created yet are reported with status "missing"
-     * so the dashboard can prompt the scheduler to prepare them.
+     * Build the dashboard payload. Rosters that have not been created yet are reported with status "missing"
+     * (with suggested dates) so the dashboard can prompt the scheduler to prepare them.
      *
      * @return array<string, mixed>
      */
     public function summary(): array
     {
         $today = $this->expiry->today();
-        $monday = $today->startOfWeek(CarbonImmutable::MONDAY);
-        $starts = ['previous' => $monday->subWeek(), 'current' => $monday, 'next' => $monday->addWeek(), 'following' => $monday->addWeeks(2)];
-        $periods = RosterPeriod::query()->whereIn('starts_on', array_map(fn ($date): string => $date->format('Y-m-d'), $starts))->get()->keyBy(fn (RosterPeriod $period): string => $period->starts_on->format('Y-m-d'));
+        $day = $today->format('Y-m-d');
+        // Roster periods around today (weeks, fortnights or months): the last one that ended, the one covering
+        // today, and the next two. A missing current roster is suggested from this week's Monday, a missing next one
+        // from the day after the current roster ends.
+        $current = RosterPeriod::query()->where('starts_on', '<=', $day)->where('ends_on', '>=', $day)->first();
+        $upcoming = RosterPeriod::query()->where('starts_on', '>', $current?->ends_on?->format('Y-m-d') ?? $day)->orderBy('starts_on')->limit(2)->get();
+        $slots = [
+            'previous' => RosterPeriod::query()->where('ends_on', '<', $day)->orderByDesc('ends_on')->first(),
+            'current' => $current,
+            'next' => $upcoming->get(0),
+            'following' => $upcoming->get(1),
+        ];
+        $suggested = ['current' => $today->startOfWeek(CarbonImmutable::MONDAY), 'next' => ($current?->ends_on ?? $today->startOfWeek(CarbonImmutable::MONDAY)->addDays(6))->addDay()];
 
         $weeks = [];
         $conflicts = [];
         $todayTrips = [];
-        foreach ($starts as $slot => $start) {
-            $period = $periods->get($start->format('Y-m-d'));
-            $week = ['slot' => $slot, 'id' => $period?->id, 'starts_on' => $start->format('Y-m-d'), 'ends_on' => $start->addDays(6)->format('Y-m-d'), 'iso_week' => $start->isoWeek,
+        foreach ($slots as $slot => $period) {
+            if ($period === null && ! isset($suggested[$slot])) {
+                continue;
+            }
+            $start = $period?->starts_on ?? $suggested[$slot];
+            $end = $period?->ends_on ?? $start->addDays(6);
+            $week = ['slot' => $slot, 'id' => $period?->id, 'starts_on' => $start->format('Y-m-d'), 'ends_on' => $end->format('Y-m-d'), 'iso_week' => $start->isoWeek,
+                'length' => $period?->length ?? 'week', 'label' => $period ? ucfirst($period->label()) : 'Week '.$start->isoWeek.' ('.$start->format('d M').'–'.$end->format('d M Y').')',
                 'status' => $period?->status ?? 'missing', 'built_at' => $period?->built_at?->toIso8601String(), 'published_at' => $period?->published_at?->toIso8601String(), 'summary' => null];
             if ($period !== null) {
                 $context = $this->legality->context($period);

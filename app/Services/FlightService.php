@@ -18,14 +18,21 @@ class FlightService
 
     /**
      * Validate the leg timeline against the current duty rules, then create or replace the pattern, its
-     * operating days and its legs in one transaction with an audit entry.
+     * operating days and its legs in one transaction with an audit entry. Leg times arrive in base-local time,
+     * or in GMT when time_zone is "utc" (converted here; a GMT time past midnight local wraps to the next day).
      *
      * @param  array<string, mixed>  $data  validated FlightRequest payload (weekdays and ordered legs)
      */
     public function save(array $data, User $actor, ?Flight $flight = null): Flight
     {
         return DB::transaction(function () use ($data, $actor, $flight): Flight {
-            $this->timeline->validate($data['legs'], RuleSet::query()->findOrFail(1));
+            $rules = RuleSet::query()->findOrFail(1);
+            // Patterns are stored in base-local time; GMT entry is converted with the rules' explicit offset.
+            if (($data['time_zone'] ?? 'local') === 'utc') {
+                $data['legs'] = array_map(fn (array $leg): array => [...$leg, 'departs_local' => $this->timeline->shiftClock($leg['departs_local'], (int) $rules->utc_offset_minutes), 'arrives_local' => $this->timeline->shiftClock($leg['arrives_local'], (int) $rules->utc_offset_minutes)], $data['legs']);
+            }
+            unset($data['time_zone']);
+            $this->timeline->validate($data['legs'], $rules);
             $flight ??= new Flight;
             $before = $flight->exists ? $flight->load('legs', 'days')->toArray() : null;
             $flight->fill(Arr::except($data, ['weekdays', 'legs']))->save();

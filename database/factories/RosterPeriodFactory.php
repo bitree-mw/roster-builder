@@ -16,6 +16,6 @@ class RosterPeriodFactory extends Factory
      */
     public function definition(): array
     {
-        return ['starts_on' => '2026-10-05', 'ends_on' => '2026-10-11', 'status' => 'draft', 'rules_snapshot' => RuleSet::factory()->make()->toArray()];
+        return ['starts_on' => '2026-10-05', 'ends_on' => '2026-10-11', 'length' => 'week', 'status' => 'draft', 'rules_snapshot' => RuleSet::factory()->make()->toArray()];
     }
 }

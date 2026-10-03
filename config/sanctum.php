@@ -18,12 +18,20 @@ return [
     |
     */
 
-    'stateful' => explode(',', env('SANCTUM_STATEFUL_DOMAINS', sprintf(
-        '%s%s',
+    /*
+     * The Blade client is always served by this application, so its own host is always trusted
+     * (currentRequestHost: the browser's Referer/Origin must match the host it is talking to, which a
+     * cross-site page cannot fake), together with APP_URL and local development hosts. Extra hosts can be
+     * added with SANCTUM_STATEFUL_DOMAINS; they are merged in, never a replacement, so a copied .env from
+     * development cannot lock out the hosted domain.
+     */
+    'stateful' => array_values(array_unique(array_filter(array_map('trim', explode(',', sprintf(
+        '%s,%s%s%s',
         'localhost,localhost:3000,127.0.0.1,127.0.0.1:8000,::1',
+        (string) env('SANCTUM_STATEFUL_DOMAINS', ''),
         Sanctum::currentApplicationUrlWithPort(),
-        // Sanctum::currentRequestHost(),
-    ))),
+        Sanctum::currentRequestHost(),
+    )))))),
 
     /*
     |--------------------------------------------------------------------------

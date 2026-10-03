@@ -593,7 +593,7 @@ class ImportService
         $legs = [];
         $day = 1;
         foreach (preg_split('/[;\n]+/', $value, -1, PREG_SPLIT_NO_EMPTY) ?: [] as $index => $text) {
-            if (! preg_match('/^\s*(?:d(?:ay)?\s*(\d)\s+)?([A-Za-z]{3,4})\s*(?:-|–|>|to)\s*([A-Za-z]{3,4})\s+(\d{1,2}:?\d{2})\s*(?:-|–)\s*(\d{1,2}:?\d{2})\s*$/u', $text, $match)) {
+            if (! preg_match('/^\s*(?:d(?:ay)?\s*(\d{1,2})\s+)?([A-Za-z]{3,4})\s*(?:-|–|>|to)\s*([A-Za-z]{3,4})\s+(\d{1,2}:?\d{2})\s*(?:-|–)\s*(\d{1,2}:?\d{2})\s*$/u', $text, $match)) {
                 $messages[] = 'Leg '.($index + 1).' "'.trim($text).'" should look like "LLW-BLZ 08:00-09:00" (prefix "D2" for a later trip day).';
 
                 continue;

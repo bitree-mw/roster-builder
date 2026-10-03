@@ -2,11 +2,14 @@
 
 namespace App\Http\Resources;
 
+use App\Models\RuleSet;
+use App\Services\FlightTimelineService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
- * JSON shape of a flight pattern with legs, weekdays, block minutes and its aircraft type.
+ * JSON shape of a flight pattern with legs (base-local and GMT times), weekdays, block minutes and its
+ * aircraft type.
  */
 class FlightResource extends JsonResource
 {
@@ -15,6 +18,9 @@ class FlightResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
+        $offset = once(fn (): int => (int) (RuleSet::query()->whereKey(1)->value('utc_offset_minutes') ?? 120));
+        $timeline = app(FlightTimelineService::class);
+
         return ['id' => $this->id,
             'code' => $this->code,
             'aircraft_type_id' => $this->aircraft_type_id,
@@ -25,6 +31,8 @@ class FlightResource extends JsonResource
             'legs' => $this->whenLoaded('legs', fn (): array => $this->legs->map(fn ($leg): array => [
                 'trip_day' => $leg->trip_day, 'sequence' => $leg->sequence, 'from_airport' => $leg->from_airport, 'to_airport' => $leg->to_airport,
                 'departs_local' => substr($leg->departs_local, 0, 5), 'arrives_local' => substr($leg->arrives_local, 0, 5),
+                // The same times in GMT (base local minus the rules' offset), as shown on the Flight routes page.
+                'departs_utc' => $timeline->shiftClock($leg->departs_local, -$offset), 'arrives_utc' => $timeline->shiftClock($leg->arrives_local, -$offset),
                 'block_minutes' => $this->blockMinutes($leg->departs_local, $leg->arrives_local),
             ])->all()),
         ];

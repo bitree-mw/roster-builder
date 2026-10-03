@@ -7,6 +7,7 @@ use App\Services\ExpiryService;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\Middleware\TrustProxies;
 use Illuminate\Http\Request;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Support\Facades\Gate;
@@ -34,6 +35,11 @@ class AppServiceProvider extends ServiceProvider
     {
         // Fail fast on N+1 queries outside production.
         Model::preventLazyLoading(! $this->app->isProduction());
+        // Behind an HTTPS proxy, trust its forwarded headers so URLs, assets and cookies use https.
+        $proxies = config('roster.trusted_proxies');
+        if (is_string($proxies) && trim($proxies) !== '') {
+            TrustProxies::at(trim($proxies) === '*' ? '*' : array_map('trim', explode(',', $proxies)));
+        }
         Gate::define('read-operations', fn (User $user): bool => $user->isStaff() && $user->tokenCan('roster:read'));
         Gate::define('manage-operations', fn (User $user): bool => $user->isStaff() && $user->tokenCan('roster:write'));
         Gate::define('manage-rules', fn (User $user): bool => in_array($user->role, ['admin', 'scheduler'], true) && $user->tokenCan('roster:write'));

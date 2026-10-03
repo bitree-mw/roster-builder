@@ -7,7 +7,8 @@ use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 /**
- * Validates an availability change. Any status other than "available" needs a reason.
+ * Validates an availability change. The fleet page offers only Available / Not available; the reason is an
+ * optional note so marking an aircraft unavailable stays a one-click action.
  */
 class AircraftStatusRequest extends FormRequest
 {
@@ -26,15 +27,8 @@ class AircraftStatusRequest extends FormRequest
     {
         return [
             'status' => ['required', Rule::in(array_keys(Aircraft::STATUSES))],
-            'reason' => ['nullable', 'required_unless:status,available', 'string', 'max:255'],
+            // Optional: a short note on why the aircraft cannot be used (shown on the card and in the audit log).
+            'reason' => ['nullable', 'string', 'max:255'],
         ];
-    }
-
-    /**
-     * @return array<string, string>
-     */
-    public function messages(): array
-    {
-        return ['reason.required_unless' => 'Give a reason when an aircraft is not available.'];
     }
 }

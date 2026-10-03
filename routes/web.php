@@ -33,7 +33,7 @@ Route::middleware('auth')->group(function (): void {
 
         return view('pages.accounts', ['page' => 'accounts', 'title' => 'Accounts']);
     })->name('accounts');
-    foreach (['dashboard' => 'Operations dashboard', 'hours' => 'Crew hours', 'reports' => 'Reports', 'data' => 'Import & backup', 'aircraft' => 'Fleet', 'maintenance' => 'Maintenance', 'crew' => 'Crew directory', 'flights' => 'Flights & routes', 'rules' => 'Duty rules'] as $page => $title) {
+    foreach (['dashboard' => 'Operations dashboard', 'hours' => 'Crew hours', 'reports' => 'Reports', 'data' => 'Import', 'aircraft' => 'Fleet', 'maintenance' => 'Maintenance', 'crew' => 'Crew directory', 'flights' => 'Flight routes', 'rules' => 'Duty rules'] as $page => $title) {
         Route::get('/'.$page, function () use ($page, $title) {
             abort_unless(auth()->user()->isStaff(), 403);
 

@@ -26,6 +26,7 @@ class RuleSetResource extends JsonResource
             'max_consecutive_days' => $this->max_consecutive_days,
             'min_days_off_month' => $this->min_days_off_month,
             'max_days_off_week' => $this->max_days_off_week,
+            'missing_documents' => $this->missing_documents,
             'utc_offset_minutes' => $this->utc_offset_minutes,
         ];
     }

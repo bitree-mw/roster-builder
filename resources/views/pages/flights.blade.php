@@ -1,7 +1,7 @@
 {{-- Flights & routes shell. Data and interactions: resources/js/pages/flights.js (API: /api/v1/flights). --}}
 @extends('layouts.app')
 @section('content')
-<x-page-heading eyebrow="Network / Flight operations" heading="Flights & routes" description="Connected flight patterns with operating days and base-local times. Every duty starts and ends at a crew base. Disable a pattern to stop it being planned without losing its legs or history.">
+<x-page-heading eyebrow="Network / Flight operations" heading="Flight routes" description="Connected flight routes with operating days and times in GMT. Every duty starts and ends at a crew base. Disable a route to stop it being planned without losing its legs or history.">
     <button id="add-flight" class="button" type="button" disabled><x-icon name="plus" class="icon-sm" />Add flight</button>
 </x-page-heading>
 
@@ -29,10 +29,10 @@
             </div>
         </div>
         <div class="table-wrap"><table class="flight-table">
-            <thead><tr><th scope="col">Flight</th><th scope="col">Aircraft</th><th scope="col">Route</th><th scope="col">Dep – Arr (base local)</th><th scope="col">Block</th><th scope="col">Days</th><th scope="col">Status</th><th scope="col"><span class="visually-hidden">Actions</span></th></tr></thead>
+            <thead><tr><th scope="col">Flight</th><th scope="col">Aircraft</th><th scope="col">Route</th><th scope="col">Dep – Arr (GMT)</th><th scope="col">Block</th><th scope="col">Days</th><th scope="col">Status</th><th scope="col"><span class="visually-hidden">Actions</span></th></tr></thead>
             <tbody id="flight-rows"><tr class="loading-row"><td colspan="8">Loading flight patterns…</td></tr></tbody>
         </table></div>
-        <div class="panel-footer"><span>Weekday 1 = Monday · times are base local (GMT+2 by default)</span><span>Select a row to inspect its rotation</span></div>
+        <div class="panel-footer"><span>Times are GMT · operating days are base-local dates</span><span>Select a row to inspect its rotation</span></div>
     </section>
 
     <aside class="panel sticky-panel" aria-labelledby="detail-title">
@@ -43,7 +43,7 @@
 
 {{-- Add/edit/copy flight dialog with operating days and an ordered leg editor. --}}
 <dialog id="flight-dialog" class="dialog" aria-labelledby="flight-dialog-title"><form id="flight-form" novalidate>
-    <div class="dialog-heading"><div><h2 id="flight-dialog-title" data-dialog-title>Add flight</h2><p>Enter all times in base local time, including outstation legs. Use trip day 2–4 for night stops.</p></div><button type="button" class="icon-button" data-close aria-label="Close"><x-icon name="x" /></button></div>
+    <div class="dialog-heading"><div><h2 id="flight-dialog-title" data-dialog-title>Add flight</h2><p>Enter all times in GMT, including outstation legs. Each new leg starts where the last one landed; after a leg to an outstation you are asked whether the crew night-stop there.</p></div><button type="button" class="icon-button" data-close aria-label="Close"><x-icon name="x" /></button></div>
     <div class="form-grid">
         <label>Flight code<input name="code" required maxlength="20" class="mono" placeholder="LB1"></label>
         <label>Aircraft type<select name="aircraft_type_id" required></select></label>
@@ -56,8 +56,8 @@
     <label class="check-label"><input name="active" type="checkbox" checked>Enabled for planning</label>
     <div>
         <div class="legs-heading"><h3>Ordered legs</h3><button id="add-leg" class="button button-sm button-quiet" type="button"><x-icon name="plus" class="icon-sm" />Add leg</button></div>
-        <p class="field-hint">The first leg must depart a crew base and the final leg must return to it.</p>
-        <div id="leg-editor"></div>
+        <p class="field-hint">The first leg departs a crew base and the final leg returns to it. Night stops are at outstations only and can last several nights (rotations up to {{ (int) config('roster.max_trip_days') }} days); the same crew fly the whole rotation and change once it is back at base.</p>
+        <div id="leg-editor" data-max-trip-days="{{ (int) config('roster.max_trip_days') }}"></div>
     </div>
     <div class="status" data-form-status role="alert"></div>
     <div class="form-actions"><button class="button button-secondary" type="button" data-close-secondary>Cancel</button><button class="button" type="submit">Save flight pattern</button></div>

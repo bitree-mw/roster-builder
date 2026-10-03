@@ -39,9 +39,8 @@ class RosterExportService
         $context = $this->legality->context($period);
         $monday = $period->starts_on->format('Y-m-d');
         $days = [];
-        for ($index = 0; $index < 7; $index++) {
-            $date = $period->starts_on->addDays($index);
-            $days[] = ['date' => $date->format('Y-m-d'), 'label' => $date->format('D d M')];
+        foreach ($period->dates() as $day) {
+            $days[] = ['date' => $day, 'label' => CarbonImmutable::parse($day)->format('D d M')];
         }
         $offset = (int) $context->rules['utc_offset_minutes'];
         $local = fn ($instant): string => $instant ? CarbonImmutable::parse($instant)->utc()->addMinutes($offset)->format('H:i') : '';
@@ -65,6 +64,16 @@ class RosterExportService
                     $person['block'] += $duty['block_minutes'];
                     $person['duty'] += $duty['duty_minutes'];
                 }
+                // Layover days between duty periods (away at an outstation, no flying) print as a night stop.
+                $staying = null;
+                foreach ($snapshot['duties'] ?? [] as $duty) {
+                    if ($staying !== null) {
+                        for ($day = CarbonImmutable::parse(max($staying['after']), 'UTC')->addDay(); $day->format('Y-m-d') < min($duty['dates']); $day = $day->addDay()) {
+                            $person['cells'][$day->format('Y-m-d')][] = ['kind' => 'activity', 'label' => 'Night stop '.($snapshot['code'] ?? ''), 'times' => $staying['airport']];
+                        }
+                    }
+                    $staying = ['after' => $duty['dates'], 'airport' => $duty['legs'][array_key_last($duty['legs'] ?? [])]['to_airport'] ?? ''];
+                }
             }
             foreach ($crew->activities as $activity) {
                 $date = $activity->date->format('Y-m-d');
@@ -76,8 +85,8 @@ class RosterExportService
                 $person['cells'][$date][] = ['kind' => 'activity', 'label' => $label, 'times' => $times];
                 $person['activities'][] = ['date' => $activity->date->format('D d M'), 'label' => $label, 'times' => $times, 'note' => $activity->note];
             }
-            $person['week'] = $this->hours($context->schedule($crew->id)->weekMinutes($monday));
-            $person['summary'] = ['Duties' => count($person['duties']), 'Block' => $this->hours($person['block']), 'Duty' => $this->hours($person['duty']), 'Week incl. SIM/standby' => $person['week']];
+            $person['week'] = $this->hours($context->schedule($crew->id)->minutesBetween($monday, $period->ends_on->format('Y-m-d')));
+            $person['summary'] = ['Duties' => count($person['duties']), 'Block' => $this->hours($person['block']), 'Duty' => $this->hours($person['duty']), 'Duty incl. SIM/standby' => $person['week']];
             $people[] = $person;
         }
         $subtitle = ucfirst($period->label()).' · '.($period->status === 'published' ? 'Published' : 'Draft — not released to crew');
@@ -104,7 +113,8 @@ class RosterExportService
         $rows = array_values(array_filter($people, fn (array $person): bool => $person['cells'] !== []));
         usort($rows, fn (array $a, array $b): int => [array_search($a['rank'], ['CPT', 'FO', 'CC'], true), $a['name']] <=> [array_search($b['rank'], ['CPT', 'FO', 'CC'], true), $b['name']]);
 
-        return $this->pdf->render('pdf.roster-grid', [...$base, 'title' => 'Weekly crew roster', 'days' => $days, 'rows' => $rows, 'open' => $open,
+        // Long periods print as one grid per week (seven day columns each), so a month stays readable.
+        return $this->pdf->render('pdf.roster-grid', [...$base, 'title' => 'Crew roster', 'weeks' => array_chunk($days, 7), 'rows' => $rows, 'open' => $open,
             'summary' => ['Trips' => $context->trips->count(), 'Seats filled' => $filled.' / '.$seats, 'Open seats' => $seats - $filled, 'Crew rostered' => count(array_filter($rows, fn (array $row): bool => $row['duties'] !== []))]]);
     }
 

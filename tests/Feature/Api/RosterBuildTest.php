@@ -2,7 +2,10 @@
 
 namespace Tests\Feature\Api;
 
+use App\Models\AircraftType;
+use App\Models\Airport;
 use App\Models\Assignment;
+use App\Models\Flight;
 use App\Models\User;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Laravel\Sanctum\Sanctum;
@@ -10,9 +13,10 @@ use Tests\Feature\Api\Concerns\RosterScenario;
 use Tests\TestCase;
 
 /**
- * The roster generator: expanding enabled patterns into a week's trips and seats, filling seats with legal
+ * The roster generator: expanding enabled patterns into a roster's trips and seats, filling seats with legal
  * crew balanced by working hours, leaving seats open (with reasons) rather than breaking rules, keeping
- * manual seats on rebuild, and refusing published or past weeks.
+ * manual seats on rebuild, the missing-documents policy, standby only on flying days, crew kept on a
+ * multi-day rotation until it is back at base, and refusing published or past rosters.
  */
 class RosterBuildTest extends TestCase
 {
@@ -106,6 +110,9 @@ class RosterBuildTest extends TestCase
 
     public function test_standby_fills_workload_gaps_up_to_the_weekly_days_off_limit_and_is_replaced_on_rebuild(): void
     {
+        // Standby is only planned on days with flying from the crew member's base. The daily flight uses an
+        // aircraft type nobody is rated on, so its seats stay open and every day of the week is a flying day.
+        $this->flight('LB1', [0, 1, 2, 3, 4, 5, 6])->update(['aircraft_type_id' => AircraftType::factory()->create()->id]);
         $idle = $this->crew('CPT', 'Idle Captain');
         $onLeave = $this->crew('CPT', 'Leave Captain');
         foreach (['2026-10-05', '2026-10-06', '2026-10-07', '2026-10-08', '2026-10-09'] as $date) {
@@ -152,10 +159,70 @@ class RosterBuildTest extends TestCase
         $past = $this->week('2026-09-21');
         $this->actingAsScheduler();
         $this->postJson("/api/v1/roster-periods/{$published->id}/build")->assertUnprocessable()->assertJsonValidationErrors('period');
-        $this->postJson("/api/v1/roster-periods/{$past->id}/build")->assertUnprocessable()->assertJsonPath('errors.period.0', 'This week has ended. Past rosters are kept as read-only history.');
+        $this->postJson("/api/v1/roster-periods/{$past->id}/build")->assertUnprocessable()->assertJsonPath('errors.period.0', 'This roster has ended. Past rosters are kept as read-only history.');
 
         Sanctum::actingAs(User::factory()->create(['role' => 'crew']), ['*']);
         $this->postJson("/api/v1/roster-periods/{$this->week('2026-10-12')->id}/build")->assertForbidden();
         $this->assertDatabaseCount('trips', 0);
+    }
+
+    public function test_missing_documents_warn_by_default_and_only_block_when_the_rules_say_so(): void
+    {
+        $this->flight('LB1', [0]);
+        $captain = $this->crew('CPT', 'Alpha Captain');
+        $captain->documents()->where('kind', 'medical')->delete();
+        $period = $this->week();
+        $this->actingAsScheduler();
+
+        $this->postJson("/api/v1/roster-periods/{$period->id}/build")->assertOk();
+        $this->assertDatabaseHas('assignments', ['rank' => 'CPT', 'crew_member_id' => $captain->id]);
+        $this->getJson("/api/v1/roster-periods/{$period->id}")->assertOk()->assertJsonPath('data.summary.blocking', 0)
+            ->assertJsonFragment(['code' => 'document_missing', 'message' => 'No medical expiry on record.', 'blocking' => false]);
+
+        $period->update(['rules_snapshot' => [...$period->rules_snapshot, 'missing_documents' => 'block']]);
+        $response = $this->postJson("/api/v1/roster-periods/{$period->id}/build")->assertOk()->assertJsonPath('data.summary.filled', 0);
+        $this->assertStringContainsString('document not on record', $response->json('message'));
+        $this->assertDatabaseMissing('assignments', ['crew_member_id' => $captain->id]);
+    }
+
+    public function test_build_without_flying_explains_itself_and_plans_no_standby(): void
+    {
+        $idle = $this->crew('CPT', 'Idle Captain');
+        $this->flight('LB1', [0], active: false);
+        $period = $this->week();
+        $this->actingAsScheduler();
+
+        $response = $this->postJson("/api/v1/roster-periods/{$period->id}/build")->assertOk()->assertJsonPath('data.summary.build.standby', 0);
+        $this->assertStringStartsWith('Nothing to plan for week 41', $response->json('message'));
+        $this->assertSame(0, $idle->activities()->count());
+    }
+
+    public function test_crew_stay_with_a_long_rotation_until_it_is_back_at_base(): void
+    {
+        // LR1: out to MZU on Tuesday 20 October, 13 nights there, back at LLW on trip day 14 (Monday 2 November).
+        Airport::factory()->create(['code' => 'MZU', 'is_base' => false]);
+        $rotation = Flight::factory()->create(['code' => 'LR1', 'aircraft_type_id' => $this->q400->id]);
+        $rotation->days()->create(['weekday' => 1]);
+        $rotation->legs()->createMany([
+            ['trip_day' => 1, 'sequence' => 1, 'from_airport' => 'LLW', 'to_airport' => 'MZU', 'departs_local' => '08:00', 'arrives_local' => '09:00'],
+            ['trip_day' => 14, 'sequence' => 1, 'from_airport' => 'MZU', 'to_airport' => 'LLW', 'departs_local' => '08:00', 'arrives_local' => '09:00'],
+        ]);
+        $alpha = $this->crew('CPT', 'Alpha Captain');
+        // Leave on a layover day (no flying, but away from base) rules the first officer out.
+        $officer = $this->crew('FO', 'Charlie Officer');
+        $officer->activities()->create(['date' => '2026-10-25', 'type' => 'leave']);
+        $this->actingAsScheduler();
+        $this->postJson("/api/v1/roster-periods/{$this->week('2026-10-19')->id}/build")->assertOk();
+        $this->assertDatabaseHas('assignments', ['rank' => 'CPT', 'crew_member_id' => $alpha->id]);
+        $this->assertDatabaseHas('assignments', ['rank' => 'FO', 'crew_member_id' => null]);
+
+        // The next roster starts on the day the rotation comes home: Alpha is still away at 08:00, so Bravo flies.
+        $rotation->update(['active' => false]);
+        $this->flight('LB1', [0]);
+        $bravo = $this->crew('CPT', 'Bravo Captain');
+        $period = $this->week('2026-11-02');
+        $this->postJson("/api/v1/roster-periods/{$period->id}/build")->assertOk();
+        $seat = Assignment::query()->where('rank', 'CPT')->whereHas('trip', fn ($query) => $query->where('roster_period_id', $period->id))->sole();
+        $this->assertSame($bravo->id, $seat->crew_member_id);
     }
 }

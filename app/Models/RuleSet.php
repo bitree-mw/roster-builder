@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Model;
  * The configurable duty limits (row id 1 is the standard set). These are planning defaults from the product
  * brief, not a certified statement of aviation regulations.
  */
-#[Fillable(['name', 'report_before_min', 'release_after_min', 'max_duty_day_h', 'min_rest_h', 'max_duty_7d_h', 'max_block_month_h', 'max_consecutive_days', 'min_days_off_month', 'max_days_off_week', 'utc_offset_minutes'])]
+#[Fillable(['name', 'report_before_min', 'release_after_min', 'max_duty_day_h', 'min_rest_h', 'max_duty_7d_h', 'max_block_month_h', 'max_consecutive_days', 'min_days_off_month', 'max_days_off_week', 'missing_documents', 'utc_offset_minutes'])]
 class RuleSet extends Model
 {
     use HasFactory;

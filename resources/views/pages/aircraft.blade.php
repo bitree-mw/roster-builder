@@ -1,7 +1,8 @@
 {{-- Fleet page shell. Data and interactions: resources/js/pages/aircraft.js (API: /api/v1/aircraft, /aircraft-types). --}}
 @extends('layouts.app')
 @section('content')
-<x-page-heading eyebrow="Fleet / Airworthiness" heading="Fleet" description="Registered airframes, their current availability and the aircraft types used by flight patterns. Mark an aircraft as in maintenance, grounded or unavailable with a reason so planners know what can fly.">
+<x-page-heading eyebrow="Fleet / Airworthiness" heading="Fleet" description="Registered airframes and whether each one is available to fly, plus the aircraft types used by flight routes. Mark an aircraft as not available (with an optional reason) so planners know what can fly.">
+    <a class="button button-secondary" href="{{ route('maintenance') }}"><x-icon name="wrench" class="icon-sm" />Maintenance log</a>
     <button id="add-type" class="button button-secondary" type="button" disabled><x-icon name="plus" class="icon-sm" />Aircraft type</button>
     <button id="add-aircraft" class="button" type="button" disabled><x-icon name="plus" class="icon-sm" />Register aircraft</button>
 </x-page-heading>
@@ -9,21 +10,18 @@
 {{-- Fleet status counts. --}}
 <div class="kpi-grid">
     <x-kpi label="Registered airframes" icon="plane" value="fleet.total" meta="Across all aircraft types" />
-    <x-kpi label="Available" icon="check" value="fleet.available" tone="success" meta="Serviceable for planning" />
-    <x-kpi label="In maintenance" icon="wrench" value="fleet.maintenance" tone="warning" meta="Checks or repairs in progress" />
-    <x-kpi label="Grounded (AOG)" icon="ban" value="fleet.grounded" tone="danger" meta="Not airworthy until released" />
-    <x-kpi label="Unavailable" icon="power" value="fleet.unavailable" meta="Leased out, stored or withdrawn" />
+    <x-kpi label="Available" icon="check" value="fleet.available" tone="success" meta="Can be planned" />
+    <x-kpi label="Not available" icon="ban" value="fleet.not_available" tone="warning" meta="Cannot be planned" />
 </div>
 
-{{-- Airframe cards with a status filter (options come from Aircraft::STATUSES). --}}
+{{-- Airframe cards with an availability filter. --}}
 <section class="panel" aria-labelledby="airframes-title">
     <div class="panel-heading">
         <div class="panel-title"><x-icon name="plane" /><h2 id="airframes-title">Airframes</h2><span id="aircraft-count" class="chip"></span></div>
         <div class="segmented" id="status-filter" role="group" aria-label="Filter airframes by status">
             <button type="button" data-value="" aria-pressed="true">All</button>
-            @foreach(\App\Models\Aircraft::STATUSES as $value => $label)
-            <button type="button" data-value="{{ $value }}" aria-pressed="false">{{ $label }}</button>
-            @endforeach
+            <button type="button" data-value="available" aria-pressed="false">Available</button>
+            <button type="button" data-value="not" aria-pressed="false">Not available</button>
         </div>
     </div>
     <div id="aircraft-cards" class="airframe-grid" aria-live="polite" aria-busy="true"><p class="loading-block">Loading fleet…</p></div>
@@ -43,7 +41,7 @@
 
 {{-- Register/edit airframe dialog (status is not edited here). --}}
 <dialog id="aircraft-dialog" class="dialog" aria-labelledby="aircraft-dialog-title"><form id="aircraft-form" novalidate>
-    <div class="dialog-heading"><div><h2 id="aircraft-dialog-title" data-dialog-title>Register aircraft</h2><p>New aircraft start as available. Use “Change status” to ground or withdraw them.</p></div><button type="button" class="icon-button" data-close aria-label="Close"><x-icon name="x" /></button></div>
+    <div class="dialog-heading"><div><h2 id="aircraft-dialog-title" data-dialog-title>Register aircraft</h2><p>New aircraft start as available. Use “Availability” on the card to mark one as not available.</p></div><button type="button" class="icon-button" data-close aria-label="Close"><x-icon name="x" /></button></div>
     <div class="form-grid">
         <label>Registration<input name="registration" required maxlength="12" placeholder="7Q-TBA" autocomplete="off" class="mono"><span class="field-hint">Letters, numbers and hyphens.</span></label>
         <label>Aircraft type<select name="aircraft_type_id" required></select></label>
@@ -54,22 +52,16 @@
     <div class="form-actions"><button class="button button-secondary" type="button" data-close-secondary>Cancel</button><button class="button" type="submit">Save aircraft</button></div>
 </form></dialog>
 
-{{-- Change status dialog: radio cards for each status and a reason (required unless available). --}}
+{{-- Availability dialog: Available or Not available, with an optional reason. --}}
 <dialog id="status-dialog" class="dialog" aria-labelledby="status-dialog-title"><form id="status-form" novalidate>
-    <div class="dialog-heading"><div><h2 id="status-dialog-title">Change aircraft status</h2><p id="status-dialog-subtitle"></p></div><button type="button" class="icon-button" data-close aria-label="Close"><x-icon name="x" /></button></div>
-    <fieldset><legend>Status</legend><div class="option-cards">
-        @foreach([
-            'available' => 'Serviceable and can be planned.',
-            'maintenance' => 'Scheduled or unscheduled work in progress.',
-            'grounded' => 'Aircraft on ground — not airworthy until released.',
-            'unavailable' => 'Leased out, stored or otherwise withdrawn.',
-        ] as $value => $description)
-        <label class="option-card"><input type="radio" name="status" value="{{ $value }}" required><span><strong>{{ \App\Models\Aircraft::STATUSES[$value] }}</strong><small>{{ $description }}</small></span></label>
-        @endforeach
+    <div class="dialog-heading"><div><h2 id="status-dialog-title">Aircraft availability</h2><p id="status-dialog-subtitle"></p></div><button type="button" class="icon-button" data-close aria-label="Close"><x-icon name="x" /></button></div>
+    <fieldset><legend>Can this aircraft fly?</legend><div class="option-cards">
+        <label class="option-card"><input type="radio" name="status" value="available" required><span><strong>Available</strong><small>Can be planned on flights.</small></span></label>
+        <label class="option-card"><input type="radio" name="status" value="unavailable" required><span><strong>Not available</strong><small>Maintenance, AOG, stored or leased out.</small></span></label>
     </div></fieldset>
-    <label>Reason<textarea name="reason" maxlength="255" placeholder="e.g. Awaiting replacement propeller de-ice boot"></textarea><span class="field-hint" id="reason-hint">Required unless the aircraft is available. Recorded in the audit log.</span></label>
+    <label>Reason <span class="field-hint">(optional)</span><textarea name="reason" maxlength="255" placeholder="e.g. A-check at LLW hangar until Friday"></textarea><span class="field-hint" id="reason-hint">Shown on the aircraft card and recorded in the audit log.</span></label>
     <div class="status" data-form-status role="alert"></div>
-    <div class="form-actions"><button class="button button-secondary" type="button" data-close-secondary>Cancel</button><button class="button" type="submit">Update status</button></div>
+    <div class="form-actions"><button class="button button-secondary" type="button" data-close-secondary>Cancel</button><button class="button" type="submit">Save availability</button></div>
 </form></dialog>
 
 {{-- Add/edit aircraft type dialog. --}}

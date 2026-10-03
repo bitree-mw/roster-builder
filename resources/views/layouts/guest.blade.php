@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<html lang="en">
+{{-- data-theme comes from the "theme" cookie (light or dark); without it the system preference applies. --}}
+<html lang="en" @if(in_array(request()->cookie('theme'), ['light', 'dark'], true)) data-theme="{{ request()->cookie('theme') }}" @endif>
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">

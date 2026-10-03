@@ -29,8 +29,9 @@ class RosterPeriodController extends Controller
     public function __construct(private RosterPeriodService $periods, private RosterLegalityService $legality, private RosterConflictService $conflicts) {}
 
     /**
-     * GET /roster-periods?from=YYYY-MM-DD&to=YYYY-MM-DD — weeks starting in the range (default: eight weeks
-     * back to twelve ahead), oldest first. Staff also get trip and seat counts; crew only see published weeks.
+     * GET /roster-periods?from=YYYY-MM-DD&to=YYYY-MM-DD — periods (weeks, fortnights, months) overlapping the
+     * range (default: eight weeks back to twelve ahead), oldest first. Staff also get trip and seat counts;
+     * crew only see published periods.
      */
     public function index(RosterQueryRequest $request): JsonResponse
     {
@@ -40,7 +41,7 @@ class RosterPeriodController extends Controller
         $to = $request->validated('to') ?? $monday->addWeeks(12)->format('Y-m-d');
         $seats = fn (bool $open) => Assignment::query()->selectRaw('count(*)')->join('trips', 'trips.id', '=', 'assignments.trip_id')
             ->whereColumn('trips.roster_period_id', 'roster_periods.id')->when($open, fn ($query) => $query->whereNull('assignments.crew_member_id'));
-        $periods = RosterPeriod::query()->whereBetween('starts_on', [$from, $to])
+        $periods = RosterPeriod::query()->where('starts_on', '<=', $to)->where('ends_on', '>=', $from)
             ->when(! $staff, fn ($query) => $query->where('status', 'published'))
             ->when($staff, fn ($query) => $query->select('roster_periods.*')->withCount('trips')->addSelect(['seats_count' => $seats(false), 'open_seats_count' => $seats(true)]))
             ->orderBy('starts_on')->get();
@@ -49,11 +50,12 @@ class RosterPeriodController extends Controller
     }
 
     /**
-     * POST /roster-periods {week_start} — 201 for a new draft week, 200 when the week already exists.
+     * POST /roster-periods {starts_on, length: week|fortnight|month} — 201 for a new draft period, 200 when
+     * the same period already exists; 422 when it would overlap another roster.
      */
     public function store(RosterPeriodRequest $request): JsonResponse
     {
-        $period = $this->periods->create($request->validated('week_start'), $request->user());
+        $period = $this->periods->create($request->validated('starts_on'), $request->user(), $request->validated('length'));
         $label = ['label' => $period->label()];
 
         return $period->wasRecentlyCreated
@@ -80,10 +82,16 @@ class RosterPeriodController extends Controller
     {
         Gate::authorize('manage-operations');
         $result = $builder->build($rosterPeriod, $request->user());
-        $key = $result['open'] > 0 ? 'roster_period.built_with_open' : 'roster_period.built';
+        // Explain the outcome: nothing to plan, open seats with their main reasons, or everything filled.
+        $key = match (true) {
+            $result['planned_trips'] === 0 => 'roster_period.built_empty',
+            $result['open'] > 0 => 'roster_period.built_with_open',
+            default => 'roster_period.built',
+        };
+        $reasons = collect($result['reasons'])->map(fn (int $count, string $code): string => (RosterLegalityService::REASON_LABELS[$code] ?? $code).' ('.$count.')')->implode(', ');
 
         return ApiResponse::resource($this->week($rosterPeriod->refresh(), $request->user(), $result), $key, [
-            'label' => $rosterPeriod->label(), 'filled' => $result['filled'], 'seats' => $result['seats'], 'open' => $result['open'],
+            'label' => $rosterPeriod->label(), 'filled' => $result['filled'], 'seats' => $result['seats'], 'open' => $result['open'], 'reasons' => $reasons ?: 'see each open seat',
         ]);
     }
 
@@ -124,12 +132,12 @@ class RosterPeriodController extends Controller
             return new RosterWeekResource(['context' => $context, 'conflicts' => $conflicts, 'summary' => [...$this->conflicts->summary($context, $conflicts), 'build' => $build], 'crew_member_id' => null]);
         }
         $own = (int) $user->crew_member_id;
-        $monday = $period->starts_on->format('Y-m-d');
+        [$from, $to] = [$period->starts_on->format('Y-m-d'), $period->ends_on->format('Y-m-d')];
 
         return new RosterWeekResource(['context' => $context, 'conflicts' => [], 'crew_member_id' => $own, 'summary' => [
             'duties' => $context->trips->filter(fn ($trip): bool => $trip->assignments->contains('crew_member_id', $own))->count(),
-            'duty_minutes' => $context->schedule($own)->weekMinutes($monday),
-            'block_minutes' => $context->schedule($own)->weekBlockMinutes($monday),
+            'duty_minutes' => $context->schedule($own)->minutesBetween($from, $to),
+            'block_minutes' => $context->schedule($own)->blockMinutesBetween($from, $to),
         ]]);
     }
 }

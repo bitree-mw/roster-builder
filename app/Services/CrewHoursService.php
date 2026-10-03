@@ -43,9 +43,9 @@ class CrewHoursService
             $totals[$id] = array_map(fn (): array => ['block_minutes' => 0, 'duty_minutes' => 0, 'scheduled_block_minutes' => 0, 'scheduled_duty_minutes' => 0, 'trips' => 0], $ranges);
         }
 
-        // Rostered trips in published weeks (trips can start up to three days before a window and reach into it).
+        // Rostered trips in published weeks (a rotation can start up to max_trip_days - 1 days before a window and reach into it).
         $assignments = Assignment::query()->whereIn('crew_member_id', $ids)
-            ->whereHas('trip', fn ($query) => $query->whereBetween('start_date', [CarbonImmutable::parse($from)->subDays(3)->format('Y-m-d'), $to])
+            ->whereHas('trip', fn ($query) => $query->whereBetween('start_date', [CarbonImmutable::parse($from)->subDays((int) config('roster.max_trip_days') - 1)->format('Y-m-d'), $to])
                 ->whereHas('rosterPeriod', fn ($query) => $query->where('status', 'published')))
             ->with('trip')->get();
         foreach ($assignments as $assignment) {

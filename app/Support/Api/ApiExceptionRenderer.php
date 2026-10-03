@@ -6,6 +6,7 @@ use Illuminate\Auth\AuthenticationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
@@ -47,13 +48,19 @@ class ApiExceptionRenderer
         return $this->fromStatus($status, $replace, $exception->getHeaders(), $exception->getMessage());
     }
 
+    /**
+     * Unexpected failures: a generic message plus a short reference that is also written to the log with
+     * the full exception, so "something went wrong" can be traced on a hosted server without exposing
+     * details to the browser (debug details only when APP_DEBUG and api.expose_debug are both on).
+     */
     private function serverError(Throwable $exception): JsonResponse
     {
-        $extra = config('app.debug') && config('api.expose_debug') ? ['debug' => [
-            'exception' => $exception::class,
-            'message' => $exception->getMessage(),
-            'location' => $exception->getFile().':'.$exception->getLine(),
-        ]] : [];
+        $reference = strtoupper(Str::random(8));
+        Log::error('API error '.$reference.': '.$exception->getMessage(), ['reference' => $reference, 'url' => request()->fullUrl(), 'user_id' => request()->user()?->id, 'exception' => $exception]);
+        $extra = ['reference' => $reference];
+        if (config('app.debug') && config('api.expose_debug')) {
+            $extra['debug'] = ['exception' => $exception::class, 'message' => $exception->getMessage(), 'location' => $exception->getFile().':'.$exception->getLine()];
+        }
         $error = config('api.errors.500');
 
         return ApiResponse::error($error['message'], 500, $error['code'], extra: $extra);

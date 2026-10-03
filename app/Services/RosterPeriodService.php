@@ -10,25 +10,42 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Lifecycle of a roster week: create the draft, publish it to crew, and reopen it for changes. Building
- * lives in RosterBuilderService and seat edits in AssignmentService; both rely on assertEditable().
+ * Lifecycle of a roster period (one week, two weeks or a month): create the draft, publish it to crew, and
+ * reopen it for changes. Building lives in RosterBuilderService and seat edits in AssignmentService; both
+ * rely on assertEditable().
  */
 class RosterPeriodService
 {
     public function __construct(private AuditService $audit, private ExpiryService $expiry, private RosterConflictService $conflicts) {}
 
     /**
-     * Create the draft week starting on a Monday, or return the existing one (idempotent). A new week stores a
-     * snapshot of the current duty rules so later rule changes do not affect it.
+     * Create a draft period, or return the existing one with the same start and length (idempotent). Periods
+     * may not overlap. A new period stores a snapshot of the current duty rules so later rule changes do not
+     * affect it.
      *
-     * @param  string  $weekStart  the Monday, "YYYY-MM-DD"
+     * @param  string  $startsOn  first day, "YYYY-MM-DD" (a Monday, or the 1st for a month)
+     * @param  string  $length  week | fortnight | month
+     *
+     * @throws ValidationException when the dates overlap another roster
      */
-    public function create(string $weekStart, User $actor): RosterPeriod
+    public function create(string $startsOn, User $actor, string $length = 'week'): RosterPeriod
     {
-        return DB::transaction(function () use ($weekStart, $actor): RosterPeriod {
-            $monday = CarbonImmutable::parse($weekStart, 'UTC');
-            $period = RosterPeriod::firstOrCreate(['starts_on' => $monday->format('Y-m-d')], [
-                'ends_on' => $monday->addDays(6)->format('Y-m-d'),
+        return DB::transaction(function () use ($startsOn, $actor, $length): RosterPeriod {
+            $start = CarbonImmutable::parse($startsOn, 'UTC');
+            $end = RosterPeriod::endFor($start, $length);
+            $existing = RosterPeriod::query()->where('starts_on', $start->format('Y-m-d'))->first();
+            if ($existing !== null && $existing->length === $length) {
+                return $existing;
+            }
+            // Periods never overlap, so every trip belongs to exactly one roster.
+            $overlap = RosterPeriod::query()->where('starts_on', '<=', $end->format('Y-m-d'))->where('ends_on', '>=', $start->format('Y-m-d'))->orderBy('starts_on')->first();
+            if ($overlap !== null) {
+                throw ValidationException::withMessages(['starts_on' => 'These dates overlap the roster for '.$overlap->label().'. Choose dates after '.$overlap->ends_on->format('d M Y').', or open that roster.']);
+            }
+            $period = RosterPeriod::create([
+                'starts_on' => $start->format('Y-m-d'),
+                'ends_on' => $end->format('Y-m-d'),
+                'length' => $length,
                 'rules_snapshot' => RuleSet::findOrFail(1)->makeHidden(['id', 'created_at', 'updated_at'])->toArray(),
             ]);
             if ($period->wasRecentlyCreated) {
@@ -114,7 +131,7 @@ class RosterPeriodService
         return $period->status === 'draft' && ! $this->ended($period);
     }
 
-    /** Whether the week's Sunday is before today's base-local date. */
+    /** Whether the period's last day is before today's base-local date. */
     public function ended(RosterPeriod $period): bool
     {
         return $period->ends_on->lt($this->expiry->today());
@@ -126,7 +143,7 @@ class RosterPeriodService
     private function assertNotEnded(RosterPeriod $period): void
     {
         if ($this->ended($period)) {
-            throw ValidationException::withMessages(['period' => 'This week has ended. Past rosters are kept as read-only history.']);
+            throw ValidationException::withMessages(['period' => 'This roster has ended. Past rosters are kept as read-only history.']);
         }
     }
 }

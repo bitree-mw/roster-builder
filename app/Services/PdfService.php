@@ -30,6 +30,13 @@ class PdfService
         $options->setIsPhpEnabled(false);
         $options->setDefaultFont('DejaVu Sans');
         $options->setChroot(base_path());
+        // Font metrics and temporary files go to storage: vendor/ is often read-only on hosting.
+        $cache = storage_path('app/dompdf');
+        if (! is_dir($cache)) {
+            @mkdir($cache, 0775, true);
+        }
+        $options->setFontCache($cache);
+        $options->setTempDir($cache);
         $dompdf = new Dompdf($options);
         $dompdf->loadHtml($html, 'UTF-8');
         $dompdf->setPaper('A4', $orientation);
@@ -63,7 +70,13 @@ class PdfService
     {
         preg_match_all('/--([a-z0-9-]+)\s*:\s*([^;]+);/i', (string) file_get_contents(resource_path('css/common/tokens.css')), $matches, PREG_SET_ORDER);
 
-        return collect($matches)->mapWithKeys(fn (array $match): array => [$match[1] => trim($match[2])])->all();
+        // First definition wins, and light-dark(light, dark) pairs resolve to the light value: PDFs are always light.
+        $tokens = [];
+        foreach ($matches as [, $name, $value]) {
+            $tokens[$name] ??= preg_match('/^light-dark\(\s*([^,]+),/', trim($value), $pair) ? trim($pair[1]) : trim($value);
+        }
+
+        return $tokens;
     }
 
     /** The airline logo as a data URI (or null when the file is missing or disabled). */

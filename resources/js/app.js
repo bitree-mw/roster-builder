@@ -1,10 +1,11 @@
 /**
- * Shared script loaded on every signed-in page (layouts/app.blade.php): sign-out, "My account", dialog cancel buttons,
+ * Shared script loaded on every signed-in page (layouts/app.blade.php): sign-out, "My account", the theme switch, dialog cancel buttons,
  * connection notices and the navigation counts / header alerts.
  */
 import { initAccountDialog } from './common/account';
 import { api, csrf } from './common/api';
 import { refreshShell } from './common/shell';
+import { initThemeToggle } from './common/theme';
 import { flash, toast } from './common/toast';
 import { showError } from './common/ui';
 
@@ -33,3 +34,5 @@ refreshShell().catch(() => {});
 
 // "My account": change your own password from the user chip.
 initAccountDialog();
+// Light / dark theme switch in the top bar.
+initThemeToggle();

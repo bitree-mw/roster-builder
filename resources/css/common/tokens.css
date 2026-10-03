@@ -2,72 +2,85 @@
  * Malawi Airlines operations design tokens.
  * Every colour in the application is defined here. Templates and JavaScript use classes, never colour values.
  * Fonts use locally installed faces with system fallbacks; no web fonts are fetched at runtime.
+ *
+ * Light and dark themes: each colour is light-dark(light value, dark value). The browser picks one from the
+ * color-scheme below: the system setting by default, or the choice saved in the "theme" cookie, which the
+ * layouts write to <html data-theme> (resources/js/common/theme.js switches it). PDF documents always use
+ * the light values (App\Services\PdfService).
  */
 @theme {
     --font-sans: "Public Sans", "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
     --font-display: "Public Sans", "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
     --font-mono: "JetBrains Mono", "Cascadia Mono", "SFMono-Regular", Consolas, "Liberation Mono", ui-monospace, monospace;
 
-    /* Structure: chart-grey canvas, white cards, navy ink. */
-    --color-canvas: #e9eef1;
-    --color-surface: #ffffff;
-    --color-surface-muted: #f4f8fb;
-    --color-surface-sunken: #e0e9f2;
-    --color-ink: #16233a;
-    --color-ink-strong: #010d23;
-    --color-muted: #56677a;
-    --color-subtle: #75808e;
-    --color-line: #cad4dc;
-    --color-line-strong: #9aa8b5;
+    /* Structure: chart-grey canvas, white cards, navy ink (dark: deep navy canvas, slate cards, pale ink). */
+    --color-canvas: light-dark(#e9eef1, #0e1621);
+    --color-surface: light-dark(#ffffff, #16202d);
+    --color-surface-muted: light-dark(#f4f8fb, #1b2736);
+    --color-surface-sunken: light-dark(#e0e9f2, #223143);
+    --color-ink: light-dark(#16233a, #dbe4ee);
+    --color-ink-strong: light-dark(#010d23, #f4f7fb);
+    --color-muted: light-dark(#56677a, #9aabbd);
+    --color-subtle: light-dark(#75808e, #7f8fa1);
+    --color-line: light-dark(#cad4dc, #2c3b4e);
+    --color-line-strong: light-dark(#9aa8b5, #475a70);
 
     /* Brand: navy console with the Malawi Airlines tail green and wordmark red. */
-    --color-brand: #16233a;
-    --color-brand-hover: #010d23;
-    --color-brand-soft: #e5eff7;
+    --color-brand: light-dark(#16233a, #3a6ea8);
+    --color-brand-hover: light-dark(#010d23, #4a80bc);
+    --color-brand-soft: light-dark(#e5eff7, #1d3047);
     --color-brand-contrast: #ffffff;
-    --color-tail: #3f9b4f;
-    --color-tail-soft: #e4f3e6;
-    --color-wordmark: #c8312a;
+    --color-tail: light-dark(#3f9b4f, #5bb86b);
+    --color-tail-soft: light-dark(#e4f3e6, #18301e);
+    --color-wordmark: light-dark(#c8312a, #e0554d);
+    /* The sign-in hero panel stays a deep navy in both themes; logos always sit on white. */
+    --color-hero: light-dark(#16233a, #0b1a2e);
+    --color-logo-bg: #ffffff;
 
     /* Flight strip buff (ATC paper strip). */
-    --color-strip: #f5ebcf;
-    --color-strip-line: #e2d3a8;
+    --color-strip: light-dark(#f5ebcf, #3a3220);
+    --color-strip-line: light-dark(#e2d3a8, #5a4c2c);
 
     /* Operational states. */
-    --color-success: #2e7d4f;
-    --color-success-soft: #e2f1e7;
-    --color-warning: #9a5b00;
-    --color-warning-accent: #b86e00;
-    --color-warning-soft: #fdf0d9;
-    --color-danger: #b3261e;
-    --color-danger-soft: #fbe9e7;
-    --color-info: #1a648c;
-    --color-info-soft: #e1f0f9;
-    --color-neutral: #5b6673;
-    --color-neutral-soft: #eceff2;
-    --color-sim: #5b4b9a;
-    --color-sim-soft: #ece8f7;
-    --color-standby: #1f7a7a;
-    --color-standby-soft: #e0f2f1;
+    --color-success: light-dark(#2e7d4f, #5cc488);
+    --color-success-soft: light-dark(#e2f1e7, #15301f);
+    --color-warning: light-dark(#9a5b00, #f0b45a);
+    --color-warning-accent: light-dark(#b86e00, #e0962e);
+    --color-warning-soft: light-dark(#fdf0d9, #33260f);
+    --color-danger: light-dark(#b3261e, #f2786f);
+    --color-danger-soft: light-dark(#fbe9e7, #3a1a18);
+    --color-info: light-dark(#1a648c, #6cb4e0);
+    --color-info-soft: light-dark(#e1f0f9, #13293a);
+    --color-neutral: light-dark(#5b6673, #a3b0be);
+    --color-neutral-soft: light-dark(#eceff2, #243142);
+    --color-sim: light-dark(#5b4b9a, #a99bea);
+    --color-sim-soft: light-dark(#ece8f7, #251f40);
+    --color-standby: light-dark(#1f7a7a, #5cc8c8);
+    --color-standby-soft: light-dark(#e0f2f1, #11302f);
 }
+
+/* Theme selection: follow the system unless the user picked light or dark. */
+:root { color-scheme: light dark; }
+:root[data-theme="light"] { color-scheme: light; }
+:root[data-theme="dark"] { color-scheme: dark; }
 
 :root {
     /* Aircraft type roster palettes (semantic key stored on aircraft_types.palette). */
-    --palette-forest: #2b6e43;
-    --palette-forest-bg: #e3f1e7;
-    --palette-gold: #855b00;
-    --palette-gold-bg: #fbefcf;
-    --palette-sky: #2a6f97;
-    --palette-sky-bg: #e1eff8;
-    --palette-plum: #8c2f6b;
-    --palette-plum-bg: #f6e4ef;
-    --palette-coral: #a5432c;
-    --palette-coral-bg: #fbe8e1;
+    --palette-forest: light-dark(#2b6e43, #6fcf94);
+    --palette-forest-bg: light-dark(#e3f1e7, #163222);
+    --palette-gold: light-dark(#855b00, #e8b84a);
+    --palette-gold-bg: light-dark(#fbefcf, #33290f);
+    --palette-sky: light-dark(#2a6f97, #6db6e3);
+    --palette-sky-bg: light-dark(#e1eff8, #132a3b);
+    --palette-plum: light-dark(#8c2f6b, #e087c0);
+    --palette-plum-bg: light-dark(#f6e4ef, #331a2c);
+    --palette-coral: light-dark(#a5432c, #f08f75);
+    --palette-coral-bg: light-dark(#fbe8e1, #36201a);
 
-    --focus-ring: #2a6f97;
-    --dialog-shade: rgb(22 35 58 / 0.55);
-    --lift-shadow: 0 2px 0 rgb(22 35 58 / 0.15);
-    --toast-shadow: 0 2px 0 rgb(22 35 58 / 0.12), 0 8px 24px rgb(22 35 58 / 0.18);
+    --focus-ring: light-dark(#2a6f97, #6db6e3);
+    --dialog-shade: light-dark(rgb(22 35 58 / 0.55), rgb(0 0 0 / 0.65));
+    --lift-shadow: 0 2px 0 light-dark(rgb(22 35 58 / 0.15), rgb(0 0 0 / 0.45));
+    --toast-shadow: 0 2px 0 light-dark(rgb(22 35 58 / 0.12), rgb(0 0 0 / 0.4)), 0 8px 24px light-dark(rgb(22 35 58 / 0.18), rgb(0 0 0 / 0.5));
     --hero-grid: rgb(255 255 255 / 0.06);
     --hero-ink-muted: #b6c3d6;
     --hero-panel: rgb(255 255 255 / 0.06);

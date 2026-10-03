@@ -48,7 +48,8 @@ const typeEditor = editor({
 function openStatus(record) {
     statusTarget = record; statusForm.reset(); status('', false, statusForm.querySelector('[data-form-status]'));
     document.querySelector('#status-dialog-subtitle').textContent = `${record.registration} · ${record.aircraft_type?.code ?? ''} · currently ${record.status_label.toLowerCase()}`;
-    statusForm.querySelector(`[name="status"][value="${record.status}"]`).checked = true;
+    // Older statuses (in maintenance, grounded) are all "not available" in this simplified choice.
+    statusForm.querySelector(`[name="status"][value="${record.status === 'available' ? 'available' : 'unavailable'}"]`).checked = true;
     statusForm.elements.reason.value = record.status_reason || '';
     statusDialog.showModal();
 }
@@ -92,7 +93,7 @@ function airframeCard(record) {
     details.append(element('dt', 'Airframe hours'), element('dd', `${formatNumber(record.airframe_hours)} h`, 'mono'), element('dt', 'Status since'), element('dd', formatInstant(record.status_changed_at), 'mono small'));
     card.append(details, dueBlock(record));
     const footer = element('footer', null, 'airframe-actions');
-    const change = element('button', null, 'button button-sm button-secondary'); change.type = 'button'; change.setAttribute('aria-label', `Change status of ${record.registration}`); change.append(icon('power', 'icon-sm'), 'Status'); change.addEventListener('click', () => openStatus(record));
+    const change = element('button', null, 'button button-sm button-secondary'); change.type = 'button'; change.setAttribute('aria-label', `Change status of ${record.registration}`); change.append(icon('power', 'icon-sm'), 'Availability'); change.addEventListener('click', () => openStatus(record));
     const log = element('a', null, 'button button-sm button-quiet'); log.href = `/maintenance?aircraft=${record.id}`; log.setAttribute('aria-label', `Maintenance log for ${record.registration}`); log.append(icon('wrench', 'icon-sm'), 'Log');
     const tools = element('div', null, 'row-actions');
     tools.append(iconButton('pencil', `Edit ${record.registration}`, () => aircraftEditor.open(record)), iconButton('trash', `Remove ${record.registration}`, () => aircraftEditor.remove(record), 'danger'));
@@ -102,7 +103,7 @@ function airframeCard(record) {
 
 /** Render the cards for the selected status filter, or an empty state. */
 function renderAircraft() {
-    const visible = aircraft.filter(record => !statusFilter || record.status === statusFilter);
+    const visible = aircraft.filter(record => !statusFilter || (statusFilter === 'available') === (record.status === 'available'));
     document.querySelector('#aircraft-count').textContent = plural(aircraft.length, 'airframe');
     cards.setAttribute('aria-busy', 'false');
     if (!visible.length) {
@@ -127,11 +128,12 @@ function renderTypes() {
     }));
 }
 
-/** Status counts for the KPI strip, from the loaded airframes. */
+/** Availability counts for the KPI strip, from the loaded airframes. */
 function renderKpis() {
-    const count = value => aircraft.filter(record => record.status === value).length;
+    const available = aircraft.filter(record => record.status === 'available').length;
     setKpi('fleet.total', aircraft.length, `${plural(types.length, 'aircraft type')}`);
-    for (const value of ['available', 'maintenance', 'grounded', 'unavailable']) setKpi(`fleet.${value}`, count(value));
+    setKpi('fleet.available', available);
+    setKpi('fleet.not_available', aircraft.length - available);
 }
 
 /** Reload airframes and types, re-render everything and refresh the navigation counts. */

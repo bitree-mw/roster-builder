@@ -26,9 +26,10 @@ function build() {
 
 /**
  * Accessible replacement for window.confirm(). Resolves true only when the user confirms.
- * Destructive confirmations focus Cancel first so Enter never deletes by accident.
+ * Destructive confirmations focus Cancel first so Enter never deletes by accident. cancelLabel lets a yes/no
+ * question name both answers; Escape or closing the dialog always counts as the cancel answer.
  */
-export function confirmAction({ title = 'Are you sure?', message = '', confirmLabel = 'Confirm', tone = 'danger' } = {}) {
+export function confirmAction({ title = 'Are you sure?', message = '', confirmLabel = 'Confirm', cancelLabel = 'Cancel', tone = 'danger' } = {}) {
     if (!dialog) build();
     if (dialog.open) dialog.close('cancel');
     dialog.dataset.tone = tone;
@@ -36,6 +37,7 @@ export function confirmAction({ title = 'Are you sure?', message = '', confirmLa
     dialog.querySelector('.confirm-message').textContent = message;
     const confirm = dialog.querySelector('[data-confirm]');
     confirm.textContent = confirmLabel;
+    dialog.querySelector('[data-cancel]').textContent = cancelLabel;
     confirm.className = tone === 'danger' ? 'button button-danger' : 'button';
     dialog.returnValue = '';
     return new Promise(resolve => {

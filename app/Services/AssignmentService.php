@@ -242,7 +242,7 @@ class AssignmentService
         $schedule = $context->schedule($crew->id);
         $released = [];
         foreach ($crew->activities as $activity) {
-            if ($activity->type === 'standby' && in_array($activity->date->format('Y-m-d'), $duty->dates(), true)) {
+            if ($activity->type === 'standby' && in_array($activity->date->format('Y-m-d'), $duty->awayDates(), true)) {
                 $schedule->remove('activity:'.$activity->id);
                 if (($schedule->unavailable[$activity->date->format('Y-m-d')] ?? null) === 'standby') {
                     unset($schedule->unavailable[$activity->date->format('Y-m-d')]);

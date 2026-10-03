@@ -95,6 +95,25 @@ final readonly class Duty
         return array_values(array_unique(array_merge(...array_column($this->periods, 'dates'))));
     }
 
+    /**
+     * Every base-local date from the first report to the last release, including layover days at an outstation
+     * with no flying. The crew are away from base for all of them, so leave or a day off on any of these dates
+     * conflicts with the trip (duty-day counts still use dates()).
+     *
+     * @return array<int, string>
+     */
+    public function awayDates(): array
+    {
+        $dates = $this->dates();
+        $last = max($dates);
+        $away = [];
+        for ($day = CarbonImmutable::parse(min($dates), 'UTC'); $day->format('Y-m-d') <= $last; $day = $day->addDay()) {
+            $away[] = $day->format('Y-m-d');
+        }
+
+        return $away;
+    }
+
     /** ISO 8601 instant to whole epoch minutes. */
     public static function minutes(string $instant): int
     {

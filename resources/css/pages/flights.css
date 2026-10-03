@@ -30,11 +30,20 @@
 .legs-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: .375rem; }
 #flight-dialog { width: min(100% - 2rem, 60rem); }
 #leg-editor { display: flex; flex-direction: column; gap: .5rem; margin-top: .75rem; }
-.leg-row { display: grid; grid-template-columns: 2rem .6fr 1fr 1fr 1fr 1fr auto; align-items: end; gap: .5rem; padding: .75rem; border: 1px solid var(--color-strip-line); border-radius: 4px; background: var(--color-strip); }
+.leg-row { display: grid; grid-template-columns: 3.25rem 1fr 1fr 1fr 1fr auto auto; align-items: end; gap: .5rem; padding: .75rem; border: 1px solid var(--color-strip-line); border-radius: 4px; background: var(--color-strip); }
+/* Leg badge: the leg number with its trip day ("Day 2" after a night stop) underneath. */
+.leg-badge { align-self: center; display: grid; justify-items: center; gap: .25rem; }
+.leg-day-label { font-size: .625rem; white-space: nowrap; }
+/* Night stop toggle and nights count at the end of a leg; dimmed when the leg lands at a base. */
+.night-stop { align-self: end; display: flex; align-items: end; gap: .5rem; min-height: 2.75rem; white-space: nowrap; font-size: .8125rem; }
+.night-stop .check-label { min-height: 2.75rem; }
+.night-stop:has([data-field="night_stop"]:disabled) { opacity: .5; }
+.night-count input { width: 4.5rem; }
 .leg-number { align-self: center; display: grid; place-items: center; width: 1.75rem; height: 1.75rem; border-radius: 50%; background: var(--color-brand); color: var(--color-brand-contrast); font-family: var(--font-mono); font-size: .75rem; font-weight: 700; }
 @media (max-width: 760px) {
     .leg-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .leg-number { grid-column: 1 / -1; }
+    .leg-badge { grid-column: 1 / -1; grid-auto-flow: column; justify-content: start; }
+    .night-stop { grid-column: 1 / -1; }
 }
 /* Flight code button (selects the row) and a minimum width for the route column. */
 .flight-table button.code-tag { min-height: 36px; padding: 0; border: 0; background: none; color: var(--color-ink-strong); }

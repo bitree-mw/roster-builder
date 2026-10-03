@@ -17,9 +17,9 @@ class Aircraft extends Model
     /** @var array<string, string> */
     public const STATUSES = [
         'available' => 'Available',
-        'maintenance' => 'In maintenance',
-        'grounded' => 'Grounded (AOG)',
-        'unavailable' => 'Unavailable',
+        'maintenance' => 'Not available (maintenance)',
+        'grounded' => 'Not available (AOG)',
+        'unavailable' => 'Not available',
     ];
 
     /** "aircraft" is its own plural, so the table name is set explicitly. */
