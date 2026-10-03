@@ -4,6 +4,7 @@ namespace App\Mail;
 
 use App\Models\CrewMember;
 use App\Models\RosterPeriod;
+use App\Services\PdfService;
 use App\Support\ThemeTokens;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Attachment;
@@ -15,9 +16,9 @@ use Symfony\Component\Mime\Email;
 use TijsVerkoyen\CssToInlineStyles\CssToInlineStyles;
 
 /**
- * A crew member's published roster (1 week, 2 weeks or a month), styled like the app: a navy header with the
- * airline logo, totals, and every day with their flights (local and GMT times, legs, and the captain, first
- * officer and cabin crew they fly with), night stops and planned days; plus an .ics calendar attachment.
+ * A crew member's published roster (1 week, 2 weeks or a month) in the app's colours, kept simple: the logo,
+ * a one-line summary and the days with something on (flights with local and GMT times and who they fly with,
+ * night stops and planned days). Attached: the same roster as a PDF with full detail, and an .ics calendar.
  *
  * Mail clients ignore CSS variables and most <style> blocks, so resources/css/mail/roster.css is resolved
  * against the app's colour tokens (ThemeTokens) and inlined into the HTML. The logo is embedded (cid:) because
@@ -61,13 +62,21 @@ class RosterMail extends Mailable
     }
 
     /**
-     * The roster as a calendar file for the crew member's phone or mail app.
+     * The roster as a PDF (the same days and crew as the email, with legs and aircraft) and as a calendar file
+     * for the crew member's phone or mail app. The PDF is only rendered when the email is sent.
      *
      * @return array<int, Attachment>
      */
     public function attachments(): array
     {
-        return [Attachment::fromData(fn (): string => $this->calendar, 'roster-'.$this->period->starts_on->format('Y-m-d').'.ics')->withMime('text/calendar')];
+        $name = 'roster-'.$this->period->starts_on->format('Y-m-d');
+
+        return [
+            Attachment::fromData(fn (): string => app(PdfService::class)->render('pdf.roster-personal', [
+                'title' => 'Crew roster · '.$this->crew->name, 'subtitle' => $this->roster['label'].' · '.$this->roster['range'], 'roster' => $this->roster,
+            ], 'portrait'), $name.'.pdf')->withMime('application/pdf'),
+            Attachment::fromData(fn (): string => $this->calendar, $name.'.ics')->withMime('text/calendar'),
+        ];
     }
 
     /** The logo file when logos are enabled for email and the file exists. */

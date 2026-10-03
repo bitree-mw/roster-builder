@@ -8,6 +8,7 @@ use App\Models\CrewMember;
 use App\Models\EmailLog;
 use App\Models\RosterPeriod;
 use App\Models\User;
+use App\Services\PdfService;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Queue;
@@ -90,10 +91,13 @@ class RosterExportTest extends TestCase
                 return false;
             }
             $monday = collect($mail->roster['days'])->firstWhere('date', '2026-10-05');
-            $mail->assertSeeInOrderInHtml(['Your published roster', 'LB1', 'Captain', '(you)', 'First officer', 'Charlie Officer', 'Cabin crew 1', 'Delta Cabin'])
-                ->assertSeeInText('Flying with: Captain')->assertDontSeeInHtml('var(--');
+            $mail->assertSeeInOrderInHtml(['Your roster', 'LB1', 'Captain', 'With:', 'Charlie Officer (First officer)', 'Delta Cabin (Cabin crew 1)'])
+                ->assertSeeInText('With: Charlie Officer (First officer), Delta Cabin (Cabin crew 1)')->assertDontSeeInHtml('var(--');
+            // The same roster attached as a PDF (which must render) and as a calendar file.
+            $pdf = app(PdfService::class)->render('pdf.roster-personal', ['title' => 'Crew roster', 'roster' => $mail->roster], 'portrait');
 
-            return count($mail->attachments()) === 1 && $monday['entries'][0]['code'] === 'LB1' && $mail->roster['totals']['flights'] === 1;
+            return array_map(fn ($attachment) => $attachment->as, $mail->attachments()) === ['roster-2026-10-05.pdf', 'roster-2026-10-05.ics']
+                && str_starts_with($pdf, '%PDF') && $monday['entries'][0]['code'] === 'LB1' && $mail->roster['totals']['flights'] === 1;
         });
         $this->getJson("/api/v1/roster-periods/{$this->period->id}/email-logs")->assertOk()->assertJsonCount(2, 'data');
     }
