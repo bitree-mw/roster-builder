@@ -102,6 +102,27 @@ export function formatInstant(value) {
     const date = new Date(value);
     return `${String(date.getUTCDate()).padStart(2, '0')} ${MONTHS[date.getUTCMonth()]} ${date.getUTCFullYear()} ${String(date.getUTCHours()).padStart(2, '0')}:${String(date.getUTCMinutes()).padStart(2, '0')} UTC`;
 }
+/**
+ * Tidy a typed 24-hour clock time: "730", "0730", "7:30", "7.30" or "7h30" become "07:30". Anything that is
+ * not a valid time is returned trimmed but unchanged, so the server's validation message explains it.
+ */
+export function normalizeClock(value) {
+    const match = String(value ?? '').trim().replace(/[.h\s]/g, ':').match(/^(\d{1,2}):?(\d{2})$/);
+    if (!match) return String(value ?? '').trim();
+    const [hours, minutes] = [Number(match[1]), Number(match[2])];
+    return hours < 24 && minutes < 60 ? `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}` : String(value).trim();
+}
+/**
+ * Make an input a 24-hour "HH:MM" field. Native time inputs follow the computer's locale and show AM/PM on
+ * many systems; operations always use the 24-hour clock. The value is tidied when the field loses focus
+ * (app.js listens for [data-clock]); the same attributes are written directly in Blade for static fields.
+ */
+export function clockInput(input) {
+    input.type = 'text'; input.inputMode = 'numeric'; input.autocomplete = 'off'; input.maxLength = 5;
+    input.placeholder = 'HH:MM'; input.pattern = '([01][0-9]|2[0-3]):[0-5][0-9]'; input.dataset.clock = '';
+    input.classList.add('mono');
+    return input;
+}
 /** 125 -> "2h05" (block times). */
 export function formatMinutes(minutes) {
     if (minutes === null || minutes === undefined) return '—';

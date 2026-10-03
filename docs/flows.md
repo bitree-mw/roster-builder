@@ -8,6 +8,9 @@ Requirements: unique aircraft code, 0–20 cabin seats, prohibit deletion while 
 Migration: aircraft_types → AircraftType → AircraftTypeRequest → AircraftTypeService → Api/V1/AircraftTypeController → AircraftTypeResource → /api/v1/aircraft-types → FoundationTest → pages/aircraft + page CSS/JS.
 Create/update/delete and the audit entry commit together. Foreign keys remain the final integrity boundary.
 
+## Airports (administrators)
+Accounts page → Airports panel → POST/PUT/DELETE /airports → AirportRequest (manage-airports gate: administrators) → AirportService (transaction, base and in-use guards, "airports" audit event) → AirportResource. Flight routes read airports from GET /lookups.
+
 ## Fleet status and maintenance
 Fleet page → GET /aircraft (+ due items) → status dialog → PATCH /aircraft/{id}/status → AircraftStatusRequest → AircraftService::changeStatus (lock, update, audit in one transaction) → AircraftResource → cards and nav counts refresh.
 Maintenance page → POST /maintenance-records → MaintenanceRecordRequest → MaintenanceService::save (hours ordering check, recorded_by, audit) → GET /maintenance-alerts → MaintenanceService evaluates the latest record per airframe and check type against ExpiryService's base-local today and current airframe hours.

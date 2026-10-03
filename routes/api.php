@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\V1\AccountController;
 use App\Http\Controllers\Api\V1\AircraftController;
 use App\Http\Controllers\Api\V1\AircraftTypeController;
+use App\Http\Controllers\Api\V1\AirportController;
 use App\Http\Controllers\Api\V1\AssignmentController;
 use App\Http\Controllers\Api\V1\BackupController;
 use App\Http\Controllers\Api\V1\CrewActivityController;
@@ -34,6 +35,8 @@ Route::prefix('v1')->name('api.v1.')->middleware(['auth:sanctum', 'throttle:api'
     Route::get('overview', OverviewController::class)->name('overview');
     Route::get('dashboard', DashboardController::class)->name('dashboard');
     Route::apiResource('aircraft-types', AircraftTypeController::class);
+    // Airports flight routes can use; administrators add, edit and remove them (Accounts page).
+    Route::apiResource('airports', AirportController::class)->except('show');
     Route::apiResource('aircraft', AircraftController::class);
     Route::patch('aircraft/{aircraft}/status', [AircraftController::class, 'status'])->name('aircraft.status');
     Route::get('maintenance-alerts', [MaintenanceRecordController::class, 'alerts'])->name('maintenance-alerts');

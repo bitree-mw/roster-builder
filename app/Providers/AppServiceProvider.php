@@ -45,6 +45,8 @@ class AppServiceProvider extends ServiceProvider
         Gate::define('manage-rules', fn (User $user): bool => in_array($user->role, ['admin', 'scheduler'], true) && $user->tokenCan('roster:write'));
         // Accounts: administrators manage everyone; schedulers create and edit pilot and cabin crew accounts only.
         Gate::define('manage-accounts', fn (User $user): bool => $user->assignableRoles() !== [] && $user->tokenCan('roster:write'));
+        // Airports (route destinations and crew bases) are administrator settings.
+        Gate::define('manage-airports', fn (User $user): bool => $user->isAdmin() && $user->tokenCan('roster:write'));
         // Backups hold every operational record and a restore replaces them all: administrators only.
         Gate::define('manage-backups', fn (User $user): bool => $user->isAdmin() && $user->tokenCan('roster:write'));
         Gate::define('delete-accounts', fn (User $user): bool => $user->isAdmin() && $user->tokenCan('roster:write'));

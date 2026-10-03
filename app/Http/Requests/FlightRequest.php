@@ -54,4 +54,17 @@ class FlightRequest extends FormRequest
             'legs.*.arrives_local' => ['required', 'date_format:H:i'],
         ];
     }
+
+    /**
+     * Times are typed on the 24-hour clock, so explain the expected format rather than naming the field.
+     *
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'legs.*.departs_local.date_format' => 'Enter leg times on the 24-hour clock as HH:MM, for example 07:30 or 19:45.',
+            'legs.*.arrives_local.date_format' => 'Enter leg times on the 24-hour clock as HH:MM, for example 07:30 or 19:45.',
+        ];
+    }
 }

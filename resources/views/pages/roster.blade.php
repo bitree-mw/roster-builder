@@ -129,8 +129,9 @@
         <span></span>
         <label>From<input name="date_from" type="date" required></label>
         <label>To<input name="date_to" type="date" required><span class="field-hint">Up to 31 days at a time.</span></label>
-        <label data-timed>Starts (LT)<input name="starts_local" type="time"><span class="field-hint">Optional. With times, SIM and standby count as duty.</span></label>
-        <label data-timed>Ends (LT)<input name="ends_local" type="time"></label>
+        {{-- 24-hour HH:MM text fields (a native time picker shows AM/PM on some computers); app.js tidies "730" to "07:30". --}}
+        <label data-timed>Starts (LT)<input name="starts_local" type="text" inputmode="numeric" maxlength="5" placeholder="HH:MM" pattern="([01][0-9]|2[0-3]):[0-5][0-9]" autocomplete="off" class="mono" data-clock><span class="field-hint">Optional, 24-hour clock. With times, SIM and standby count as duty.</span></label>
+        <label data-timed>Ends (LT)<input name="ends_local" type="text" inputmode="numeric" maxlength="5" placeholder="HH:MM" pattern="([01][0-9]|2[0-3]):[0-5][0-9]" autocomplete="off" class="mono" data-clock></label>
         <label class="span-2">Note<input name="note" maxlength="1000" autocomplete="off"></label>
     </div>
     <div class="status" data-form-status role="alert"></div>

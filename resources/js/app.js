@@ -1,13 +1,13 @@
 /**
  * Shared script loaded on every signed-in page (layouts/app.blade.php): sign-out, "My account", the theme switch, dialog cancel buttons,
- * connection notices and the navigation counts / header alerts.
+ * 24-hour clock fields, connection notices and the navigation counts / header alerts.
  */
 import { initAccountDialog } from './common/account';
 import { api, csrf } from './common/api';
 import { refreshShell } from './common/shell';
 import { initThemeToggle } from './common/theme';
 import { flash, toast } from './common/toast';
-import { showError } from './common/ui';
+import { normalizeClock, showError } from './common/ui';
 
 // Sign out, carry the server's message to the login page as a pop-up, then leave.
 document.querySelector('#logout')?.addEventListener('click', async event => {
@@ -23,6 +23,11 @@ document.querySelector('#logout')?.addEventListener('click', async event => {
 // Any [data-close-secondary] button (e.g. "Cancel") closes the dialog it sits in.
 document.addEventListener('click', event => {
     event.target.closest('[data-close-secondary]')?.closest('dialog')?.close();
+});
+
+// 24-hour clock fields ([data-clock], see clockInput in ui.js): "730" becomes "07:30" when the field is left.
+document.addEventListener('focusout', event => {
+    if (event.target.matches?.('input[data-clock]')) event.target.value = normalizeClock(event.target.value);
 });
 
 // Tell people when the connection drops or returns, since saves will fail while offline.

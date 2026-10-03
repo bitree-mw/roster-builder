@@ -9,7 +9,7 @@ import { api, allPages } from '../common/api';
 import { confirmAction } from '../common/confirm';
 import { editor } from '../common/editor';
 import { refreshShell } from '../common/shell';
-import { actions, cell, chip, element, emptyRow, formatMinutes, icon, iconButton, options, plural, segmented, setKpi, showError } from '../common/ui';
+import { actions, cell, chip, clockInput, element, emptyRow, formatMinutes, icon, iconButton, normalizeClock, options, plural, segmented, setKpi, showError } from '../common/ui';
 
 const form = document.querySelector('#flight-form');
 const tbody = document.querySelector('#flight-rows');
@@ -83,7 +83,8 @@ function addLeg(record = null, nights = 0) {
     for (const [key, label, type] of [['from_airport', 'From', 'select'], ['to_airport', 'To', 'select'], ['departs_utc', 'Departs (GMT)', 'time'], ['arrives_utc', 'Arrives (GMT)', 'time']]) {
         const wrapper = element('label', label); const input = element(type === 'select' ? 'select' : 'input');
         input.dataset.field = key; input.required = true; input.classList.add('mono');
-        if (type === 'select') options(input, airports, 'code', airport => `${airport.code}${airport.is_base ? ' · base' : ''}`); else input.type = type;
+        // Times are 24-hour HH:MM text fields (a native time picker would show AM/PM on some computers).
+        if (type === 'select') options(input, airports, 'code', airport => `${airport.code}${airport.is_base ? ' · base' : ''}`); else clockInput(input);
         input.value = record[key] ?? (type === 'select' ? airports[0]?.code : '');
         wrapper.append(input); row.append(wrapper);
     }
@@ -141,7 +142,7 @@ const controller = editor({
         // trip_day comes from the night stops before each leg (see renumberLegs).
         legs: [...legs.children].map(row => {
             const value = name => row.querySelector(`[data-field="${name}"]`).value;
-            return { trip_day: Number(row.dataset.tripDay), from_airport: value('from_airport'), to_airport: value('to_airport'), departs_local: value('departs_utc'), arrives_local: value('arrives_utc') };
+            return { trip_day: Number(row.dataset.tripDay), from_airport: value('from_airport'), to_airport: value('to_airport'), departs_local: normalizeClock(value('departs_utc')), arrives_local: normalizeClock(value('arrives_utc')) };
         }),
     }),
     fill: (record, { copy }) => {

@@ -44,6 +44,8 @@ class CrewActivityRequest extends FormRequest
         return [
             'date_to.before_or_equal' => 'Plan at most 31 days at a time.',
             'starts_local.prohibited_if' => 'Leave and days off are whole days; times are only for SIM and standby.',
+            'starts_local.date_format' => 'Enter times on the 24-hour clock as HH:MM, for example 06:00 or 18:30.',
+            'ends_local.date_format' => 'Enter times on the 24-hour clock as HH:MM, for example 06:00 or 18:30.',
         ];
     }
 

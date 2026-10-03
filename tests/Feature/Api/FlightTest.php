@@ -112,6 +112,16 @@ class FlightTest extends TestCase
             ->assertJsonPath('data.legs.0.departs_local', '10:00')->assertJsonPath('data.legs.0.departs_utc', '08:00')->assertJsonPath('data.legs.1.arrives_utc', '11:00');
     }
 
+    public function test_twelve_hour_times_are_refused_with_a_24_hour_hint(): void
+    {
+        $payload = $this->flightPayload();
+        $payload['legs'][0]['departs_local'] = '7:30 PM';
+        Sanctum::actingAs(User::factory()->create(['role' => 'scheduler']), ['*']);
+        $this->postJson('/api/v1/flights', $payload)->assertUnprocessable()
+            ->assertJsonPath('errors', ['legs.0.departs_local' => ['Enter leg times on the 24-hour clock as HH:MM, for example 07:30 or 19:45.']]);
+        $this->assertDatabaseCount('flights', 0);
+    }
+
     public function test_overnight_duty_and_utc_conversion_keep_date_boundaries(): void
     {
         $payload = $this->flightPayload();

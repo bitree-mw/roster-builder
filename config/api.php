@@ -42,6 +42,11 @@ return [
             'login' => 'Welcome back, :label.',
             'logout' => 'You have signed out.',
         ],
+        'airport' => [
+            'created' => 'Airport :label added. It can now be used on flight routes.',
+            'updated' => 'Airport :label updated.',
+            'deleted' => 'Airport :label removed.',
+        ],
         'aircraft_type' => [
             'created' => 'Aircraft type :label added.',
             'updated' => 'Aircraft type :label updated.',

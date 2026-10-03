@@ -99,7 +99,9 @@
     .button-block { width: 100%; }
     .icon-button { display: inline-grid; place-items: center; width: 36px; height: 36px; border: 1px solid transparent; border-radius: 4px; background: transparent; color: var(--color-muted); }
     .icon-button:hover:not(:disabled) { border-color: var(--color-line); background: var(--color-surface); color: var(--color-ink); }
-    .icon-button[data-tone="danger"]:hover:not(:disabled) { border-color: var(--color-danger); color: var(--color-danger); }
+    /* Delete/remove buttons are always red so destructive actions stand out; hover adds the outline. */
+    .icon-button[data-tone="danger"] { color: var(--color-danger); }
+    .icon-button[data-tone="danger"]:hover:not(:disabled) { border-color: var(--color-danger); background: var(--color-danger-soft); color: var(--color-danger); }
     .text-button { display: inline-flex; align-items: center; gap: .375rem; min-height: 36px; padding: 0 .25rem; border: 0; background: none; color: var(--color-info); font-size: .8125rem; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
     .row-actions { display: flex; justify-content: flex-end; gap: .125rem; }
 

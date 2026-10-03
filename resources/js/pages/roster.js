@@ -18,7 +18,7 @@
 import { api, download } from '../common/api';
 import { confirmAction } from '../common/confirm';
 import { ACTIVITIES, RANKS, WEEKDAYS, addDays, conflictRow, mondayOf, parseDay, shortDate, weekState } from '../common/roster';
-import { busy, chip, element, emptyState, formatDate, formatInstant, formatMinutes, icon, iconButton, plural, segmented, setKpi, setKpiTone, showError, status, toast } from '../common/ui';
+import { busy, chip, element, emptyState, formatDate, formatInstant, formatMinutes, icon, iconButton, normalizeClock, plural, segmented, setKpi, setKpiTone, showError, status, toast } from '../common/ui';
 
 const staff = ['admin', 'scheduler', 'crew_control'].includes(document.body.dataset.role);
 const today = document.querySelector('#roster-root').dataset.today;
@@ -944,7 +944,7 @@ if (planDialog) {
     planForm.addEventListener('submit', async event => {
         event.preventDefault();
         const body = { crew_member_id: planning.id, type: planForm.elements.type.value, date_from: planForm.elements.date_from.value, date_to: planForm.elements.date_to.value,
-            starts_local: planForm.elements.starts_local.value || null, ends_local: planForm.elements.ends_local.value || null, note: planForm.elements.note.value || null };
+            starts_local: normalizeClock(planForm.elements.starts_local.value) || null, ends_local: normalizeClock(planForm.elements.ends_local.value) || null, note: planForm.elements.note.value || null };
         await busy(planForm.querySelector('[type="submit"]'), async () => {
             try {
                 await api('/api/v1/crew-activities', { method: 'POST', body });
