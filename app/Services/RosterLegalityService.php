@@ -42,6 +42,9 @@ class RosterLegalityService
     /** Whole-day activities that make a crew member unavailable for flying. */
     private const ACTIVITIES = ['leave' => 'On leave', 'day_off' => 'Protected day off', 'sim' => 'Simulator session', 'standby' => 'Standby'];
 
+    /** @var array<string, int> date => days since 1970, see dayNumber() */
+    private array $dayNumbers = [];
+
     public function __construct(private ExpiryService $expiry) {}
 
     /**
@@ -116,8 +119,16 @@ class RosterLegalityService
     public function issues(PlanningContext $context, CrewMember $crew, Trip $trip, Assignment $seat): array
     {
         $issues = $this->eligibility($context, $crew, $trip, $seat->rank);
-        if ($trip->assignments->contains(fn (Assignment $other): bool => $other->id !== $seat->id && $other->crew_member_id === $crew->id)) {
-            $issues[] = ['code' => 'already_on_trip', 'message' => 'Already holds another seat on this trip.'];
+        // Raw attribute reads: this runs for every seat × candidate and the seats change during a build.
+        $crewId = $crew->getKey();
+        $seatId = $seat->getKey();
+        foreach ($trip->assignments as $other) {
+            $raw = $other->getAttributes();
+            if (($raw['id'] ?? null) != $seatId && $raw['crew_member_id'] !== null && (int) $raw['crew_member_id'] === $crewId) {
+                $issues[] = ['code' => 'already_on_trip', 'message' => 'Already holds another seat on this trip.'];
+
+                break;
+            }
         }
         $duty = $context->tripDuties[$trip->id] ?? null;
         if ($duty === null) {
@@ -158,7 +169,9 @@ class RosterLegalityService
      */
     public function capacity(PlanningContext $context, CrewMember $crew): int
     {
-        return (int) round($crew->weekly_hours ? $crew->weekly_hours * 60 : $context->rules['max_duty_7d_h'] * 60);
+        $weeklyHours = $context->crewFacts($crew)['weekly_hours'];
+
+        return (int) round($weeklyHours ? $weeklyHours * 60 : $context->rules['max_duty_7d_h'] * 60);
     }
 
     /**
@@ -169,34 +182,34 @@ class RosterLegalityService
      */
     public function eligibility(PlanningContext $context, CrewMember $crew, Trip $trip, string $rank): array
     {
-        $snapshot = $trip->schedule_snapshot;
+        // Trip and crew facts are read once per build (see PlanningContext): this runs for every seat × candidate.
+        $facts = $context->tripFacts($trip);
+        $crewFacts = $context->crewFacts($crew);
         $issues = [];
-        if (! $crew->active) {
+        if (! $crewFacts['active']) {
             $issues[] = ['code' => 'inactive', 'message' => 'Inactive crew member.'];
         }
-        if ($crew->rank !== $rank) {
-            $issues[] = ['code' => 'rank', 'message' => 'Holds '.$crew->rank.'; this is a '.self::RANKS[$rank].' seat.'];
+        if ($crewFacts['rank'] !== $rank) {
+            $issues[] = ['code' => 'rank', 'message' => 'Holds '.$crewFacts['rank'].'; this is a '.self::RANKS[$rank].' seat.'];
         }
-        if (isset($snapshot['base']) && $crew->base_airport !== $snapshot['base']) {
-            $issues[] = ['code' => 'base', 'message' => 'Based at '.$crew->base_airport.'; this trip starts at '.$snapshot['base'].'.'];
+        if ($facts['base'] !== null && $crewFacts['base'] !== $facts['base']) {
+            $issues[] = ['code' => 'base', 'message' => 'Based at '.$crewFacts['base'].'; this trip starts at '.$facts['base'].'.'];
         }
-        $typeId = $snapshot['aircraft_type_id'] ?? null;
-        if ($typeId !== null && ! ($crew->all_aircraft && $crew->rank === 'CC') && ! $crew->ratings->contains('id', $typeId)) {
-            $issues[] = ['code' => 'rating', 'message' => 'Not rated on the '.($snapshot['aircraft_type'] ?? 'aircraft type').'.'];
+        $typeId = $facts['aircraft_type_id'];
+        if ($typeId !== null && ! ($crewFacts['all_aircraft'] && $crewFacts['rank'] === 'CC') && ! isset($crewFacts['ratings'][$typeId])) {
+            $issues[] = ['code' => 'rating', 'message' => 'Not rated on the '.($facts['aircraft_type'] ?? 'aircraft type').'.'];
         }
         // Documents must stay valid until the last day of the duty (a document is valid on its expiry date).
-        $duty = $context->tripDuties[$trip->id] ?? null;
-        $lastDate = $duty ? max($duty->dates()) : $trip->start_date->format('Y-m-d');
         foreach (self::DOCUMENTS as $kind => $label) {
-            $document = $crew->documents->firstWhere('kind', $kind);
+            $document = $crewFacts['documents'][$kind] ?? null;
             // Missing records block only when the rules say so (policy "block"); with "warn" they are reported by
             // documentWarnings() instead. Rule snapshots from before the policy existed count as "warn".
             if ($document === null) {
                 if (($context->rules['missing_documents'] ?? 'warn') === 'block') {
                     $issues[] = ['code' => 'document_missing', 'message' => 'No '.strtolower($label).' expiry on record.'];
                 }
-            } elseif ($document->expires_on->format('Y-m-d') < $lastDate) {
-                $issues[] = ['code' => 'document_expired', 'message' => $label.' expires '.$document->expires_on->format('d M Y').', before this duty ends.'];
+            } elseif ($document[0] < $facts['last_date']) {
+                $issues[] = ['code' => 'document_expired', 'message' => $label.' expires '.$document[1].', before this duty ends.'];
             }
         }
         if ($trip->exclusions->contains('crew_member_id', $crew->id)) {
@@ -279,13 +292,16 @@ class RosterLegalityService
         $week = 7 * 1440;
         $limit = (int) round($rules['max_duty_7d_h'] * 60);
         $worst = ['minutes' => 0, 'start' => null];
+        // Only periods starting within a week either side of this duty can open or fall in such a window, so the
+        // pairwise check runs over a handful of periods instead of the whole month (same result, much faster).
+        $nearby = array_values(array_filter($periods, fn (array $period): bool => $period['start'] > $duty->start() - $week && $period['start'] < $duty->end() + $week));
         foreach ($duty->periods as $own) {
-            foreach ($periods as $candidate) {
+            foreach ($nearby as $candidate) {
                 $start = $candidate['start'];
                 if ($start > $own['start'] || $start <= $own['start'] - $week) {
                     continue;
                 }
-                $minutes = array_sum(array_map(fn (array $period): int => $period['start'] >= $start && $period['start'] < $start + $week ? $period['end'] - $period['start'] : 0, $periods));
+                $minutes = array_sum(array_map(fn (array $period): int => $period['start'] >= $start && $period['start'] < $start + $week ? $period['end'] - $period['start'] : 0, $nearby));
                 if ($minutes > $worst['minutes']) {
                     $worst = ['minutes' => $minutes, 'start' => $candidate['date']];
                 }
@@ -306,13 +322,16 @@ class RosterLegalityService
 
         // Consecutive duty days: the run of duty dates that includes this duty.
         $dutyDates = array_flip(array_merge(...array_column($periods, 'dates')));
+        // Walk whole days as integers (days since 1970) rather than date objects: this runs for every candidate.
+        $dutyDays = array_flip(array_map($this->dayNumber(...), array_keys($dutyDates)));
         $run = 0;
         foreach ($duty->dates() as $date) {
             $length = 1;
-            for ($day = CarbonImmutable::parse($date)->subDay(); isset($dutyDates[$day->format('Y-m-d')]); $day = $day->subDay()) {
+            $today = $this->dayNumber($date);
+            for ($day = $today - 1; isset($dutyDays[$day]); $day--) {
                 $length++;
             }
-            for ($day = CarbonImmutable::parse($date)->addDay(); isset($dutyDates[$day->format('Y-m-d')]); $day = $day->addDay()) {
+            for ($day = $today + 1; isset($dutyDays[$day]); $day++) {
                 $length++;
             }
             $run = max($run, $length);
@@ -323,10 +342,11 @@ class RosterLegalityService
 
         // Minimum days off in each calendar month this duty touches (days without any duty count as off).
         foreach (array_unique(array_map(fn (string $date): string => substr($date, 0, 7), $duty->dates())) as $month) {
-            $first = CarbonImmutable::parse($month.'-01');
-            $daysOff = $first->daysInMonth - count(array_filter(array_keys($dutyDates), fn (string $date): bool => str_starts_with($date, $month)));
+            // Days in the month and its name from the 1st, without building a date object per candidate.
+            $first = (int) strtotime($month.'-01 00:00:00 UTC');
+            $daysOff = (int) gmdate('t', $first) - count(array_filter(array_keys($dutyDates), fn (string $date): bool => str_starts_with($date, $month)));
             if ($daysOff < $rules['min_days_off_month']) {
-                $issues[] = ['code' => 'days_off_month', 'message' => 'Would leave only '.$daysOff.' days off in '.$first->format('F').' (minimum '.$rules['min_days_off_month'].').'];
+                $issues[] = ['code' => 'days_off_month', 'message' => 'Would leave only '.$daysOff.' days off in '.gmdate('F', $first).' (minimum '.$rules['min_days_off_month'].').'];
             }
         }
 
@@ -342,5 +362,11 @@ class RosterLegalityService
         }
 
         return $issues;
+    }
+
+    /** A base-local date (Y-m-d) as whole days since 1970, remembered per date (used to count consecutive days). */
+    private function dayNumber(string $date): int
+    {
+        return $this->dayNumbers[$date] ??= intdiv((int) strtotime($date.' 00:00:00 UTC'), 86400);
     }
 }

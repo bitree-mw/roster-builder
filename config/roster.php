@@ -26,6 +26,12 @@ return [
      */
     'max_trip_days' => (int) env('ROSTER_MAX_TRIP_DAYS', 14),
 
+    /**
+     * Seconds a roster build may run (monthly rosters check every crew member for hundreds of seats). Shared
+     * hosts often stop requests after 30 seconds; the build asks for this much where the host allows it.
+     */
+    'build_time_limit' => (int) env('ROSTER_BUILD_TIME_LIMIT', 180),
+
     /** Most weeks returned by one GET /roster-periods?from=&to= request (the week timeline). */
     'max_weeks_listed' => 60,
 

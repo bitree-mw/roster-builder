@@ -76,11 +76,17 @@ class RosterPeriodController extends Controller
     }
 
     /**
-     * POST /roster-periods/{id}/build — run the roster generator for a draft week and return the new roster.
+     * POST /roster-periods/{id}/build — run the roster generator for a draft roster (1 week, 2 weeks or a month)
+     * and return the new roster. A monthly build checks every crew member for hundreds of seats, so the request
+     * asks PHP for more than the usual 30 seconds (config roster.build_time_limit) where the host allows it.
      */
     public function build(Request $request, RosterPeriod $rosterPeriod, RosterBuilderService $builder): JsonResponse
     {
         Gate::authorize('manage-operations');
+        // Only raise an existing limit (0 means none, as on the command line); hosts may disable set_time_limit.
+        if ((int) ini_get('max_execution_time') !== 0 && function_exists('set_time_limit')) {
+            set_time_limit((int) config('roster.build_time_limit'));
+        }
         $result = $builder->build($rosterPeriod, $request->user());
         // Explain the outcome: nothing to plan, open seats with their main reasons, or everything filled.
         $key = match (true) {

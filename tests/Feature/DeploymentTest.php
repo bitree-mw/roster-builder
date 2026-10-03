@@ -11,7 +11,8 @@ use Tests\TestCase;
 /**
  * Hosting safeguards: the browser session is accepted on whatever domain the app is hosted on (a copied
  * development SANCTUM_STATEFUL_DOMAINS cannot lock it out, while other sites' pages are still not trusted),
- * and unexpected server errors carry a reference that matches the log entry.
+ * the deployment doctor spots cPanel mail placeholders left in .env, and unexpected server errors carry a
+ * reference that matches the log entry.
  */
 class DeploymentTest extends TestCase
 {
@@ -23,6 +24,15 @@ class DeploymentTest extends TestCase
 
         $this->assertTrue(EnsureFrontendRequestsAreStateful::fromFrontend($own));
         $this->assertFalse(EnsureFrontendRequestsAreStateful::fromFrontend($foreign));
+    }
+
+    public function test_doctor_flags_unreplaced_cpanel_mail_placeholders(): void
+    {
+        config(['mail.default' => 'smtp', 'mail.mailers.smtp.host' => 'mail.your-domain.com', 'mail.mailers.smtp.username' => 'roster@your-domain.com']);
+        $this->artisan('roster:doctor')->expectsOutputToContain('your-domain.com placeholders')->run();
+
+        config(['mail.mailers.smtp.host' => 'mail.malawian-airlines.example', 'mail.mailers.smtp.username' => 'roster@malawian-airlines.example', 'mail.from.address' => 'roster@malawian-airlines.example']);
+        $this->artisan('roster:doctor')->doesntExpectOutputToContain('your-domain.com placeholders')->run();
     }
 
     public function test_server_errors_return_a_reference_that_is_logged(): void

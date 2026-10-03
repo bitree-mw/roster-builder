@@ -23,7 +23,25 @@ final readonly class Duty
      * @param  int|null  $tripId  the rostered trip, or null for an activity
      * @param  array<int, array{start: int, end: int, block: int, date: string, dates: array<int, string>}>  $periods
      */
-    public function __construct(public string $key, public string $label, public ?int $tripId, public array $periods) {}
+    /** @var array<int, string> every base-local date a duty period touches (see dates()) */
+    private array $touchedDates;
+
+    /** @var array<int, string> every base-local date from first report to last release (see awayDates()) */
+    private array $awayDateList;
+
+    public function __construct(public string $key, public string $label, public ?int $tripId, public array $periods)
+    {
+        // Worked out once: the legality checks ask for these for every seat × candidate during a build.
+        $this->touchedDates = array_values(array_unique(array_merge(...array_column($periods, 'dates'))));
+        $away = [];
+        if ($this->touchedDates !== []) {
+            $last = max($this->touchedDates);
+            for ($day = strtotime(min($this->touchedDates).' 00:00:00 UTC'); gmdate('Y-m-d', $day) <= $last; $day += 86400) {
+                $away[] = gmdate('Y-m-d', $day);
+            }
+        }
+        $this->awayDateList = $away;
+    }
 
     /**
      * Build a trip duty from a trip's schedule_snapshot (see RosterBuilderService::snapshot()). Returns null
@@ -92,7 +110,7 @@ final readonly class Duty
      */
     public function dates(): array
     {
-        return array_values(array_unique(array_merge(...array_column($this->periods, 'dates'))));
+        return $this->touchedDates;
     }
 
     /**
@@ -104,14 +122,7 @@ final readonly class Duty
      */
     public function awayDates(): array
     {
-        $dates = $this->dates();
-        $last = max($dates);
-        $away = [];
-        for ($day = CarbonImmutable::parse(min($dates), 'UTC'); $day->format('Y-m-d') <= $last; $day = $day->addDay()) {
-            $away[] = $day->format('Y-m-d');
-        }
-
-        return $away;
+        return $this->awayDateList;
     }
 
     /** ISO 8601 instant to whole epoch minutes. */
@@ -128,9 +139,14 @@ final readonly class Duty
         return intdiv($minutes, 60).'h'.str_pad((string) ($minutes % 60), 2, '0', STR_PAD_LEFT);
     }
 
-    /** The Monday (Y-m-d) of the base-local week containing a date. */
+    /**
+     * The Monday (Y-m-d) of the base-local week containing a date. Remembered per date, because the weekly
+     * working-hours check asks for every duty period of a crew member for each seat considered.
+     */
     public static function weekOf(string $date): string
     {
-        return CarbonImmutable::parse($date, 'UTC')->startOfWeek(CarbonImmutable::MONDAY)->format('Y-m-d');
+        static $mondays = [];
+
+        return $mondays[$date] ??= CarbonImmutable::parse($date, 'UTC')->startOfWeek(CarbonImmutable::MONDAY)->format('Y-m-d');
     }
 }

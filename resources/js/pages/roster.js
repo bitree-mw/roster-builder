@@ -309,14 +309,95 @@ function renderActions() {
     buttons.reopen.hidden = !(week?.status === 'published' && !past);
 }
 
+/* ---------------------------------------------------------------- Creating rosters (1 week, 2 weeks or a month) */
+
+// What each length means, shown on the option cards of the create form.
+const LENGTH_HELP = { week: 'Monday to Sunday', fortnight: 'Two weeks from a Monday', month: 'A whole calendar month, from the 1st' };
+
 /**
- * First valid start for a new roster of a length inside the selected gap: a Monday for one or two weeks,
- * the 1st of a month for a month (the gap's own date when it already is one).
+ * First valid start on or after a date for a roster of a length: a Monday for one or two weeks, the 1st for a
+ * month. Dates before this week are moved up to this week (the current month for a monthly roster).
  */
-function suggestedStart(length) {
-    const start = state.slot.start < today ? mondayOf(today) : state.slot.start;
+function suggestedStart(length, from = state.slot?.start ?? today) {
+    const start = from < today ? mondayOf(today) : from;
     if (length === 'month') return start.slice(8) === '01' ? start : addDays(`${start.slice(0, 8)}01`, 40).slice(0, 8) + '01';
     return parseDay(start).getUTCDay() === 1 ? start : addDays(mondayOf(start), 7);
+}
+
+/** Last day of a roster of a length starting on a date (the same rule as RosterPeriod::endFor on the server). */
+function rosterEnd(start, length) {
+    if (length === 'month') { const day = parseDay(start); return new Date(Date.UTC(day.getUTCFullYear(), day.getUTCMonth() + 1, 0)).toISOString().slice(0, 10); }
+    return addDays(start, length === 'fortnight' ? 13 : 6);
+}
+
+/** The first day after the latest loaded roster that is still running or upcoming (today when there is none). */
+function nextFreeDate() {
+    const latest = state.periods.filter(period => period.ends_on >= today).reduce((last, period) => (period.ends_on > last ? period.ends_on : last), '');
+    return latest ? addDays(latest, 1) : today;
+}
+
+/**
+ * Checks shown under the create form before anything is sent: the start day rule, dates that have already
+ * passed, and overlap with a roster already on the timeline. The server repeats every check.
+ *
+ * @returns {{ text: string, tone: string|undefined }}
+ */
+function createPreview(start, length) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(start)) return { text: 'Choose the first day of the roster.', tone: 'warning' };
+    if (length === 'month' && start.slice(8) !== '01') return { text: 'A monthly roster starts on the 1st of the month.', tone: 'warning' };
+    if (length !== 'month' && parseDay(start).getUTCDay() !== 1) return { text: 'One- and two-week rosters start on a Monday.', tone: 'warning' };
+    const end = rosterEnd(start, length);
+    const days = Math.round((parseDay(end) - parseDay(start)) / 86400000) + 1;
+    const covers = `Covers ${WEEKDAYS[(parseDay(start).getUTCDay() + 6) % 7]} ${formatDate(start)} – ${WEEKDAYS[(parseDay(end).getUTCDay() + 6) % 7]} ${formatDate(end)} (${days} days).`;
+    if (end < today) return { text: `${covers} These dates have passed.`, tone: 'warning' };
+    const same = state.periods.find(period => period.starts_on === start && period.length === length);
+    if (same) return { text: `${covers} This roster already exists; it will be opened and built.`, tone: 'info' };
+    const overlap = state.periods.find(period => period.starts_on <= end && period.ends_on >= start);
+    if (overlap) return { text: `${covers} This overlaps the roster for ${overlap.label}.`, tone: 'warning' };
+    return { text: covers, tone: 'success' };
+}
+
+/**
+ * The create form used by the "New roster" dialog and the "No roster" view: three length cards (1 week,
+ * 2 weeks, calendar month), the start date (moved to a valid start when the length changes), a preview of the
+ * dates covered, and "Create & build roster". onDone runs after the roster is created and built.
+ */
+function createRosterForm({ from, onDone = () => {} } = {}) {
+    const form = element('form', null, 'create-roster-form'); form.noValidate = true;
+    const remembered = (() => { try { return localStorage.getItem('roster.length') || 'fortnight'; } catch { return 'fortnight'; } })();
+    // Start with the remembered length unless it would overlap a roster or start in the past; then the first that fits.
+    let length = [remembered, 'fortnight', 'week', 'month'].find(value => createPreview(suggestedStart(value, from), value).tone !== 'warning') ?? remembered;
+    const cards = element('fieldset', null, 'create-lengths');
+    cards.append(element('legend', 'How long does the roster run?'));
+    const options = element('div', null, 'option-cards');
+    for (const [value, label] of Object.entries(LENGTHS)) {
+        const card = element('label', null, 'option-card');
+        const radio = element('input'); radio.type = 'radio'; radio.name = 'length'; radio.value = value; radio.checked = value === length;
+        const text = element('span'); text.append(element('strong', label === 'Month' ? 'Calendar month' : label), element('small', LENGTH_HELP[value]));
+        card.append(radio, text); options.append(card);
+    }
+    cards.append(options);
+    const startLabel = element('label', 'Starts on'); const start = element('input'); start.type = 'date'; start.name = 'starts_on'; start.required = true;
+    start.value = suggestedStart(length, from); startLabel.append(start);
+    const preview = element('p', '', 'create-preview'); preview.setAttribute('role', 'status');
+    const status = element('div', null, 'status'); status.dataset.formStatus = ''; status.setAttribute('role', 'alert');
+    const submit = element('button', null, 'button'); submit.type = 'submit'; submit.append(icon('zap', 'icon-sm'), 'Create & build roster');
+    /** Redraw the preview line for the current choice. */
+    const update = () => { const { text, tone } = createPreview(start.value, length); preview.textContent = text; preview.dataset.tone = tone ?? ''; };
+    options.addEventListener('change', event => {
+        length = event.target.value; start.value = suggestedStart(length, start.value || from); update();
+        try { localStorage.setItem('roster.length', length); } catch { /* remembering the choice is optional */ }
+    });
+    start.addEventListener('input', update);
+    form.append(cards, startLabel, preview, status, submit);
+    form.addEventListener('submit', event => {
+        event.preventDefault();
+        busy(submit, async () => {
+            try { await createPeriod(start.value, length); onDone(); } catch (error) { showError(error, status); }
+        });
+    });
+    update();
+    return form;
 }
 
 /** No roster for the selected slot: explain, and let staff create one (1 week, 2 weeks or a month) and build it. */
@@ -327,36 +408,28 @@ function renderMissing() {
     if (!staff) return view.replaceChildren(emptyState('No published roster for these dates', 'Your duties appear here once crew control publishes the roster.', 'calendar'));
     if (ended(state.slot)) return view.replaceChildren(emptyState('No roster was made for these dates', 'These dates have passed, so a roster can no longer be created for them.', 'calendar'));
     const wrap = element('div', null, 'create-roster');
-    wrap.append(emptyState('No roster for these dates yet', 'Choose how long the roster runs and when it starts. Creating it freezes the current duty rules, then the generator fills every seat from enabled flights, crew working hours, leave and documents. You can change any seat afterwards.', 'calendar'));
-    const form = element('form', null, 'create-roster-form'); form.noValidate = true;
-    const lengths = element('div', null, 'segmented'); lengths.setAttribute('role', 'group'); lengths.setAttribute('aria-label', 'Roster length');
-    let length = (() => { try { return localStorage.getItem('roster.length') || 'fortnight'; } catch { return 'fortnight'; } })();
-    for (const [value, label] of Object.entries(LENGTHS)) {
-        const option = element('button', label); option.type = 'button'; option.dataset.value = value; option.setAttribute('aria-pressed', String(value === length)); lengths.append(option);
-    }
-    const startLabel = element('label', 'Starts on', 'inline-field'); const start = element('input'); start.type = 'date'; start.name = 'starts_on'; start.required = true; start.value = suggestedStart(length); startLabel.append(start);
-    const hint = element('span', length === 'month' ? 'A month starts on the 1st.' : 'One- and two-week rosters start on a Monday.', 'field-hint');
-    const submit = element('button', null, 'button'); submit.type = 'submit'; submit.append(icon('zap', 'icon-sm'), 'Create & build roster');
-    segmented(lengths, value => {
-        length = value; start.value = suggestedStart(value);
-        hint.textContent = value === 'month' ? 'A month starts on the 1st.' : 'One- and two-week rosters start on a Monday.';
-        try { localStorage.setItem('roster.length', value); } catch { /* remembering the choice is optional */ }
-    });
-    form.append(lengths, startLabel, submit, hint);
-    form.addEventListener('submit', event => { event.preventDefault(); busy(submit, () => createPeriod(start.value, length)); });
-    wrap.append(form);
+    wrap.append(emptyState('No roster for these dates yet', 'Choose 1 week, 2 weeks or a calendar month and when it starts. Creating it freezes the current duty rules, then the generator fills every seat from enabled flights, crew working hours, leave and documents. You can change any seat afterwards.', 'calendar'));
+    wrap.append(createRosterForm({ from: state.slot.start }));
     view.replaceChildren(wrap);
 }
 
-/** Create a roster of a length from a date, select it and build it straight away. */
+/** "New roster" dialog: the create form, starting after the latest running or upcoming roster. */
+function openCreateDialog() {
+    const dialog = document.querySelector('#create-dialog');
+    dialog.querySelector('[data-create-body]').replaceChildren(createRosterForm({ from: nextFreeDate(), onDone: () => dialog.close() }));
+    dialog.showModal();
+}
+
+/**
+ * Create a roster of a length from a date, select it and build it straight away. Errors are thrown so the
+ * form that asked can show them next to its fields.
+ */
 async function createPeriod(startsOn, length) {
-    try {
-        const { data } = await api('/api/v1/roster-periods', { method: 'POST', body: { starts_on: startsOn, length }, notify: false });
-        await loadTimeline();
-        state.slot = state.slots.find(slot => slot.period?.id === data.id) ?? state.slot;
-        state.week = { ...data, built_at: null };
-        await build();
-    } catch (error) { showError(error); }
+    const { data } = await api('/api/v1/roster-periods', { method: 'POST', body: { starts_on: startsOn, length }, notify: false });
+    await loadTimeline();
+    state.slot = state.slots.find(slot => slot.period?.id === data.id) ?? state.slot;
+    state.week = { ...data, built_at: null };
+    await build();
 }
 
 /* ---------------------------------------------------------------- Views */
@@ -1042,6 +1115,9 @@ async function build() {
 }
 
 if (staff) {
+    // "New roster": 1 week, 2 weeks or a calendar month, created and built from the dialog.
+    document.querySelector('#new-roster').addEventListener('click', openCreateDialog);
+    document.querySelector('#create-dialog [data-close]').addEventListener('click', () => document.querySelector('#create-dialog').close());
     buttons.build.addEventListener('click', event => busy(event.currentTarget, () => build().catch(showError)));
     buttons.publish.addEventListener('click', event => busy(event.currentTarget, async () => {
         const confirmed = await confirmAction({ title: `Publish ${state.week.label}?`, message: `Crew will see their duties for ${state.week.label}.${state.week.summary.open ? ` ${plural(state.week.summary.open, 'seat')} will show as open time.` : ''} To change it later, reopen it as a draft.`, confirmLabel: 'Publish', tone: 'info' });

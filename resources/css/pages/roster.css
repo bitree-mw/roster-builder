@@ -216,8 +216,22 @@ button.activity { width: 100%; font: inherit; cursor: pointer; }
 
 /* Creating a roster from the "No roster" view. */
 .create-roster { display: flex; flex-direction: column; align-items: center; padding-bottom: 1.5rem; }
-.create-roster-form { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: .75rem; padding: 0 1rem; }
-.create-roster-form .field-hint { flex-basis: 100%; text-align: center; }
+/* Create form (New roster dialog and "No roster" view): length cards, start date, date preview, submit. */
+.create-roster-form { display: grid; gap: 1rem; width: min(100%, 44rem); padding: 0 1rem; }
+.create-roster .create-roster-form { margin: 0 auto; }
+#create-dialog .create-roster-form { width: 100%; padding: 0; }
+#create-dialog { width: min(100% - 2rem, 46rem); }
+/* The dialog's form is built by roster.js inside this wrapper, which gives the usual dialog spacing. */
+.create-dialog-inner { display: flex; flex-direction: column; gap: 1.125rem; padding: 1.375rem 1.5rem 1.5rem; }
+.create-lengths .option-cards { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.create-lengths small { display: block; color: var(--color-muted); font-size: .75rem; }
+.create-roster-form > label { max-width: 16rem; }
+.create-roster-form > .button { justify-self: start; }
+.create-preview { margin: 0; padding: .625rem .75rem; border-left: 3px solid var(--color-line-strong); background: var(--color-surface-muted); font-size: .8125rem; }
+.create-preview[data-tone="success"] { border-left-color: var(--color-success); }
+.create-preview[data-tone="warning"] { border-left-color: var(--color-warning); }
+.create-preview[data-tone="info"] { border-left-color: var(--color-info); }
+@media (max-width: 640px) { .create-lengths .option-cards { grid-template-columns: 1fr; } }
 .inline-field { flex-direction: row; align-items: center; gap: .375rem; font-size: .8125rem; }
 .inline-field input, .inline-field select { width: auto; min-height: 38px; }
 

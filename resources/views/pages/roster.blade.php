@@ -11,7 +11,8 @@
 <div id="roster-root" data-today="{{ $today }}" hidden></div>
 <x-page-heading :eyebrow="$staff ? 'Crew control / Roster' : 'My roster'" :heading="$staff ? 'Roster' : 'My roster'" :description="$staff ? 'Rosters run for one week, two weeks or a calendar month. The generator fills every seat with legal crew, balancing each person\'s working hours; you can then change any seat, and click an empty day to plan leave, a day off, standby or SIM. Past rosters are kept as read-only history.' : 'Your published duties day by day. Only rosters released by crew control are shown.'">
     @if($staff)
-    {{-- Roster actions; roster.js shows only those that apply. New rosters are created from the "No roster" view. --}}
+    {{-- Roster actions; roster.js shows only those that apply. "New roster" creates 1 week, 2 weeks or a month. --}}
+    <button id="new-roster" class="button button-secondary" type="button"><x-icon name="plus" class="icon-sm" />New roster</button>
     <button id="build-week" class="button" type="button" hidden><x-icon name="zap" class="icon-sm" /><span data-label>Build roster</span></button>
     <button id="publish-week" class="button button-secondary" type="button" hidden><x-icon name="send" class="icon-sm" />Publish to crew</button>
     <button id="reopen-week" class="button button-secondary" type="button" hidden><x-icon name="rotate" class="icon-sm" />Reopen as draft</button>
@@ -105,6 +106,14 @@
 
 @if($staff)
 {{-- Seat editor: candidates (legal first) and, when a choice breaks a rule, the override reason. --}}
+@if($staff)
+{{-- New roster: length (1 week, 2 weeks or a calendar month), start date and a preview; roster.js builds the form. --}}
+<dialog id="create-dialog" class="dialog" aria-labelledby="create-dialog-title"><div class="create-dialog-inner">
+    <div class="dialog-heading"><div><h2 id="create-dialog-title">New roster</h2><p>Choose how long it runs and when it starts. It is built straight away; you can change any seat afterwards.</p></div><button type="button" class="icon-button" data-close aria-label="Close"><x-icon name="x" /></button></div>
+    <div data-create-body></div>
+</div></dialog>
+@endif
+
 <dialog id="seat-dialog" class="dialog" aria-labelledby="seat-dialog-title"><form id="seat-form" novalidate>
     <div class="dialog-heading"><div><h2 id="seat-dialog-title">Change seat</h2><p id="seat-dialog-subtitle"></p></div><button type="button" class="icon-button" data-close aria-label="Close"><x-icon name="x" /></button></div>
     <fieldset>

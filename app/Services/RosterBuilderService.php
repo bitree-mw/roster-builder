@@ -328,7 +328,14 @@ class RosterBuilderService
     {
         [$from, $to] = [$context->period->starts_on->format('Y-m-d'), $context->period->ends_on->format('Y-m-d')];
         $weeks = count($context->period->dates()) / 7;
-        $share = fn (CrewMember $crew, int $extra = 0): float => ($context->schedule($crew->id)->minutesBetween($from, $to) + $extra) / max($this->legality->capacity($context, $crew) * $weeks, 1);
+        // Duty minutes in the period per crew member, remembered until a move changes that person's schedule
+        // (only the two people in a move change), so ordering candidates for every seat stays cheap.
+        $used = [];
+        $share = function (CrewMember $crew, int $extra = 0) use (&$used, $context, $from, $to, $weeks): float {
+            $used[$crew->id] ??= $context->schedule($crew->id)->minutesBetween($from, $to);
+
+            return ($used[$crew->id] + $extra) / max($this->legality->capacity($context, $crew) * $weeks, 1);
+        };
         $moves = 0;
         for ($pass = 0; $pass < 3; $pass++) {
             $seats = [];
@@ -362,6 +369,7 @@ class RosterBuilderService
                     }
                     $context->schedule($holder->id)->remove('assignment:'.$seat->id);
                     $context->schedule($crew->id)->add($duty->withKey('assignment:'.$seat->id));
+                    unset($used[$holder->id], $used[$crew->id]);
                     $seat->crew_member_id = $crew->id;
                     $seat->decision_log = [...($seat->decision_log ?? []), 'rebalanced_from' => ['crew_member_id' => $holder->id, 'name' => $holder->name]];
                     $movedThisPass++;

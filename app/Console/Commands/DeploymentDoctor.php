@@ -31,6 +31,8 @@ class DeploymentDoctor extends Command
      */
     public function handle(): int
     {
+        // The command object can be reused in one process (Artisan::call, tests): start each run empty.
+        $this->results = [];
         $url = (string) ($this->option('url') ?: config('app.url'));
         $host = (string) parse_url($url, PHP_URL_HOST);
         $port = parse_url($url, PHP_URL_PORT);
@@ -159,6 +161,11 @@ class DeploymentDoctor extends Command
         $this->result(in_array($mailer, ['log', 'array'], true) ? 'WARN' : 'OK', 'Mail', in_array($mailer, ['log', 'array'], true)
             ? 'MAIL_MAILER='.$mailer.': roster emails and password reset links are not delivered. Configure SMTP or a mail service.'
             : 'MAIL_MAILER='.$mailer.'.');
+        // The .env.example placeholders (cPanel section) must be replaced with the real mailbox details.
+        $placeholders = array_filter([config('mail.mailers.smtp.host'), config('mail.mailers.smtp.username'), config('mail.from.address')], fn ($value): bool => str_contains((string) $value, 'your-domain'));
+        if ($mailer === 'smtp' && $placeholders !== []) {
+            $this->result('FAIL', 'Mail settings', 'MAIL_HOST / MAIL_USERNAME / MAIL_FROM_ADDRESS still contain the your-domain.com placeholders. Enter your cPanel mailbox details.');
+        }
         $queue = (string) config('queue.default');
         $this->result($queue === 'sync' ? 'OK' : 'WARN', 'Queue', $queue === 'sync' ? 'sync: emails are sent during the request.' : $queue.': keep a worker running (php artisan queue:work) or emails stay queued.');
     }
