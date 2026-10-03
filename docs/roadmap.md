@@ -12,7 +12,7 @@
 - CSV and iCalendar exports, print view, queued roster emails with delivery logs.
 - Flight routes entered in GMT, legs chained from the previous destination, night stops (one or more nights, outstations only) asked for when adding a leg, rotations up to ROSTER_MAX_TRIP_DAYS days with the same crew until back at base, and layover days shown on the roster.
 - Light and dark themes.
-- Airport administration (route destinations and crew bases) for administrators; 24-hour HH:MM time entry everywhere; delete buttons shown in red.
+- Admin settings tab with separate User accounts and Airports pages (airports: route destinations and crew bases, administrators only); 24-hour HH:MM time entry everywhere; delete buttons always red.
 - Accumulated block and duty hours for pilots and cabin crew; account administration (administrator, scheduler, crew control, pilot, cabin crew) and own password change.
 - PDF files (dompdf): roster grid, per-crew pages and every report. Reports page with seven reports as table, CSV and PDF.
 - CSV import of crew, flight patterns and day planning with preview and atomic commit; versioned JSON backup and restore; self-service password reset by email.

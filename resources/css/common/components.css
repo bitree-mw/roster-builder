@@ -99,9 +99,12 @@
     .button-block { width: 100%; }
     .icon-button { display: inline-grid; place-items: center; width: 36px; height: 36px; border: 1px solid transparent; border-radius: 4px; background: transparent; color: var(--color-muted); }
     .icon-button:hover:not(:disabled) { border-color: var(--color-line); background: var(--color-surface); color: var(--color-ink); }
-    /* Delete/remove buttons are always red so destructive actions stand out; hover adds the outline. */
-    .icon-button[data-tone="danger"] { color: var(--color-danger); }
-    .icon-button[data-tone="danger"]:hover:not(:disabled) { border-color: var(--color-danger); background: var(--color-danger-soft); color: var(--color-danger); }
+    /* Delete/remove buttons are always visibly red (outline, tint, bold icon); hover fills them solid red. */
+    .icon-button[data-tone="danger"] { border-color: var(--color-danger); background: var(--color-danger-soft); color: var(--color-danger); }
+    .icon-button[data-tone="danger"] .icon { stroke-width: 2.25; }
+    /* A delete that is not allowed (e.g. an airport in use) stays recognisably red, just dimmer. */
+    .icon-button[data-tone="danger"]:disabled { opacity: .7; }
+    .icon-button[data-tone="danger"]:hover:not(:disabled) { border-color: var(--color-danger); background: var(--color-danger); color: var(--color-brand-contrast); }
     .text-button { display: inline-flex; align-items: center; gap: .375rem; min-height: 36px; padding: 0 .25rem; border: 0; background: none; color: var(--color-info); font-size: .8125rem; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
     .row-actions { display: flex; justify-content: flex-end; gap: .125rem; }
 
@@ -155,6 +158,11 @@
     .code-tag::before { content: ""; width: 4px; height: 1.375rem; border-radius: 2px; background: var(--accent, var(--color-ink)); }
 
     /* Segmented control. */
+    /* Sub-navigation inside a section (e.g. Admin settings: User accounts / Airports). */
+    .subnav { display: flex; flex-wrap: wrap; gap: .25rem; border-bottom: 1px solid var(--color-line); }
+    .subnav a { display: inline-flex; align-items: center; gap: .5rem; min-height: 44px; padding: .5rem 1rem; border-bottom: 3px solid transparent; margin-bottom: -1px; color: var(--color-muted); font-weight: 600; text-decoration: none; }
+    .subnav a:hover { color: var(--color-ink); }
+    .subnav a[aria-current="page"] { border-bottom-color: var(--color-brand); color: var(--color-ink-strong); }
     .segmented { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--color-line); border-radius: 4px; background: var(--color-surface); overflow: hidden; }
     .segmented button { min-height: 38px; padding: .375rem .875rem; border: 0; border-right: 1px solid var(--color-line); background: transparent; color: var(--color-ink); font-family: var(--font-mono); font-size: .6875rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; }
     .segmented button:last-child { border-right: 0; }

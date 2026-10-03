@@ -39,7 +39,7 @@
             <button id="logout" class="icon-button" type="button" aria-label="Sign out" title="Sign out"><x-icon name="logout" /></button>
         </div>
     </div>
-    {{-- Main navigation: Dashboard, Roster, Flight routes, Fleet, Crew, Crew hours, Duty rules, Import, Accounts.
+    {{-- Main navigation: Dashboard, Roster, Flight routes, Fleet, Crew, Crew hours, Duty rules, Import, Admin settings.
          Crew accounts only see their roster. Reports open from the Dashboard; the maintenance log from Fleet.
          data-tab-count badges are filled from /api/v1/overview. --}}
     <nav class="tabs" aria-label="Main navigation">
@@ -60,7 +60,8 @@
         @endforeach
         @endif
         @if(auth()->user()->assignableRoles() !== [])
-        <a class="tab" href="{{ route('accounts') }}" @if($page === 'accounts') aria-current="page" @endif><x-icon name="lock" class="icon-sm" />Accounts</a>
+        {{-- Admin settings: user accounts (administrators and schedulers) and airports (administrators). --}}
+        <a class="tab" href="{{ route('accounts') }}" @if(in_array($page, ['accounts', 'airports'], true)) aria-current="page" @endif><x-icon name="lock" class="icon-sm" />Admin settings</a>
         @endif
     </nav>
 </header>

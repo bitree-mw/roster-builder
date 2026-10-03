@@ -31,8 +31,14 @@ Route::middleware('auth')->group(function (): void {
     Route::get('/accounts', function () {
         abort_unless(auth()->user()->assignableRoles() !== [], 403);
 
-        return view('pages.accounts', ['page' => 'accounts', 'title' => 'Accounts']);
+        return view('pages.accounts', ['page' => 'accounts', 'title' => 'User accounts']);
     })->name('accounts');
+    // Admin settings / Airports: route destinations and crew bases, administrators only.
+    Route::get('/airports', function () {
+        abort_unless(auth()->user()->isAdmin(), 403);
+
+        return view('pages.airports', ['page' => 'airports', 'title' => 'Airports']);
+    })->name('airports');
     foreach (['dashboard' => 'Operations dashboard', 'hours' => 'Crew hours', 'reports' => 'Reports', 'data' => 'Import', 'aircraft' => 'Fleet', 'maintenance' => 'Maintenance', 'crew' => 'Crew directory', 'flights' => 'Flight routes', 'rules' => 'Duty rules'] as $page => $title) {
         Route::get('/'.$page, function () use ($page, $title) {
             abort_unless(auth()->user()->isStaff(), 403);

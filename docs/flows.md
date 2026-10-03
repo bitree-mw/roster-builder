@@ -9,7 +9,7 @@ Migration: aircraft_types → AircraftType → AircraftTypeRequest → AircraftT
 Create/update/delete and the audit entry commit together. Foreign keys remain the final integrity boundary.
 
 ## Airports (administrators)
-Accounts page → Airports panel → POST/PUT/DELETE /airports → AirportRequest (manage-airports gate: administrators) → AirportService (transaction, base and in-use guards, "airports" audit event) → AirportResource. Flight routes read airports from GET /lookups.
+Admin settings → Airports page (/airports, administrators) → POST/PUT/DELETE /airports → AirportRequest (manage-airports gate: administrators) → AirportService (transaction, base and in-use guards, "airports" audit event) → AirportResource. Flight routes read airports from GET /lookups.
 
 ## Fleet status and maintenance
 Fleet page → GET /aircraft (+ due items) → status dialog → PATCH /aircraft/{id}/status → AircraftStatusRequest → AircraftService::changeStatus (lock, update, audit in one transaction) → AircraftResource → cards and nav counts refresh.

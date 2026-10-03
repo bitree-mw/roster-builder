@@ -1,0 +1,6 @@
+/*
+ * Admin settings / Airports page (pages/airports.blade.php). Colours come from tokens.css via var(); no values here.
+ */
+
+/* Add/edit airport dialog: narrower than the default dialog (four short fields). */
+#airport-dialog { width: min(100% - 2rem, 40rem); }

@@ -50,4 +50,19 @@ class PageTest extends TestCase
         $this->actingAs(User::factory()->create(['role' => 'crew_control']))->get('/accounts')->assertForbidden();
         $this->actingAs(User::factory()->create(['role' => 'admin']))->get('/accounts')->assertOk()->assertSee('Administrator');
     }
+
+    public function test_admin_settings_separate_user_accounts_from_airports_which_only_admins_open(): void
+    {
+        $this->withoutVite();
+        // Administrators: the "Admin settings" tab with both sub-pages, airports on its own page.
+        $this->actingAs(User::factory()->create(['role' => 'admin']));
+        $this->get('/accounts')->assertOk()->assertSee('Admin settings')->assertSee(route('airports'), false)->assertDontSee('id="airport-form"', false);
+        $this->get('/airports')->assertOk()->assertViewIs('pages.airports')->assertSee('id="airport-form"', false)->assertSee(route('accounts'), false);
+
+        // Schedulers manage pilot and cabin crew accounts only: no airports sub-page or link.
+        $this->actingAs(User::factory()->create(['role' => 'scheduler']));
+        $this->get('/accounts')->assertOk()->assertSee('Admin settings')->assertDontSee(route('airports'), false);
+        $this->get('/airports')->assertForbidden();
+        $this->actingAs(User::factory()->create(['role' => 'crew_control']))->get('/airports')->assertForbidden();
+    }
 }

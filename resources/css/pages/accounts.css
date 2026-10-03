@@ -8,5 +8,3 @@
 #account-rows td:first-child .chip { margin-top: .25rem; }
 #account-rows td .chip + .chip { margin-left: .25rem; }
 
-/* Airports dialog (administrators): narrower than the account dialog. */
-#airport-dialog { width: min(100% - 2rem, 40rem); }
