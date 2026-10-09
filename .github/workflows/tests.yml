@@ -14,7 +14,7 @@ jobs:
           php-version: '8.4'
           extensions: mbstring, pdo_sqlite, dom, xml, curl, fileinfo
           coverage: none
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: '24'
           cache: npm
