@@ -1,0 +1,1 @@
+Every screen of the Malawi Airlines Roster Builder in three minutes: set up airports, routes, fleet, crew and duty rules, then build a roster where the generator fills every seat with legal crew and the duty inspector shows why each person was chosen. Change a seat, plan leave or SIM, publish, and export to CSV, PDF or calendar, all from one crew control console.

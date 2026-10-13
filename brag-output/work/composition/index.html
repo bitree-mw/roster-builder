@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Roster Builder how-to</title>
+<style>
+/* ---------- tokens: values copied from resources/css/common/tokens.css ---------- */
+:root {
+  --hero: #16233a; --hero-deep: #0f1a2c; --ink: #16233a; --tail: #3f9b4f; --tail-bright: #5bb86b;
+  --wordmark: #c8312a; --strip: #f5ebcf; --strip-line: #e2d3a8; --canvas: #e9eef1; --line: #cad4dc;
+  --sans: "Public Sans", "Segoe UI", system-ui, sans-serif;
+  --mono: "JetBrains Mono", "Cascadia Mono", Consolas, monospace;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 1920px; height: 1080px; overflow: hidden; background: var(--hero); }
+body { font-family: var(--sans); color: #fff; -webkit-font-smoothing: antialiased; }
+#stage { position: absolute; inset: 0; overflow: hidden; }
+
+/* ---------- background: navy chart grid like the sign-in hero ---------- */
+#bg { position: absolute; inset: 0;
+  background:
+    radial-gradient(1200px 700px at 72% 45%, rgba(58,110,168,.28), transparent 70%),
+    linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px) 0 0 / 64px 64px,
+    linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px) 0 0 / 64px 64px,
+    var(--hero); }
+
+/* ---------- left step rail ---------- */
+#rail { position: absolute; left: 72px; top: 150px; width: 430px; }
+#eyebrow { display: inline-flex; align-items: center; gap: 12px; font: 700 15px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: #9fb4cc; }
+#eyebrow .num { background: var(--strip); color: var(--ink); padding: 7px 10px; border-left: 4px solid var(--tail); }
+#title { margin-top: 22px; font: 700 50px/1.08 var(--sans); letter-spacing: -.015em; color: #fff; }
+#steps { margin-top: 40px; list-style: none; display: flex; flex-direction: column; gap: 22px; }
+#steps li { display: grid; grid-template-columns: 40px 1fr; gap: 16px; align-items: start; font: 500 23px/1.3 var(--sans); color: #fff; }
+#steps .n { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; font: 700 17px/1 var(--mono);
+  border: 2px solid rgba(255,255,255,.35); color: rgba(255,255,255,.8); margin-top: -4px; }
+#steps li.active .n { background: var(--tail); border-color: var(--tail); color: #fff; box-shadow: 0 0 0 6px rgba(63,155,79,.22); }
+#steps li.done .n { border-color: var(--tail-bright); color: var(--tail-bright); }
+#steps li.done .t { color: rgba(255,255,255,.62); }
+
+/* ---------- browser window with the real app ---------- */
+#win { position: absolute; left: 548px; top: 118px; width: 1328px; height: 785px; border-radius: 14px; overflow: hidden;
+  background: var(--canvas); box-shadow: 0 40px 90px rgba(0,0,0,.45), 0 0 0 1px rgba(255,255,255,.08); transform-origin: 50% 50%; }
+#chrome { height: 38px; background: #dfe6ec; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 8px; padding: 0 16px; }
+#chrome i { width: 12px; height: 12px; border-radius: 50%; background: #b9c4ce; display: block; }
+#url { margin-left: 18px; flex: 0 1 520px; height: 24px; border-radius: 6px; background: #fff; color: #56677a; font: 500 13px/24px var(--mono); padding: 0 12px; }
+#url b { color: var(--ink); font-weight: 600; }
+#view { position: absolute; left: 0; top: 38px; width: 1328px; height: 747px; overflow: hidden; background: var(--canvas); }
+#cam { position: absolute; left: 0; top: 0; width: 1600px; height: 900px; transform-origin: 0 0; }
+#cam img { position: absolute; left: 0; top: 0; width: 1600px; height: 900px; }
+#typer { position: absolute; background: #fff; color: var(--ink); font: 400 16px/1 "Segoe UI", sans-serif; display: flex; align-items: center; white-space: pre; }
+#typer .caret { display: inline-block; width: 1.5px; height: 20px; background: var(--ink); margin-left: 1px; }
+
+/* ---------- overlays in stage coordinates ---------- */
+#hl { position: absolute; border: 3px solid var(--tail); border-radius: 9px; box-shadow: 0 0 0 7px rgba(63,155,79,.20), 0 0 30px rgba(63,155,79,.35); pointer-events: none; }
+#ripple { position: absolute; width: 20px; height: 20px; border-radius: 50%; border: 3px solid var(--tail); }
+#cursor { position: absolute; width: 34px; height: 40px; transform-origin: 3px 3px; filter: drop-shadow(0 3px 5px rgba(0,0,0,.35)); }
+
+/* ---------- bottom progress ---------- */
+#progress { position: absolute; left: 548px; top: 948px; width: 1328px; display: grid; gap: 10px; }
+#progress .seg { position: relative; }
+#progress .bar { height: 5px; border-radius: 3px; background: rgba(255,255,255,.14); overflow: hidden; }
+#progress .fill { height: 100%; background: var(--tail-bright); width: 0; }
+#progress .lab { margin-top: 12px; font: 700 13px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: rgba(255,255,255,.45); }
+#progress .seg.on .lab { color: #fff; }
+#counter { position: absolute; left: 72px; top: 945px; font: 700 14px/1.5 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: rgba(255,255,255,.5); }
+#counter b { color: #fff; }
+
+/* ---------- intro / outro ---------- */
+.full { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; padding-left: 160px; }
+.logo-chip { width: 210px; height: 145px; border-radius: 14px; background: #fff; display: grid; place-items: center; box-shadow: 0 20px 50px rgba(0,0,0,.35); }
+.logo-chip img { width: 172px; }
+.kicker { margin-top: 40px; font: 700 18px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: #9fb4cc; }
+.kicker .flag { display: inline-block; padding: 8px 12px; background: rgba(255,255,255,.06); border-left: 4px solid var(--tail); color: #fff; }
+.headline { margin-top: 30px; width: 1300px; font: 700 84px/1.05 var(--sans); letter-spacing: -.02em; }
+.headline span { display: inline-block; margin-right: .24em; }
+.sub { margin-top: 30px; font: 400 28px/1.4 var(--sans); color: #c9d5e3; }
+.strip { position: absolute; left: 160px; bottom: 120px; width: 1600px; height: 74px; background: var(--strip); border-left: 7px solid var(--tail);
+  display: flex; align-items: center; padding: 0 32px; gap: 24px; color: var(--ink); font: 700 32px/1 var(--mono); }
+.strip .track { position: relative; flex: 1; height: 2px; border-top: 3px dashed #8a99a8; }
+.strip .plane { position: absolute; top: -21px; width: 40px; height: 40px; }
+#outro .headline { font-size: 64px; width: 1350px; }
+.foot { margin-top: 44px; font: 600 18px/1.6 var(--mono); letter-spacing: .06em; color: #9fb4cc; }
+.foot em { font-style: normal; color: var(--strip); }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="bg"></div>
+
+  <section id="intro" class="full">
+    <div class="logo-chip"><img src="../logo.png" alt=""></div>
+    <div class="kicker"><span class="flag">Roster Builder · Crew control workstation</span></div>
+    <h1 class="headline" id="intro-h"></h1>
+    <p class="sub" id="intro-sub">The complete how-to, every screen in about three minutes.</p>
+    <div class="strip" id="intro-strip"><span>LLW</span><span class="track"><svg class="plane" id="plane" viewBox="0 0 24 24" fill="none" stroke="#16233a" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/></svg></span><span>BLZ</span></div>
+  </section>
+
+  <section id="rail">
+    <div id="eyebrow"><span class="num" id="chap-num"></span><span id="chap-sec"></span></div>
+    <h2 id="title"></h2>
+    <ol id="steps"></ol>
+  </section>
+
+  <div id="win">
+    <div id="chrome"><i></i><i></i><i></i><div id="url"></div></div>
+    <div id="view"><div id="cam"><img id="imgA" alt=""><img id="imgB" alt=""><div id="typer"></div></div></div>
+  </div>
+  <div id="hl"></div>
+  <div id="ripple"></div>
+  <svg id="cursor" viewBox="0 0 34 40"><path d="M3 3 L3 33 L11 25.5 L16.5 37 L21.5 34.8 L16.2 23.6 L27 23.6 Z" fill="#fff" stroke="#16233a" stroke-width="2.4" stroke-linejoin="round"/></svg>
+
+  <div id="counter"></div>
+  <div id="progress"></div>
+
+  <section id="outro" class="full">
+    <div class="logo-chip"><img src="../logo.png" alt=""></div>
+    <div class="kicker"><span class="flag">Malawi Airlines · Roster Builder</span></div>
+    <h1 class="headline" id="outro-h"></h1>
+    <p class="foot">Crew Control · Kamuzu International Airport (LLW)<br><em>Development build · not an approved scheduling system</em></p>
+  </section>
+</div>
+<script src="timeline.js"></script>
+<script src="shots.js"></script>
+<script src="engine.js"></script>
+</body>
+</html>
