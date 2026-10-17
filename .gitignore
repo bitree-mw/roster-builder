@@ -24,7 +24,6 @@
 !/resources/**/*.key
 
 # Build output and Vite dev artefacts
-/public/build
 /public/hot
 /public/storage
 /public/fonts-manifest.dev.json
