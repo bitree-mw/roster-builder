@@ -98,8 +98,8 @@ function viewerState(period) {
 }
 /** Whether a slot (roster or gap) has ended: its last day is before today at base. */
 function ended(slot) { return Boolean(slot) && slot.end < today; }
-/** Whether seats on a trip can still be changed by the scheduler. */
-function changeable(trip) { return staff && state.week?.editable && !trip.operated; }
+/** Whether seats on a trip can still be changed by the scheduler: drafts and published rosters, not ended or flown. */
+function changeable(trip) { return staff && state.week?.changeable && !trip.operated; }
 /**
  * The duty periods a seat's holder flies: a captain section's own periods (worked out by the server), or the
  * whole trip's for every other seat.
@@ -126,7 +126,7 @@ function layoverTag(trip, airport) {
     tag.append(element('strong', 'Night stop'), element('span', `${trip.code} · ${airport}`, 'mono'));
     tag.title = `Away at ${airport} with ${trip.code}; the crew stay with the trip until it is back at base`;
     // A night stop of a disabled flight carries the same warning as its duties.
-    if (!trip.flight_active) { tag.dataset.flight = 'disabled'; tag.append(element('span', 'Flight disabled', 'duty-disabled')); tag.title = `${trip.code} is disabled on Flight routes. Review the route changes and rebuild to remove this trip.`; }
+    if (!trip.flight_active && !trip.operated) { tag.dataset.flight = 'disabled'; tag.append(element('span', 'Flight disabled', 'duty-disabled')); tag.title = `${trip.code} is disabled on Flight routes. Review the route changes and rebuild to remove this trip.`; }
     tag.addEventListener('click', () => selectTrip(trip.id));
     return tag;
 }
@@ -300,12 +300,12 @@ function renderNotice() {
         action.addEventListener('click', openChanges);
     }
     else if (week?.status === 'published' && staff && week.changed_crew?.length) {
-        // Republished with changes: name how many crew are affected and offer to email just them.
-        message = `Published again: ${plural(week.changed_crew.length, 'crew member')} ${week.changed_crew.length === 1 ? 'has' : 'have'} different duties since the last publication.`;
+        // Changed after publication (edited, or published again): name how many crew to tell and offer to email them.
+        message = `${plural(week.changed_crew.length, 'crew member')} ${week.changed_crew.length === 1 ? 'has' : 'have'} changed duties they have not been told about yet. They already see them in the app.`;
         action = element('button', 'Email changed crew', 'button button-sm button-secondary'); action.type = 'button';
         action.addEventListener('click', event => busy(event.currentTarget, emailChangedCrew));
     }
-    else if (week?.status === 'published') message = staff ? 'Published to crew. Reopen it as a draft to rebuild or change seats.' : null;
+    else if (week?.status === 'published') message = staff ? 'Published to crew. You can still change seats and planes; crew see changes straight away and you can email them afterwards. Reopen it as a draft to rebuild.' : null;
     else if (week && staff && !week.built_at) { message = 'This draft has not been built yet. Build it to fill every seat automatically from crew working hours and the duty rules. Click an empty day in the grid to plan leave, a day off, standby or SIM first.'; tone = 'warning'; }
     else if (week && staff && !week.trips.length) { message = 'No trips in this roster: no enabled flight operates on its remaining days. Check Flight routes, then rebuild.'; tone = 'warning'; }
     else if (week && staff && week.summary.blocking) { message = `${plural(week.summary.blocking, 'rule conflict')} must be changed or accepted with an override reason before this roster can be published.`; tone = 'danger'; }
@@ -576,11 +576,19 @@ function gridView() {
                 button.dataset.tripId = trip.id;
                 button.append(element('span', trip.code, 'mono'), element('span', seat.rank === 'CC' ? `CC${seat.seat_number}` : seat.rank));
                 // Open seats on a disabled flight do not need filling: they go when the route changes are confirmed.
-                if (!trip.flight_active) { button.dataset.flight = 'disabled'; button.prepend(icon('ban', 'icon-sm')); button.title = `${trip.code} is disabled on Flight routes`; }
+                // Disabled flight: red until the trip is removed; greyed out if it had already flown.
+                if (!trip.flight_active && !trip.operated) { button.dataset.flight = 'disabled'; button.prepend(icon('ban', 'icon-sm')); button.title = `${trip.code} is disabled on Flight routes`; }
+                if (!trip.flight_active && trip.operated) button.dataset.flight = 'flown';
                 // An open captain section names its own route.
                 if (seat.section && trip.flight_active) button.title = `Captain section ${seat.section.route}`;
                 button.setAttribute('aria-label', `Open ${seatName(seat)} seat${seat.section ? ` (section ${seat.section.route})` : ''} on ${trip.code}, ${formatDate(trip.start_date)}${trip.flight_active ? '' : ', flight disabled'}`);
                 button.addEventListener('click', () => (changeable(trip) ? openSeat(trip, seat) : selectTrip(trip.id)));
+                // An open seat can be dragged onto a crew member's row to fill it.
+                if (changeable(trip)) {
+                    button.draggable = true;
+                    button.addEventListener('dragstart', event => startDrag(event, trip, seat));
+                    button.addEventListener('dragend', endDrag);
+                }
                 seats.append(button);
             }
         }
@@ -590,6 +598,8 @@ function gridView() {
         openRow.append(td);
     }
     openRow.append(element('td', openTotal ? plural(openTotal, 'open seat') : 'None', 'roster-total small'));
+    // Dropping a held seat on Open time clears it.
+    if (staff) dropTarget(openRow, seat => seat.crew_member_id !== null, clearDraggedSeat);
     body.append(openRow);
 
     const crews = visibleCrew();
@@ -608,16 +618,24 @@ function gridView() {
         for (const day of days) {
             const td = element('td', null, 'roster-cell');
             for (const { trip, seat } of seats) {
-                for (const duty of dutiesOn(trip, day.date, seat)) td.append(dutyButton(trip, seat, duty, day.date));
+                for (const duty of dutiesOn(trip, day.date, seat)) td.append(dutyButton(trip, seat, duty, day.date, { draggable: staff }));
                 const away = layoverOn(trip, day.date, seat);
                 if (away) td.append(layoverTag(trip, away));
             }
             for (const activity of crew.activities.filter(item => item.date === day.date)) td.append(activityTag(activity, crew));
             // An empty day: staff can plan leave, a day off, standby or SIM from here.
             if (staff && !td.childElementCount) td.append(planButton(crew, day.date));
+            // Same-person drops transfer the seat to this date; other-person drops keep the existing row behavior.
+            if (staff) dropTarget(td, seat => crew.active && seat.crew_member_id === crew.id && dragging?.trip.start_date !== day.date,
+                dropped => moveSeatDate(dropped, day.date));
             row.append(td);
         }
         row.append(hoursCell(crew));
+        // Drop a duty (or open seat) of the same position here to give it to this crew member.
+        if (staff) {
+            row.dataset.rank = crew.rank;
+            dropTarget(row, seat => crew.active && seat.rank === crew.rank && seat.crew_member_id !== crew.id, dropped => moveSeat(dropped, crew));
+        }
         body.append(row);
     }
     if (!crews.length) {
@@ -642,11 +660,15 @@ function planButton(crew, date) {
 /**
  * A duty in the grid: flight code, local times, lock for manual seats and a conflict marker. A duty whose
  * flight was disabled on Flight routes is hatched with a "Flight disabled" line until a confirmed rebuild
- * removes it, so it is never mistaken for a flight that still operates.
+ * removes it, so it is never mistaken for a flight that still operates. One that had already flown before the
+ * flight was disabled is simply greyed out: it is history and nothing needs doing.
+ *
+ * In the crew grid ({ draggable: true }) a duty that can still change can be dragged onto another crew
+ * member's row to give them the seat (see startDrag()).
  */
-function dutyButton(trip, seat, duty, date) {
+function dutyButton(trip, seat, duty, date, { draggable = false } = {}) {
     const conflicts = state.index.seatConflicts.get(seat.id) || [];
-    const disabled = !trip.flight_active;
+    const disabled = !trip.flight_active && !trip.operated;
     const button = element('button', null, `duty accent-${trip.palette || 'sky'}`); button.type = 'button';
     button.dataset.tripId = trip.id;
     if (trip.id === state.tripId) button.dataset.selected = 'true';
@@ -654,6 +676,8 @@ function dutyButton(trip, seat, duty, date) {
     else if (conflicts.length) button.dataset.conflict = 'accepted';
     if (seat.source === 'manual') button.dataset.manual = 'true';
     if (disabled) button.dataset.flight = 'disabled';
+    // Flown before its flight was disabled: greyed out, no warning.
+    if (!trip.flight_active && trip.operated) { button.dataset.flight = 'flown'; button.title = `${trip.code} flew before the flight was disabled.`; }
     const top = element('span', null, 'duty-top'); top.append(element('span', trip.code, 'duty-code'));
     if (seat.source === 'manual') top.append(icon('lock', 'icon-sm'));
     if (conflicts.length) top.append(icon('alert', 'icon-sm'));
@@ -670,7 +694,99 @@ function dutyButton(trip, seat, duty, date) {
     if (disabled) button.title = `${trip.code} is disabled on Flight routes. Review the route changes and rebuild to remove this trip.`;
     button.setAttribute('aria-label', `${trip.code} ${formatDate(trip.start_date)}, ${seatName(seat)}${seat.section ? `, section ${seat.section.route}` : ''}, ${times} local${seat.source === 'manual' ? ', locked' : ''}${conflicts.length ? `, ${plural(conflicts.length, 'conflict')}` : ''}${disabled ? ', flight disabled' : ''}`);
     button.addEventListener('click', () => selectTrip(trip.id));
+    if (draggable && changeable(trip)) {
+        button.draggable = true;
+        button.title = [button.title, 'Drag onto another crew member, or another day in your row to move to that occurrence of the same flight.'].filter(Boolean).join(' ');
+        button.addEventListener('dragstart', event => startDrag(event, trip, seat));
+        button.addEventListener('dragend', endDrag);
+    }
     return button;
+}
+
+/* ---------------------------------------------------------------- Drag and drop in the crew grid */
+
+// The seat being dragged ({ trip, seat }), or null.
+let dragging = null;
+
+/**
+ * Start dragging a seat (a duty or an open seat). Rows of crew who could take it (same position, not already
+ * holding it) light up as drop targets; dropping on the Open time row clears it. Keyboard users keep the
+ * seat editor (Change / Fill), which does the same.
+ */
+function startDrag(event, trip, seat) {
+    dragging = { trip, seat };
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/plain', String(seat.id));
+    view.querySelector('.roster-grid')?.setAttribute('data-dragging', seat.rank);
+}
+
+/** Finish a drag (dropped or cancelled): forget the seat and clear every highlight. */
+function endDrag() {
+    dragging = null;
+    view.querySelector('.roster-grid')?.removeAttribute('data-dragging');
+    for (const row of view.querySelectorAll('[data-drop]')) delete row.dataset.drop;
+}
+
+/**
+ * Make a grid row a drop target. accepts(seat) says whether the dragged seat may be dropped here; onDrop runs
+ * the change. The row is highlighted while a seat it accepts is over it.
+ */
+function dropTarget(row, accepts, onDrop) {
+    row.addEventListener('dragover', event => {
+        if (!dragging || !accepts(dragging.seat)) return;
+        event.stopPropagation();
+        event.preventDefault(); event.dataTransfer.dropEffect = 'move'; row.dataset.drop = 'ok';
+    });
+    row.addEventListener('dragleave', event => { if (!row.contains(event.relatedTarget)) delete row.dataset.drop; });
+    row.addEventListener('drop', event => {
+        if (!dragging || !accepts(dragging.seat)) return;
+        event.stopPropagation();
+        event.preventDefault();
+        const dropped = dragging; endDrag();
+        if (dropped) onDrop(dropped).catch(showError);
+    });
+}
+
+/** Transfer this person's duty to an open matching seat on the chosen date, with server legality checks. */
+async function moveSeatDate({ trip, seat }, date) {
+    const targets = state.week.trips.filter(item => item.flight_id === trip.flight_id && item.start_date === date && changeable(item));
+    const matches = targets.flatMap(target => target.assignments.filter(item => item.rank === seat.rank && !item.crew_member_id
+        && item.from_leg === seat.from_leg && item.to_leg === seat.to_leg).map(targetSeat => ({ trip: target, seat: targetSeat })));
+    if (!matches.length) {
+        toast(`No open matching seat for ${trip.code} on ${formatDate(date)}. The flight must already operate that day, with the same captain section if split.`, { type: 'warning' });
+        return;
+    }
+    const target = matches[0];
+    const confirmed = await confirmAction({ title: 'Move duty to another day?',
+        message: `${seat.crew?.name} moves from ${trip.code} on ${formatDate(trip.start_date)} to ${formatDate(date)}. The original seat will be open. The whole rotation or captain section moves together.`, confirmLabel: 'Move duty' });
+    if (!confirmed) return;
+    try {
+        const response = await api(`/api/v1/assignments/${seat.id}`, { method: 'PUT',
+            body: { crew_member_id: seat.crew_member_id, target_assignment_id: target.seat.id }, notify: false });
+        toast(response.message, { type: 'success' });
+        await Promise.all([loadTimeline(), loadWeek()]);
+    } catch (error) { showError(error); }
+}
+
+/**
+ * Give a dragged seat to a crew member. When the server's rule checks need an override reason, the seat editor
+ * opens with that crew member selected so the reason can be recorded; other problems pop up as usual.
+ */
+async function moveSeat({ trip, seat }, crew) {
+    try {
+        const response = await api(`/api/v1/assignments/${seat.id}`, { method: 'PUT', body: { crew_member_id: crew.id }, notify: false });
+        toast(response.message, { type: 'success' });
+        await Promise.all([loadTimeline(), loadWeek()]);
+    } catch (error) {
+        if (error.errors?.override_reason) { await openSeat(trip, seat, crew.id); return; }
+        showError(error);
+    }
+}
+
+/** Clear a dragged seat by dropping it on the Open time row, after confirming. */
+async function clearDraggedSeat({ trip, seat }) {
+    const confirmed = await confirmAction({ title: `Clear ${seatName(seat)} seat?`, message: `${seat.crew?.name} is removed from ${trip.code} on ${formatDate(trip.start_date)}. The seat stays open until you fill it or rebuild.`, confirmLabel: 'Clear seat' });
+    if (confirmed) await seatAction(`/api/v1/assignments/${seat.id}`, 'PUT', { crew_member_id: null });
 }
 
 /**
@@ -817,7 +933,7 @@ function tripCard(trip) {
     const open = trip.assignments.filter(seat => !seat.crew_member_id).length;
     if (open) chips.append(chip(`${open} open`, 'warning'));
     if (trip.operated) chips.append(chip('Operated', undefined));
-    if (!trip.flight_active) chips.append(chip('Flight disabled', 'danger'));
+    if (!trip.flight_active) chips.append(trip.operated ? chip('Flown, flight since disabled', undefined) : chip('Flight disabled', 'danger'));
     const pending = routeChangeChip(trip); if (pending) chips.append(pending);
     for (const conflict of state.index.tripConflicts.get(trip.id) || []) if (conflict.code === 'no_aircraft') chips.append(chip('No airframe', 'danger'));
     if (chips.childElementCount) card.append(chips);
@@ -870,7 +986,7 @@ function renderInspector() {
     head.append(title, element('span', `${formatDate(trip.start_date)} · ${trip.route || ''}`, 'small mono'));
     const chips = element('div', null, 'chip-list');
     if (trip.operated) chips.append(chip('Operated · read-only', undefined, { iconName: 'lock' }));
-    if (!trip.flight_active) chips.append(chip('Flight disabled', 'danger'));
+    if (!trip.flight_active) chips.append(trip.operated ? chip('Flown, flight since disabled', undefined) : chip('Flight disabled', 'danger'));
     const pending = routeChangeChip(trip); if (pending) chips.append(pending);
     if (chips.childElementCount) head.append(chips);
     nodes.push(head);
@@ -971,7 +1087,8 @@ function seatRow(trip, seat) {
  */
 function planeTools(trip) {
     const tools = element('div', null, 'plane-tools');
-    const open = element('button', 'Change plane', 'button button-sm button-secondary'); open.type = 'button';
+    const open = element('button', 'Change trip plane', 'button button-sm button-secondary'); open.type = 'button';
+    tools.append(element('p', 'Applies to this dated trip only. To change preferred planes for the route, edit Flight routes.', 'small muted'));
     open.addEventListener('click', event => busy(event.currentTarget, async () => {
         let choices;
         try { choices = (await api(`/api/v1/trips/${trip.id}/aircraft-options`)).data; } catch (error) { showError(error); return; }
@@ -1074,13 +1191,15 @@ const dialog = document.querySelector('#seat-dialog');
 const seatForm = document.querySelector('#seat-form');
 const candidateList = document.querySelector('#candidate-list');
 const overrideField = document.querySelector('#override-field');
+const exchangeField = document.querySelector('#exchange-field');
+const exchangeSelect = document.querySelector('#exchange-seat');
 const seatStatus = dialog?.querySelector('[data-form-status]');
 let editing = null;
 
 /** Open the editor for a seat and load its candidates from the server. */
-async function openSeat(trip, seat) {
-    editing = { trip, seat, candidates: [] };
-    seatForm.reset(); status('', false, seatStatus); overrideField.hidden = true;
+async function openSeat(trip, seat, preselectCrewId = null) {
+    editing = { trip, seat, candidates: [], preselect: preselectCrewId };
+    seatForm.reset(); status('', false, seatStatus); overrideField.hidden = true; exchangeField.hidden = true; exchangeSelect.replaceChildren();
     document.querySelector('#seat-dialog-title').textContent = `${trip.code} · ${formatDate(trip.start_date)} · ${seatName(seat)}`;
     document.querySelector('#seat-dialog-subtitle').textContent = `Currently ${seat.crew?.name || 'open'}. ${trip.route || ''} ${tripTimes(trip)}`;
     document.querySelector('#clear-seat').hidden = !seat.crew_member_id;
@@ -1099,12 +1218,15 @@ function renderCandidates() {
     candidateList.replaceChildren(...editing.candidates.map(candidate => {
         const label = element('label', null, 'candidate'); label.dataset.legal = String(candidate.legal);
         const input = element('input'); input.type = 'radio'; input.name = 'crew_member_id'; input.value = candidate.crew_member_id;
-        input.checked = candidate.current; input.disabled = !candidate.overridable;
+        // A crew member chosen by dragging starts selected, so only the override reason is left to fill in.
+        input.checked = editing.preselect ? candidate.crew_member_id === editing.preselect : candidate.current;
+        input.disabled = !candidate.overridable && !candidate.exchanges?.length;
         const body = element('span', null, 'candidate-body');
         const top = element('span', null, 'candidate-top');
         top.append(element('strong', candidate.name), element('span', candidate.base_airport, 'chip mono'));
         if (candidate.current) top.append(chip('Current', 'brand'));
         top.append(candidate.legal ? chip('Legal', 'success', { iconName: 'check' }) : chip(candidate.overridable ? plural(candidate.issues.length, 'problem') : 'Not allowed', 'danger'));
+        if (candidate.exchanges?.length) top.append(chip('Exchange available', 'info'));
         const hours = `Week ${formatMinutes(candidate.week_minutes)} of ${candidate.weekly_hours ? `${candidate.weekly_hours}h working hours` : `${formatMinutes(candidate.capacity_minutes)} limit`}${candidate.score !== null ? ` · score ${candidate.score}` : ''}`;
         body.append(top, element('span', hours, 'small muted mono'));
         if (candidate.issues.length) {
@@ -1117,23 +1239,47 @@ function renderCandidates() {
         label.append(input, body);
         return label;
     }));
-    updateOverride();
+    updateExchange();
 }
 
 /** The checked candidate id (a lone radio is not a RadioNodeList, so query the checked input directly). */
 function checkedCrew() { return seatForm.querySelector('input[name="crew_member_id"]:checked')?.value ?? null; }
-/** Show the override reason only when the chosen candidate breaks a rule. */
+/** Present the server-checked exchange choices for the selected candidate without choosing a swap implicitly. */
+function updateExchange() {
+    const chosen = editing?.candidates.find(candidate => String(candidate.crew_member_id) === checkedCrew());
+    const direct = element('option', 'Assign only — keep their other duties'); direct.value = '';
+    exchangeSelect.replaceChildren(direct);
+    for (const choice of chosen?.exchanges || []) {
+        const option = element('option', `Exchange with ${choice.label}`); option.value = choice.assignment_id; exchangeSelect.append(option);
+    }
+    exchangeField.hidden = !chosen?.exchanges?.length;
+    updateOverride();
+}
+
+/** Exchanges must be legal on both sides; the normal assignment retains its explicit override field. */
 function updateOverride() {
     const chosen = editing?.candidates.find(candidate => String(candidate.crew_member_id) === checkedCrew());
-    overrideField.hidden = !chosen || chosen.legal;
+    overrideField.hidden = !chosen || chosen.legal || Boolean(exchangeSelect.value);
     seatForm.elements.override_reason.required = !overrideField.hidden;
+    seatForm.querySelector('[type="submit"]').textContent = exchangeSelect.value ? 'Exchange crew' : 'Assign';
 }
 
 /** Save a seat (or clear it with null), then reload the week and keep the trip selected. */
 async function saveSeat(crewId) {
     const reason = seatForm.elements.override_reason.value.trim();
+    const exchangeId = crewId !== null ? Number(exchangeSelect.value) || null : null;
+    if (exchangeId) {
+        const candidate = editing.candidates.find(item => item.crew_member_id === crewId);
+        const choice = candidate?.exchanges?.find(item => item.assignment_id === exchangeId);
+        const confirmed = await confirmAction({ title: 'Exchange crew duties?',
+            message: `${candidate?.name} takes ${editing.trip.code} on ${formatDate(editing.trip.start_date)}. ${editing.seat.crew?.name} takes ${choice?.label}. Both duties are checked again before saving.`, confirmLabel: 'Exchange crew' });
+        if (!confirmed) return;
+    }
     try {
-        await api(`/api/v1/assignments/${editing.seat.id}`, { method: 'PUT', body: { crew_member_id: crewId, override_reason: reason || null } });
+        const body = exchangeId
+            ? { crew_member_id: crewId, exchange_assignment_id: exchangeId, expected_crew_member_id: editing.seat.crew_member_id }
+            : { crew_member_id: crewId, override_reason: reason || null };
+        await api(`/api/v1/assignments/${editing.seat.id}`, { method: 'PUT', body });
         dialog.close();
         await Promise.all([loadTimeline(), loadWeek()]);
     } catch (error) {
@@ -1144,7 +1290,8 @@ async function saveSeat(crewId) {
 
 if (dialog) {
     dialog.querySelector('[data-close]').addEventListener('click', () => dialog.close());
-    candidateList.addEventListener('change', updateOverride);
+    candidateList.addEventListener('change', updateExchange);
+    exchangeSelect.addEventListener('change', updateOverride);
     seatForm.addEventListener('submit', async event => {
         event.preventDefault();
         const value = checkedCrew();
@@ -1265,15 +1412,16 @@ async function loadEmailLog() {
     }));
 }
 /**
- * Email only the crew whose duties changed when this roster was published again (for example after flights
- * were disabled or edited). Lists who and what changed, asks first, then the server sends; its message pops up.
+ * Email only the crew whose duties changed since they were last told (after the published roster was edited, or
+ * published again after flights were disabled or edited). Lists who and what changed, asks first, then the
+ * server sends; its message pops up. Emailed crew then count as up to date.
  */
 async function emailChangedCrew() {
     const changed = state.week?.changed_crew || [];
     if (!changed.length) return;
     const names = changed.map(item => item.name);
     const confirmed = await confirmAction({ title: `Email ${plural(changed.length, 'crew member')} about the changes?`,
-        message: `${names.slice(0, 8).join(', ')}${names.length > 8 ? ` and ${names.length - 8} more` : ''} get their updated roster with a list of what changed since the last publication.`, confirmLabel: 'Send emails', tone: 'info' });
+        message: `${names.slice(0, 8).join(', ')}${names.length > 8 ? ` and ${names.length - 8} more` : ''} get their updated roster by email, with a list of what changed since they were last told.`, confirmLabel: 'Send emails', tone: 'info' });
     if (!confirmed) return;
     try { await api(`/api/v1/roster-periods/${state.week.id}/email`, { method: 'POST', body: { only: 'changed' } }); }
     catch (error) { showError(error); }

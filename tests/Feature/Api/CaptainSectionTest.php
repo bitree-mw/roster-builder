@@ -171,7 +171,7 @@ class CaptainSectionTest extends TestCase
         $period = $this->week();
         $this->actingAsScheduler();
         $this->postJson("/api/v1/roster-periods/{$period->id}/build")->assertOk();
-        $this->postJson("/api/v1/roster-periods/{$period->id}/publish")->assertOk()->assertJsonPath('data.changed_crew', null);
+        $this->postJson("/api/v1/roster-periods/{$period->id}/publish")->assertOk()->assertJsonPath('data.changed_crew', []);
         $this->postJson("/api/v1/roster-periods/{$period->id}/email", ['only' => 'changed'])->assertUnprocessable()
             ->assertJsonPath('errors.only.0', 'No crew have different duties since this roster was last published.');
         $this->postJson("/api/v1/roster-periods/{$period->id}/reopen")->assertOk();
@@ -197,6 +197,7 @@ class CaptainSectionTest extends TestCase
 
             return $mail->envelope()->subject === 'Roster changed: Week 41 (05–11 Oct 2026)';
         });
+        $this->getJson("/api/v1/roster-periods/{$period->id}")->assertJsonPath('data.changed_crew', []);
     }
 
     /**

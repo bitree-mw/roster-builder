@@ -161,7 +161,7 @@
     "isEntry": true
   },
   "resources/css/pages/roster.css": {
-    "file": "assets/roster-BaMFQchG.css",
+    "file": "assets/roster-3NEvbXqE.css",
     "name": "roster",
     "names": [
       "roster.css"
@@ -321,7 +321,7 @@
     ]
   },
   "resources/js/pages/roster.js": {
-    "file": "assets/roster-KaHG7ao5.js",
+    "file": "assets/roster-BLAwAyby.js",
     "name": "roster",
     "src": "resources/js/pages/roster.js",
     "isEntry": true,

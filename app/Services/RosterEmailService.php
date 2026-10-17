@@ -19,13 +19,16 @@ use Illuminate\Validation\ValidationException;
  * default (send(), for hosts such as cPanel without a queue worker) or queued with ROSTER_MAIL_DELIVERY=queue
  * (queue()). Crew without an email address are skipped and counted. Nothing is ever sent for drafts or by
  * the demo seeder.
+ *
+ * Each email lists what changed for its crew member since they were last told (RosterPeriodService::
+ * pendingChanges()); once it is sent or queued, that crew member counts as up to date (markNotified()).
  */
 class RosterEmailService
 {
     /** How planned days read in the email. */
     private const ACTIVITIES = ['leave' => 'Leave', 'day_off' => 'Day off', 'sim' => 'Simulator session', 'standby' => 'Standby'];
 
-    public function __construct(private AuditService $audit) {}
+    public function __construct(private AuditService $audit, private RosterPeriodService $periods) {}
 
     /**
      * Create the log rows and dispatch one job per recipient once the transaction commits.
@@ -43,9 +46,11 @@ class RosterEmailService
         }
 
         return DB::transaction(function () use ($period, $actor, $crewIds): array {
+            $this->recordChanges($period);
             $crews = $this->recipients($period, $crewIds);
             $queued = 0;
             $missing = 0;
+            $notified = [];
             foreach ($crews as $crew) {
                 if (blank($crew->email)) {
                     $missing++;
@@ -55,7 +60,10 @@ class RosterEmailService
                 $log = EmailLog::query()->create(['crew_member_id' => $crew->id, 'roster_period_id' => $period->id, 'email' => $crew->email, 'requested_by' => $actor->id, 'status' => 'queued']);
                 SendRosterEmail::dispatch($log->id)->afterCommit();
                 $queued++;
+                $notified[] = $crew->id;
             }
+            // Queued crew are counted as told; a failed send can be retried with "Email crew".
+            $this->periods->markNotified($period, $notified);
             $this->audit->record($actor, 'emailed', $period, null, ['queued' => $queued, 'missing' => $missing]);
 
             return ['queued' => $queued, 'missing' => $missing];
@@ -79,6 +87,7 @@ class RosterEmailService
             throw ValidationException::withMessages(['period' => 'Publish this roster before emailing it to crew.']);
         }
         [$logs, $missing] = DB::transaction(function () use ($period, $actor, $crewIds): array {
+            $this->recordChanges($period);
             $crews = $this->recipients($period, $crewIds);
             $logs = [];
             $missing = 0;
@@ -102,6 +111,8 @@ class RosterEmailService
             SendRosterEmail::dispatchSync($log->id);
         }
         $results = EmailLog::query()->whereKey(array_map(fn (EmailLog $log): int => $log->id, $logs))->get();
+        // Crew who got their roster are up to date; those whose email failed stay listed as changed.
+        $this->periods->markNotified($period, $results->where('status', 'sent')->pluck('crew_member_id')->map(fn ($id): int => (int) $id)->all());
 
         return [
             'sent' => $results->where('status', 'sent')->count(),
@@ -182,6 +193,16 @@ class RosterEmailService
             // What changed for this crew member when the roster was last published again (null: nothing).
             'changes' => collect($period->changed_crew ?? [])->firstWhere('crew_member_id', $crew->id),
         ];
+    }
+
+    /**
+     * Store the crew's changes since they were last told on the roster (changed_crew), so each email of this
+     * send can list "Changes since your last roster" for its crew member.
+     */
+    private function recordChanges(RosterPeriod $period): void
+    {
+        $period->changed_crew = $this->periods->pendingChanges($period);
+        $period->save();
     }
 
     /**

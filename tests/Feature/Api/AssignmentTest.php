@@ -20,6 +20,55 @@ class AssignmentTest extends TestCase
 
     private RosterPeriod $period;
 
+    /** A date transfer changes both seats atomically and preserves the flight pattern and trip dates. */
+    public function test_a_holder_can_move_to_an_open_occurrence_of_the_same_flight(): void
+    {
+        $flight = $this->flight('LB3', [2, 4]);
+        $captain = $this->crew('CPT', 'Moving Captain');
+        $this->actingAsScheduler();
+        $this->postJson("/api/v1/roster-periods/{$this->period->id}/build")->assertOk();
+        $source = $this->seat('CPT', '2026-10-07');
+        $target = $this->seat('CPT', '2026-10-09');
+        $this->putJson("/api/v1/assignments/{$source->id}", ['crew_member_id' => $captain->id])->assertOk();
+        $this->putJson("/api/v1/assignments/{$target->id}", ['crew_member_id' => null])->assertOk();
+
+        $this->putJson("/api/v1/assignments/{$source->id}", ['crew_member_id' => $captain->id, 'target_assignment_id' => $target->id])
+            ->assertOk()->assertJsonPath('data.crew_member_id', $captain->id);
+
+        $this->assertDatabaseHas('assignments', ['id' => $source->id, 'crew_member_id' => null]);
+        $this->assertDatabaseHas('assignments', ['id' => $target->id, 'crew_member_id' => $captain->id, 'source' => 'manual']);
+        $this->assertDatabaseHas('trips', ['id' => $source->trip_id, 'flight_id' => $flight->id, 'start_date' => '2026-10-07']);
+    }
+
+    /** A rejected destination never clears the source or overwrites an occupied or unrelated seat. */
+    public function test_date_moves_reject_occupied_unrelated_and_illegal_destinations_without_releasing_the_holder(): void
+    {
+        $this->flight('LB3', [2, 4]);
+        $captain = $this->crew('CPT', 'Moving Captain');
+        $other = $this->crew('CPT', 'Other Captain');
+        $this->actingAsScheduler();
+        $this->postJson("/api/v1/roster-periods/{$this->period->id}/build")->assertOk();
+        $source = $this->seat('CPT', '2026-10-07');
+        $target = $this->seat('CPT', '2026-10-09');
+        $this->putJson("/api/v1/assignments/{$source->id}", ['crew_member_id' => $captain->id])->assertOk();
+        $this->putJson("/api/v1/assignments/{$target->id}", ['crew_member_id' => $other->id])->assertOk();
+
+        $this->putJson("/api/v1/assignments/{$source->id}", ['crew_member_id' => $captain->id, 'target_assignment_id' => $target->id])
+            ->assertUnprocessable()->assertJsonValidationErrors('target_assignment_id');
+        $this->assertDatabaseHas('assignments', ['id' => $target->id, 'crew_member_id' => $other->id]);
+        $unrelated = $this->seat('FO', '2026-10-06');
+        $this->putJson("/api/v1/assignments/{$source->id}", ['crew_member_id' => $captain->id, 'target_assignment_id' => $unrelated->id])
+            ->assertUnprocessable()->assertJsonValidationErrors('target_assignment_id');
+        $this->putJson("/api/v1/assignments/{$target->id}", ['crew_member_id' => null])->assertOk();
+        $captain->activities()->updateOrCreate(['date' => '2026-10-09'], ['type' => 'leave', 'starts_at' => null, 'ends_at' => null, 'roster_period_id' => null]);
+
+        $this->putJson("/api/v1/assignments/{$source->id}", ['crew_member_id' => $captain->id, 'target_assignment_id' => $target->id])
+            ->assertUnprocessable()->assertJsonValidationErrors('override_reason');
+
+        $this->assertDatabaseHas('assignments', ['id' => $source->id, 'crew_member_id' => $captain->id]);
+        $this->assertDatabaseHas('assignments', ['id' => $target->id, 'crew_member_id' => null]);
+    }
+
     /** Two shuttles: LB2 Monday evening (release 23:10) and LB1 Tuesday morning (report 07:00). */
     protected function setUp(): void
     {

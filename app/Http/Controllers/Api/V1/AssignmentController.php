@@ -36,16 +36,22 @@ class AssignmentController extends Controller
     }
 
     /**
-     * PUT /assignments/{id} {crew_member_id|null, override_reason?} — assign (locks the seat) or clear it.
+     * PUT /assignments/{id} {crew_member_id|null, override_reason?, target_assignment_id?} — assign, clear,
+     * or atomically transfer/exchange holders when a destination or exchange seat is supplied.
      * 422 lists the broken rules when no override reason is given.
      */
     public function update(AssignmentRequest $request, Assignment $assignment): JsonResponse
     {
-        $seat = $this->service->assign($assignment, $request->validated('crew_member_id'), $request->validated('override_reason'), $request->user());
+        $seat = match (true) {
+            $request->has('exchange_assignment_id') => $this->service->exchange($assignment, (int) $request->validated('exchange_assignment_id'), $request->validated('crew_member_id'), (int) $request->validated('expected_crew_member_id'), $request->user()),
+            $request->has('target_assignment_id') => $this->service->moveDate($assignment, (int) $request->validated('target_assignment_id'), $request->validated('crew_member_id'), $request->validated('override_reason'), $request->user()),
+            default => $this->service->assign($assignment, $request->validated('crew_member_id'), $request->validated('override_reason'), $request->user()),
+        };
         $label = $this->label($seat);
         $key = match ($seat->decision_log['action'] ?? null) {
             'cleared' => 'assignment.cleared',
             'overridden' => 'assignment.overridden',
+            'exchanged' => 'assignment.exchanged',
             default => 'assignment.assigned',
         };
 

@@ -13,8 +13,9 @@ use Illuminate\Validation\ValidationException;
 
 /**
  * Lifecycle of a roster period (one week, two weeks or a month): create the draft, publish it to crew, and
- * reopen it for changes. Building lives in RosterBuilderService and seat edits in AssignmentService; both
- * rely on assertEditable().
+ * reopen it for changes. Building lives in RosterBuilderService (drafts only, assertEditable()); seat and plane
+ * edits live in AssignmentService and TripAircraftService (drafts and published rosters, assertChangeable()).
+ * Changes made after publication are tracked against what crew were told (pendingChanges()).
  */
 class RosterPeriodService
 {
@@ -64,9 +65,9 @@ class RosterPeriodService
      * conflict must be fixed or accepted with a recorded override first, and weeks that have ended cannot
      * be published.
      *
-     * Each crew member's duties are recorded as published. When the roster was published before (it was
-     * reopened, for example after flights changed), the crew whose duties differ are stored in changed_crew
-     * with what was removed and added, so crew control can email just them.
+     * The first publication records each crew member's duties as what crew have been told (published_duties).
+     * Publishing again keeps that record, so pendingChanges() shows who has changes they were not told about;
+     * changed_crew stores the changes found at this publication for the record.
      *
      * @throws ValidationException when the week is not ready to publish
      */
@@ -86,7 +87,8 @@ class RosterPeriodService
             $before = $period->toArray();
             $lines = $this->dutyLines($context);
             $period->changed_crew = $period->published_duties === null ? null : $this->changedCrew($context, $period->published_duties, $lines);
-            $period->published_duties = $lines;
+            // Only the first publication sets what crew were told; later ones are compared against it.
+            $period->published_duties ??= $lines;
             $period->status = 'published';
             $period->published_at = now();
             $period->published_by = $actor->id;
@@ -94,6 +96,48 @@ class RosterPeriodService
             $this->audit->record($actor, 'published', $period, $before, $period->toArray());
 
             return $period;
+        });
+    }
+
+    /**
+     * Crew of a published roster whose duties differ from what they were last told (the first publication, or
+     * their last roster email), with the duty lines removed and added. Empty for drafts and for rosters published
+     * before this record existed. Changes to a published roster are visible to crew at once; this tells crew
+     * control whom to email about them.
+     *
+     * @return array<int, array{crew_member_id: int, name: string, removed: array<int, string>, added: array<int, string>}>
+     */
+    public function pendingChanges(RosterPeriod $period, ?PlanningContext $context = null): array
+    {
+        if ($period->status !== 'published' || $period->published_duties === null) {
+            return [];
+        }
+        $context ??= $this->legality->context($period);
+
+        return $this->changedCrew($context, $period->published_duties, $this->dutyLines($context));
+    }
+
+    /**
+     * Record that crew have been sent their current roster, so their changes are no longer pending. Called after
+     * roster emails are sent or queued (crew whose email failed are not passed in, so they stay pending).
+     *
+     * @param  array<int, int>  $crewIds
+     */
+    public function markNotified(RosterPeriod $period, array $crewIds): void
+    {
+        DB::transaction(function () use ($period, $crewIds): void {
+            $period = RosterPeriod::query()->lockForUpdate()->findOrFail($period->id);
+            $current = $this->dutyLines($this->legality->context($period));
+            // A roster published before this record existed starts from what it shows now.
+            $told = $period->published_duties ?? $current;
+            foreach ($crewIds as $id) {
+                unset($told[$id], $told[(string) $id]);
+                if (isset($current[$id])) {
+                    $told[$id] = $current[$id];
+                }
+            }
+            $period->published_duties = $told;
+            $period->save();
         });
     }
 
@@ -188,10 +232,28 @@ class RosterPeriodService
         $this->assertNotEnded($period);
     }
 
-    /** Whether the week can still change (draft and not ended), for the API response. */
+    /**
+     * Manual changes (seats, captain sections, exclusions, undo, planes) are allowed on drafts and on published
+     * rosters until they end; crew see changes to a published roster straight away. Builds stay draft-only
+     * (assertEditable) because a rebuild re-plans every automatic seat.
+     *
+     * @throws ValidationException when the roster has ended
+     */
+    public function assertChangeable(RosterPeriod $period): void
+    {
+        $this->assertNotEnded($period);
+    }
+
+    /** Whether the week can still be built (draft and not ended), for the API response. */
     public function editable(RosterPeriod $period): bool
     {
         return $period->status === 'draft' && ! $this->ended($period);
+    }
+
+    /** Whether seats and planes can still be changed by hand (draft or published, not ended). */
+    public function changeable(RosterPeriod $period): bool
+    {
+        return ! $this->ended($period);
     }
 
     /** Whether the period's last day is before today's base-local date. */

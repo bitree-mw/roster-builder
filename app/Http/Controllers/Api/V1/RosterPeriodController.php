@@ -150,7 +150,9 @@ class RosterPeriodController extends Controller
             $conflicts = $this->conflicts->forPeriod($period, $context);
 
             return new RosterWeekResource(['context' => $context, 'conflicts' => $conflicts, 'summary' => [...$this->conflicts->summary($context, $conflicts), 'build' => $build], 'crew_member_id' => null,
-                'route_changes' => $this->schedule->changes($period)]);
+                'route_changes' => $this->schedule->changes($period),
+                // Published roster: crew whose duties changed since they were last told (to email them).
+                'changed_crew' => $period->status === 'published' ? $this->periods->pendingChanges($period, $context) : null]);
         }
         $own = (int) $user->crew_member_id;
         [$from, $to] = [$period->starts_on->format('Y-m-d'), $period->ends_on->format('Y-m-d')];

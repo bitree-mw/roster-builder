@@ -9,8 +9,8 @@ use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
  * JSON shape of a roster week for the week timeline: dates, status, build/publication times and, when the
- * controller counted them, seat totals and pending route changes. editable is false once the week is
- * published or has ended.
+ * controller counted them, seat totals and pending route changes. editable (can be built) is false once the
+ * week is published or has ended; changeable (seats and planes can be edited) only once it has ended.
  *
  * @mixin RosterPeriod
  */
@@ -32,6 +32,8 @@ class RosterPeriodResource extends JsonResource
             'built_at' => $this->built_at?->toIso8601String(),
             'published_at' => $this->published_at?->toIso8601String(),
             'editable' => app(RosterPeriodService::class)->editable($this->resource),
+            // Seats and planes can still be changed by hand: drafts and published rosters until they end.
+            'changeable' => app(RosterPeriodService::class)->changeable($this->resource),
             'ended' => app(RosterPeriodService::class)->ended($this->resource),
             'trips_count' => $this->whenCounted('trips'),
             'seats_count' => $this->whenHas('seats_count', fn (): int => (int) $this->seats_count),

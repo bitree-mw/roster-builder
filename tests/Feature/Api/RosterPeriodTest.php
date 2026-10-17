@@ -110,8 +110,10 @@ class RosterPeriodTest extends TestCase
 
         $seat = Assignment::firstWhere('crew_member_id', $alpha->id);
         $this->putJson("/api/v1/assignments/{$seat->id}", ['crew_member_id' => $bravo->id])->assertOk();
-        $this->postJson("/api/v1/roster-periods/{$period->id}/publish")->assertOk()->assertJsonPath('data.status', 'published')->assertJsonPath('data.editable', false);
-        $this->putJson("/api/v1/assignments/{$seat->id}", ['crew_member_id' => null])->assertUnprocessable()->assertJsonValidationErrors('period');
+        $this->postJson("/api/v1/roster-periods/{$period->id}/publish")->assertOk()->assertJsonPath('data.status', 'published')->assertJsonPath('data.editable', false)->assertJsonPath('data.changeable', true);
+        // A published roster can still be changed by hand (it stays published); only builds need a draft.
+        $this->putJson("/api/v1/assignments/{$seat->id}", ['crew_member_id' => null])->assertOk();
+        $this->assertDatabaseHas('roster_periods', ['id' => $period->id, 'status' => 'published']);
         $this->postJson("/api/v1/roster-periods/{$period->id}/reopen")->assertOk()->assertJsonPath('data.status', 'draft');
         $this->assertDatabaseHas('audit_logs', ['entity' => 'roster_periods', 'action' => 'reopened']);
     }

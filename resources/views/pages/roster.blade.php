@@ -116,12 +116,16 @@
 
 <dialog id="seat-dialog" class="dialog" aria-labelledby="seat-dialog-title"><form id="seat-form" novalidate>
     <div class="dialog-heading"><div><h2 id="seat-dialog-title">Change seat</h2><p id="seat-dialog-subtitle"></p></div><button type="button" class="icon-button" data-close aria-label="Close"><x-icon name="x" /></button></div>
+    {{-- Only the body scrolls, keeping the actions reachable when conflict details expand. --}}
+    <div class="seat-editor-body">
     <fieldset>
         <legend>Choose a crew member <span class="field-hint">Legal choices are listed first, lowest fairness score (share of weekly hours used) first.</span></legend>
         <div id="candidate-list" class="candidate-list" aria-busy="true"><p class="loading-block">Checking crew…</p></div>
     </fieldset>
+    <label id="exchange-field" hidden>Exchange duties<select id="exchange-seat" name="exchange_assignment_id"></select><span class="field-hint">Both crew members exchange these duties. Only exchanges passing both crew members' rule checks are offered.</span></label>
     <label id="override-field" hidden>Override reason<textarea name="override_reason" maxlength="500" placeholder="Why this assignment is acceptable despite the rule checks above"></textarea><span class="field-hint">Required to assign someone who breaks a rule. It is recorded with the seat and in the audit log.</span></label>
     <div class="status" data-form-status role="alert"></div>
+    </div>
     <div class="form-actions">
         <button id="clear-seat" class="button button-danger" type="button">Clear seat</button>
         <button class="button button-secondary" type="button" data-close-secondary>Cancel</button>

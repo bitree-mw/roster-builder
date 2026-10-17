@@ -11,6 +11,7 @@ use App\Models\EmailLog;
 use App\Models\RosterPeriod;
 use App\Services\RosterEmailService;
 use App\Services\RosterExportService;
+use App\Services\RosterPeriodService;
 use App\Support\Api\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -71,14 +72,15 @@ class RosterExportController extends Controller
      * are sent straight away in this request (config roster.mail_delivery "direct", for hosts without a queue
      * worker such as cPanel); the reply says how many were sent, and 422 with the mail server's reason when none
      * could be. With "queue" they are queued for a worker instead. {"only": "changed"} emails just the crew whose
-     * duties changed when the roster was last published again (422 when there are none).
+     * duties differ from what they were last told, after the roster was published again or edited while
+     * published (422 when there are none). Crew who are sent their roster no longer count as changed.
      */
-    public function email(RosterEmailRequest $request, RosterPeriod $rosterPeriod, RosterEmailService $emails): JsonResponse
+    public function email(RosterEmailRequest $request, RosterPeriod $rosterPeriod, RosterEmailService $emails, RosterPeriodService $periods): JsonResponse
     {
-        // "Only changed": the crew whose duties changed when the roster was last published again.
+        // "Only changed": crew whose duties differ from what they were last told (republished or edited roster).
         $only = null;
         if ($request->validated('only') === 'changed') {
-            $only = array_column($rosterPeriod->changed_crew ?? [], 'crew_member_id');
+            $only = array_column($periods->pendingChanges($rosterPeriod), 'crew_member_id');
             if ($only === []) {
                 throw ValidationException::withMessages(['only' => 'No crew have different duties since this roster was last published.']);
             }

@@ -71,7 +71,7 @@ class TripAircraftService
     {
         return DB::transaction(function () use ($trip, $aircraftId, $actor): Trip {
             $period = RosterPeriod::query()->lockForUpdate()->findOrFail($trip->roster_period_id);
-            $this->periods->assertEditable($period);
+            $this->periods->assertChangeable($period);
             $trip = Trip::query()->with('flight.aircraftType')->findOrFail($trip->id);
             if ($trip->start_date->lt($this->expiry->today())) {
                 throw ValidationException::withMessages(['aircraft_id' => 'This trip has already operated and can no longer be changed.']);

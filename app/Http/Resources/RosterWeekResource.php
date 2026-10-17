@@ -66,8 +66,9 @@ class RosterWeekResource extends JsonResource
             // Staff only: what a rebuild would change to follow the current flight routes (null before the first
             // build and once the roster has ended). Crew never see unpublished planning changes.
             'route_changes' => $own === null ? $this->routeChanges($this->resource['route_changes'] ?? null) : null,
-            // Staff only: crew whose duties changed at the latest publication [{crew_member_id, name, removed, added}].
-            'changed_crew' => $own === null ? $period->changed_crew : null,
+            // Staff only, published rosters: crew whose duties changed since they were last told (by the first
+            // publication or their last roster email) [{crew_member_id, name, removed, added}]; null for drafts.
+            'changed_crew' => $own === null ? $this->resource['changed_crew'] ?? null : null,
         ];
     }
 

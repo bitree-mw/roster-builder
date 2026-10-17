@@ -133,6 +133,7 @@ return [
             'restored' => 'Backup restored: :count records. Accounts and passwords were not changed.',
         ],
         'assignment' => [
+            'exchanged' => 'Crew exchanged for :label. Both seats are locked for rebuilds.',
             'undone' => 'Last change to :label undone.',
             'assigned' => ':crew assigned to :label. The seat is locked for rebuilds.',
             'overridden' => ':crew assigned to :label with a recorded override.',

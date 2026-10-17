@@ -33,6 +33,142 @@ class AssignmentService
     public function __construct(private AuditService $audit, private RosterLegalityService $legality, private RosterPeriodService $periods) {}
 
     /**
+     * Exchange two occupied seats of the same position within one roster, checking both resulting schedules.
+     * Expected holders protect a reviewed exchange from concurrent seat edits. Any failure rolls back both
+     * assignments and their audits. Exchanges have no one-sided undo; exchange again to reverse them.
+     *
+     * @return Assignment The original seat with its new holder.
+     *
+     * @throws ValidationException When either holder, trip or resulting duty is no longer eligible.
+     */
+    public function exchange(Assignment $assignment, int $otherId, ?int $crewId, int $expectedCrewId, User $actor): Assignment
+    {
+        return DB::transaction(function () use ($assignment, $otherId, $crewId, $expectedCrewId, $actor): Assignment {
+            [$context, $trip, $seat] = $this->open($assignment);
+            $other = $context->trips->flatMap(fn (Trip $item) => $item->assignments)->firstWhere('id', $otherId);
+            $otherTrip = $other ? $context->trips->get($other->trip_id) : null;
+            if ($other === null || $otherTrip === null || $otherTrip->id === $trip->id
+                || $context->operated($otherTrip) || $seat->rank !== $other->rank
+                || $seat->crew_member_id !== $expectedCrewId || $crewId === null
+                || $other->crew_member_id !== $crewId || $crewId === $expectedCrewId) {
+                throw ValidationException::withMessages(['exchange_assignment_id' => 'Choose another occupied seat of the same position in this roster. Both trips must still be editable and both crew members unchanged.']);
+            }
+            $issues = $this->exchangeIssues($context, $trip, $seat, $otherTrip, $other);
+            if ($issues !== []) {
+                throw ValidationException::withMessages(['exchange_assignment_id' => $issues]);
+            }
+            $before = [$seat->toArray(), $other->toArray()];
+            // Free both duties before normal assignment checks, so neither sees the duty being exchanged away.
+            $this->assign($seat, null, null, $actor);
+            $this->assign($other, null, null, $actor);
+            $first = $this->assign($seat, $crewId, null, $actor);
+            $second = $this->assign($other, $expectedCrewId, null, $actor);
+            foreach ([$first, $second] as $index => $changed) {
+                $log = $changed->decision_log;
+                unset($log['previous']);
+                $changed->forceFill(['decision_log' => [...$log, 'action' => 'exchanged', 'exchange_assignment_id' => $index === 0 ? $otherId : $seat->id]])->save();
+                $this->audit->record($actor, 'exchanged', $changed, $before[$index], $changed->toArray());
+            }
+
+            return $first;
+        });
+    }
+
+    /**
+     * Preview both crew members after removing their old duties. Restore all in-memory state afterwards so
+     * evaluating one exchange never changes the candidate checks that follow it.
+     *
+     * @return array<int, string> Crew-labelled legality failures; an empty array permits the exchange.
+     */
+    private function exchangeIssues(PlanningContext $context, Trip $trip, Assignment $seat, Trip $otherTrip, Assignment $other): array
+    {
+        $holder = $context->crews->get($seat->crew_member_id);
+        $incoming = $context->crews->get($other->crew_member_id);
+        if ($holder === null || $incoming === null) {
+            return ['Both seats must have a crew member.'];
+        }
+        $schedules = [$holder->id => clone $context->schedule($holder->id), $incoming->id => clone $context->schedule($incoming->id)];
+        try {
+            $context->schedule($holder->id)->remove('assignment:'.$seat->id);
+            $context->schedule($incoming->id)->remove('assignment:'.$other->id);
+            $seat->crew_member_id = null;
+            $other->crew_member_id = null;
+            $this->releaseStandby($context, $incoming, $trip, $seat);
+            $this->releaseStandby($context, $holder, $otherTrip, $other);
+
+            return [
+                ...array_map(fn (array $issue): string => $incoming->name.': '.$issue['message'], $this->legality->issues($context, $incoming, $trip, $seat)),
+                ...array_map(fn (array $issue): string => $holder->name.': '.$issue['message'], $this->legality->issues($context, $holder, $otherTrip, $other)),
+            ];
+        } finally {
+            $seat->crew_member_id = $holder->id;
+            $other->crew_member_id = $incoming->id;
+            foreach ($schedules as $id => $schedule) {
+                $context->schedules[$id] = $schedule;
+            }
+        }
+    }
+
+    /**
+     * Legal same-position exchanges with this candidate's other flights; operated trips are never offered.
+     *
+     * @return array<int, array{assignment_id: int, label: string}>
+     */
+    private function exchanges(PlanningContext $context, Trip $trip, Assignment $seat, CrewMember $candidate): array
+    {
+        if ($seat->crew_member_id === null || $seat->crew_member_id === $candidate->id || $context->operated($trip)) {
+            return [];
+        }
+        $choices = [];
+        foreach ($context->trips as $otherTrip) {
+            if ($otherTrip->id === $trip->id || $context->operated($otherTrip)) {
+                continue;
+            }
+            foreach ($otherTrip->assignments as $other) {
+                if ($other->crew_member_id !== $candidate->id || $other->rank !== $seat->rank
+                    || $this->exchangeIssues($context, $trip, $seat, $otherTrip, $other) !== []) {
+                    continue;
+                }
+                $snapshot = Section::restrict($otherTrip->schedule_snapshot, $other->from_leg, $other->to_leg);
+                $choices[] = ['assignment_id' => $other->id, 'label' => ($snapshot['code'] ?? 'Trip').' on '.$otherTrip->start_date->format('d M Y').' · '.($snapshot['route'] ?? '').' · '.$seat->rank.' seat '.$other->seat_number];
+            }
+        }
+
+        return $choices;
+    }
+
+    /**
+     * Move a holder to an open matching seat on another occurrence of the same flight in this roster.
+     * Both changes and audits commit together; failed legality checks leave the original duty intact.
+     *
+     * @param  int  $targetId  Destination assignment, never a replacement for an occupied seat.
+     * @param  int|null  $crewId  Expected current holder, protecting against stale grid edits.
+     * @param  string|null  $reason  Recorded justification for overridable destination issues.
+     * @return Assignment The destination seat after the transfer.
+     *
+     * @throws ValidationException When dates, flight, sections, holder or eligibility do not match.
+     */
+    public function moveDate(Assignment $assignment, int $targetId, ?int $crewId, ?string $reason, User $actor): Assignment
+    {
+        return DB::transaction(function () use ($assignment, $targetId, $crewId, $reason, $actor): Assignment {
+            [, $trip, $source] = $this->open($assignment);
+            $target = Assignment::query()->with('trip')->findOrFail($targetId);
+            if ($crewId === null || $source->crew_member_id !== $crewId
+                || $target->crew_member_id !== null || $target->rank !== $source->rank
+                || $target->trip->roster_period_id !== $trip->roster_period_id
+                || $target->trip->flight_id !== $trip->flight_id
+                || $target->trip->start_date->eq($trip->start_date)
+                || $target->from_leg !== $source->from_leg || $target->to_leg !== $source->to_leg) {
+                throw ValidationException::withMessages(['target_assignment_id' => 'Choose an open matching seat on another date of the same flight in this roster. The original crew member must still hold this duty.']);
+            }
+            // Release first so the destination checks the crew's resulting schedule; rollback restores it on failure.
+            $this->assign($source, null, null, $actor);
+
+            return $this->assign($target, $crewId, $reason, $actor);
+        });
+    }
+
+    /**
      * Put a crew member in a seat (or clear it with null).
      *
      * @throws ValidationException when the week cannot change, the trip has operated, the problem cannot be
@@ -193,7 +329,7 @@ class AssignmentService
         DB::transaction(function () use ($exclusion, $actor): void {
             $trip = Trip::query()->findOrFail($exclusion->trip_id);
             $period = RosterPeriod::query()->lockForUpdate()->findOrFail($trip->roster_period_id);
-            $this->periods->assertEditable($period);
+            $this->periods->assertChangeable($period);
             $this->audit->record($actor, 'deleted', $exclusion, $exclusion->toArray());
             $exclusion->delete();
         });
@@ -233,7 +369,7 @@ class AssignmentService
      * the reasons they would break. Only active crew of the seat's position are offered. Standby on the
      * trip's days is not counted against a candidate because assigning them clears it.
      *
-     * @return array<int, array{crew_member_id: int, name: string, rank: string, base_airport: string, weekly_hours: ?int, current: bool, legal: bool, overridable: bool, clears_standby: bool, issues: array<int, array{code: string, message: string}>, warnings: array<int, array{code: string, message: string}>, score: ?float, week_minutes: int, capacity_minutes: int}>
+     * @return array<int, array{crew_member_id: int, name: string, rank: string, base_airport: string, weekly_hours: ?int, current: bool, legal: bool, overridable: bool, clears_standby: bool, issues: array<int, array{code: string, message: string}>, warnings: array<int, array{code: string, message: string}>, exchanges: array<int, array{assignment_id: int, label: string}>, score: ?float, week_minutes: int, capacity_minutes: int}>
      */
     public function candidates(Assignment $assignment): array
     {
@@ -264,6 +400,7 @@ class AssignmentService
                 'clears_standby' => $standby !== [],
                 'issues' => $issues,
                 'warnings' => $positioning === null ? [] : [['code' => 'positioning', 'message' => $positioning]],
+                'exchanges' => $this->exchanges($context, $trip, $seat, $crew),
                 'score' => $score['score'] ?? null,
                 'week_minutes' => $score['week_minutes'] ?? 0,
                 'capacity_minutes' => $score['capacity_minutes'] ?? 0,
@@ -287,7 +424,7 @@ class AssignmentService
     {
         // Lock the week first so edits and builds of the same week run one at a time.
         $period = RosterPeriod::query()->lockForUpdate()->findOrFail($assignment->trip()->value('roster_period_id'));
-        $this->periods->assertEditable($period);
+        $this->periods->assertChangeable($period);
         $context = $this->legality->context($period);
         $trip = $context->trips->get($assignment->trip_id);
         if ($context->operated($trip)) {

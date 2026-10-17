@@ -34,7 +34,8 @@ class RosterConflictService
             $snapshot = $trip->schedule_snapshot;
             $base = ['trip_id' => $trip->id, 'flight_code' => $snapshot['code'] ?? $trip->flight->code, 'date' => $trip->start_date->format('Y-m-d'), 'assignment_id' => null, 'crew_member_id' => null, 'crew_name' => null, 'rank' => null];
             $warning = fn (string $code, string $message, array $extra = []): array => [...$base, ...$extra, 'severity' => 'warning', 'code' => $code, 'message' => $message, 'blocking' => false, 'acknowledged' => false];
-            if (! $trip->flight->active) {
+            // A trip that has already flown stays as history even if its flight was disabled later: no warning.
+            if (! $trip->flight->active && ! $context->operated($trip)) {
                 $conflicts[] = $warning('flight_disabled', 'Flight '.$base['flight_code'].' is disabled but this trip is still on the roster.');
             }
             // The trip's own plane: not available, or flying another trip at the same time.
