@@ -17,6 +17,7 @@ class AircraftTypeResource extends JsonResource
     {
         return ['id' => $this->id,
             'code' => $this->code,
+            'name' => $this->name,
             'cabin_crew_required' => $this->cabin_crew_required,
             'palette' => $this->palette,
             'aircraft_count' => $this->whenCounted('aircraft'),

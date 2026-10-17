@@ -10,6 +10,7 @@ use App\Models\RosterPeriod;
 use App\Models\Trip;
 use App\Models\User;
 use App\Support\Roster\PlanningContext;
+use App\Support\Roster\Section;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -18,6 +19,10 @@ use Illuminate\Validation\ValidationException;
  * keeps it. Clearing a seat hands it back to the generator. An assignment that breaks a rule is only saved
  * with a written reason; the accepted problems are stored as flag_reasons so the conflict check treats them
  * as acknowledged, and any new problem that appears later is still reported.
+ *
+ * Captain seats can be split into sections at any stop (split/join), so captains may fly only part of a
+ * trip; first officers and cabin crew always fly it all. A captain joining or leaving a section away from
+ * their base is allowed and reported as a positioning warning.
  *
  * Assigning a flight to someone on standby that day clears the standby in the same transaction. Every
  * manual change keeps the seat's previous state so it can be undone once; a crew member can also be
@@ -48,7 +53,7 @@ class AssignmentService
             }
 
             $crew = $context->crews->get($crewId);
-            $standby = $this->releaseStandby($context, $crew, $trip);
+            $standby = $this->releaseStandby($context, $crew, $trip, $seat);
             $issues = $this->legality->issues($context, $crew, $trip, $seat);
             $hard = array_values(array_filter($issues, fn (array $issue): bool => in_array($issue['code'], RosterLegalityService::HARD, true)));
             if ($hard !== []) {
@@ -72,11 +77,86 @@ class AssignmentService
                 'source' => 'manual',
                 'flag_reasons' => $messages === [] ? null : $messages,
                 'decision_log' => [...$log, 'action' => $messages === [] ? 'assigned' : 'overridden', 'reason' => $reason === '' ? null : $reason, 'issues' => $messages,
+                    // Accepted without a reason: crew control arranges the captain's travel to or from the section.
+                    'positioning' => $this->legality->positioning($crew, $trip, $seat),
                     'cleared_standby' => array_map(fn (CrewActivity $activity): string => $activity->date->format('Y-m-d'), $standby)],
             ])->save();
             $this->audit->record($actor, $messages === [] ? 'assigned' : 'overridden', $seat, $before, $seat->toArray());
 
             return $seat->load('crewMember');
+        });
+    }
+
+    /**
+     * Split a captain seat after one of its legs, so two captains can share the trip: the seat keeps its holder
+     * for the legs up to and including $afterLeg, and a new open captain seat covers the rest (the generator or
+     * crew control fills it). Captains may change at any stop, base or outstation; first officers and cabin crew
+     * always fly the whole trip, so only captain seats can be split.
+     *
+     * @return array{0: Assignment, 1: Assignment} the shortened seat and the new section seat
+     *
+     * @throws ValidationException when the seat is not a captain seat, the leg is not inside it, or the week or
+     *                             trip cannot change
+     */
+    public function split(Assignment $assignment, int $afterLeg, User $actor): array
+    {
+        return DB::transaction(function () use ($assignment, $afterLeg, $actor): array {
+            [, $trip, $seat] = $this->open($assignment);
+            if ($seat->rank !== 'CPT') {
+                throw ValidationException::withMessages(['after_leg' => 'Only captain seats can be split. First officers and cabin crew fly the whole trip.']);
+            }
+            $snapshot = $trip->schedule_snapshot;
+            [$from, $to] = [$seat->from_leg ?? 1, $seat->to_leg ?? Section::count($snapshot)];
+            if ($afterLeg < $from || $afterLeg >= $to) {
+                throw ValidationException::withMessages(['after_leg' => 'Choose a stop inside this captain\'s section, before its last leg.']);
+            }
+            $before = $seat->toArray();
+            // Later sections move up one seat number, highest first so the unique seat index is never broken.
+            foreach ($trip->assignments->where('rank', 'CPT')->where('seat_number', '>', $seat->seat_number)->sortByDesc('seat_number') as $later) {
+                $later->forceFill(['seat_number' => $later->seat_number + 1])->save();
+            }
+            $stop = Section::ends($snapshot, $from, $afterLeg)[1];
+            $seat->forceFill(['from_leg' => $from, 'to_leg' => $afterLeg, 'decision_log' => [...($seat->decision_log ?? []), 'split' => ['at' => $stop, 'by' => $actor->name, 'on' => now()->toIso8601String()]]])->save();
+            $section = $trip->assignments()->create(['rank' => 'CPT', 'seat_number' => $seat->seat_number + 1, 'from_leg' => $afterLeg + 1, 'to_leg' => $to, 'source' => 'auto',
+                'decision_log' => ['by' => 'manual', 'user' => $actor->name, 'at' => now()->toIso8601String(), 'action' => 'split', 'reason' => 'Captain change at '.$stop.'.']]);
+            $this->audit->record($actor, 'split', $seat, $before, ['seat' => $seat->toArray(), 'new_seat' => $section->toArray()]);
+
+            // The trip is already loaded: attach it so callers can describe the sections without another query.
+            return [$seat->load('crewMember')->setRelation('trip', $trip), $section->setRelation('trip', $trip)];
+        });
+    }
+
+    /**
+     * Join a captain section with the next one, so one captain flies both again. The joined seat is open (its
+     * longer duty has to be checked afresh), and becomes the whole-trip seat when it covers every leg. Both
+     * captains who held the two sections are released.
+     *
+     * @return array{seat: Assignment, released: array<int, string>} the joined seat and the names released
+     *
+     * @throws ValidationException when there is no next section or the week or trip cannot change
+     */
+    public function join(Assignment $assignment, User $actor): array
+    {
+        return DB::transaction(function () use ($assignment, $actor): array {
+            [$context, $trip, $seat] = $this->open($assignment);
+            $next = $trip->assignments->where('rank', 'CPT')->firstWhere('seat_number', $seat->seat_number + 1);
+            if ($seat->rank !== 'CPT' || $next === null) {
+                throw ValidationException::withMessages(['assignment' => 'There is no following captain section to join.']);
+            }
+            $released = array_values(array_filter([$context->crews->get((int) $seat->crew_member_id)?->name, $context->crews->get((int) $next->crew_member_id)?->name]));
+            $before = ['seat' => $seat->toArray(), 'next' => $next->toArray()];
+            $legs = Section::count($trip->schedule_snapshot);
+            $whole = ($seat->from_leg ?? 1) === 1 && ($next->to_leg ?? $legs) === $legs;
+            $next->delete();
+            $seat->forceFill(['from_leg' => $whole ? null : $seat->from_leg, 'to_leg' => $whole ? null : $next->to_leg, 'crew_member_id' => null, 'source' => 'auto', 'flag_reasons' => null,
+                'decision_log' => ['by' => 'manual', 'user' => $actor->name, 'at' => now()->toIso8601String(), 'action' => 'joined', 'released' => $released]])->save();
+            // Later sections move down one seat number, lowest first so the unique seat index is never broken.
+            foreach ($trip->assignments->where('rank', 'CPT')->where('seat_number', '>', $next->seat_number)->sortBy('seat_number') as $later) {
+                $later->forceFill(['seat_number' => $later->seat_number - 1])->save();
+            }
+            $this->audit->record($actor, 'joined', $seat, $before, $seat->toArray());
+
+            return ['seat' => $seat->setRelation('trip', $trip), 'released' => $released];
         });
     }
 
@@ -153,7 +233,7 @@ class AssignmentService
      * the reasons they would break. Only active crew of the seat's position are offered. Standby on the
      * trip's days is not counted against a candidate because assigning them clears it.
      *
-     * @return array<int, array{crew_member_id: int, name: string, rank: string, base_airport: string, weekly_hours: ?int, current: bool, legal: bool, overridable: bool, clears_standby: bool, issues: array<int, array{code: string, message: string}>, score: ?float, week_minutes: int, capacity_minutes: int}>
+     * @return array<int, array{crew_member_id: int, name: string, rank: string, base_airport: string, weekly_hours: ?int, current: bool, legal: bool, overridable: bool, clears_standby: bool, issues: array<int, array{code: string, message: string}>, warnings: array<int, array{code: string, message: string}>, score: ?float, week_minutes: int, capacity_minutes: int}>
      */
     public function candidates(Assignment $assignment): array
     {
@@ -161,15 +241,17 @@ class AssignmentService
         $context = $this->legality->context($period);
         $trip = $context->trips->get($assignment->trip_id);
         $seat = $trip->assignments->firstWhere('id', $assignment->id);
-        $duty = $context->tripDuties[$trip->id] ?? null;
+        $duty = $context->seatDuty($trip, $seat);
         $rows = [];
         foreach ($context->crews as $crew) {
             if ($crew->rank !== $seat->rank || ! $crew->active) {
                 continue;
             }
-            $standby = $this->releaseStandby($context, $crew, $trip);
+            $standby = $this->releaseStandby($context, $crew, $trip, $seat);
             $issues = $this->legality->issues($context, $crew, $trip, $seat);
             $score = $duty ? $this->legality->score($context, $crew, $trip, $seat) : null;
+            // Joining or leaving a captain section away from base: allowed, shown as a warning.
+            $positioning = $this->legality->positioning($crew, $trip, $seat);
             $rows[] = [
                 'crew_member_id' => $crew->id,
                 'name' => $crew->name,
@@ -181,13 +263,15 @@ class AssignmentService
                 'overridable' => ! collect($issues)->contains(fn (array $issue): bool => in_array($issue['code'], RosterLegalityService::HARD, true)),
                 'clears_standby' => $standby !== [],
                 'issues' => $issues,
+                'warnings' => $positioning === null ? [] : [['code' => 'positioning', 'message' => $positioning]],
                 'score' => $score['score'] ?? null,
                 'week_minutes' => $score['week_minutes'] ?? 0,
                 'capacity_minutes' => $score['capacity_minutes'] ?? 0,
             ];
         }
-        usort($rows, fn (array $a, array $b): int => [! $a['legal'], count($a['issues']), $a['score'] ?? PHP_FLOAT_MAX, $a['name'], $a['crew_member_id']]
-            <=> [! $b['legal'], count($b['issues']), $b['score'] ?? PHP_FLOAT_MAX, $b['name'], $b['crew_member_id']]);
+        // Legal first; among them, captains who need no positioning first.
+        usort($rows, fn (array $a, array $b): int => [! $a['legal'], count($a['issues']), count($a['warnings']), $a['score'] ?? PHP_FLOAT_MAX, $a['name'], $a['crew_member_id']]
+            <=> [! $b['legal'], count($b['issues']), count($b['warnings']), $b['score'] ?? PHP_FLOAT_MAX, $b['name'], $b['crew_member_id']]);
 
         return $rows;
     }
@@ -233,9 +317,10 @@ class AssignmentService
      *
      * @return array<int, CrewActivity>
      */
-    private function releaseStandby(PlanningContext $context, CrewMember $crew, Trip $trip): array
+    private function releaseStandby(PlanningContext $context, CrewMember $crew, Trip $trip, Assignment $seat): array
     {
-        $duty = $context->tripDuties[$trip->id] ?? null;
+        // A captain section only clears standby on the days of that section.
+        $duty = $context->seatDuty($trip, $seat);
         if ($duty === null) {
             return [];
         }

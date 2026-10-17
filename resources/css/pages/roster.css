@@ -246,3 +246,65 @@ button.activity { width: 100%; font: inherit; cursor: pointer; }
 .individual-entries { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
 .individual-duty { width: auto; min-width: 14rem; }
 .individual-entries .plan-cell { width: 2.25rem; }
+
+/* ---------------------------------------------------------------- Route changes
+   Review of what a rebuild would change after flights were disabled, enabled or edited on Flight routes.
+   Rows carry an accent bar by kind (removed / added / changed) and always a text chip, never colour alone. */
+.week-notice .button { flex: none; margin-left: auto; }
+#changes-dialog { width: min(100% - 2rem, 48rem); }
+.changes-body { display: flex; flex-direction: column; gap: 1.125rem; max-height: 58dvh; overflow-y: auto; }
+.change-section-title { display: flex; align-items: center; gap: .5rem; margin-bottom: .5rem; font-size: .8125rem; }
+.change-list { display: flex; flex-direction: column; gap: .375rem; margin: 0; padding: 0; list-style: none; }
+.change-row { display: flex; flex-direction: column; gap: .25rem; padding: .5rem .75rem; border-left: 4px solid var(--color-line-strong); background: var(--color-surface-muted); font-size: .8125rem; }
+.change-row[data-kind="removed"] { border-left-color: var(--color-danger); }
+.change-row[data-kind="added"] { border-left-color: var(--color-success); }
+.change-row[data-kind="changed"] { border-left-color: var(--color-warning-accent); }
+.change-row-head { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
+.change-released { display: flex; flex-wrap: wrap; align-items: center; gap: .375rem; color: var(--color-muted); font-size: .75rem; }
+
+/* ---------------------------------------------------------------- Disabled flights in the grid
+   Trips whose flight was disabled on Flight routes stay on the roster until a confirmed rebuild removes them.
+   They are hatched with a danger outline, a ban icon and a "Flight disabled" line (text, not colour alone). */
+.duty[data-flight="disabled"] { border: 2px dashed var(--color-danger); background: repeating-linear-gradient(135deg, var(--color-danger-soft) 0 9px, var(--color-surface) 9px 12px); }
+.duty[data-flight="disabled"]::before { background: var(--color-danger); }
+.duty[data-flight="disabled"] .duty-code { color: var(--color-danger); }
+/* Red warning badge, top right of the card (the flight code pushes it there). */
+.duty-flag { display: inline-grid; place-items: center; flex: none; width: 1.125rem; height: 1.125rem; border-radius: 50%; background: var(--color-danger); }
+.duty .duty-top .duty-flag .icon { width: .75rem; height: .75rem; color: var(--color-brand-contrast); }
+.duty-disabled { color: var(--color-danger); font-weight: 700; }
+.activity.layover[data-flight="disabled"] { border-style: dashed; border-color: var(--color-danger); }
+.activity.layover[data-selected="true"] { box-shadow: inset 0 0 0 2px var(--color-brand); }
+.open-seat[data-flight="disabled"] { border-color: var(--color-danger); color: var(--color-danger); text-decoration: line-through; }
+.legend-item[data-kind="disabled"]::before { border: 1px dashed var(--color-danger); background: repeating-linear-gradient(135deg, var(--color-danger-soft) 0 4px, var(--color-surface) 4px 6px); }
+
+/* ---------------------------------------------------------------- Collapsible Open time row
+   Expanded: every open seat as a button. Collapsed: one "n open" count per day, so the crew rows move up. */
+.open-toggle { display: flex; align-items: center; gap: .375rem; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.open-toggle:hover strong { text-decoration: underline; }
+.open-toggle-icon { flex: none; transition: transform .15s ease; }
+.open-toggle[aria-expanded="true"] .open-toggle-icon { transform: rotate(90deg); }
+.open-toggle-action { margin-left: .25rem; padding: .0625rem .5rem; border: 1px solid var(--color-warning-accent); border-radius: 999px; background: var(--color-surface); color: var(--color-warning); font-family: var(--font-mono); font-size: .6875rem; font-weight: 700; text-transform: uppercase; }
+.open-toggle:hover .open-toggle-action, .open-toggle:focus-visible .open-toggle-action { background: var(--color-warning-soft); }
+.open-seats { display: flex; flex-direction: column; gap: .25rem; }
+.open-count { display: none; color: var(--color-warning); font-size: .6875rem; font-weight: 700; }
+.open-row[data-collapsed="true"] .open-seats { display: none; }
+.open-row[data-collapsed="true"] .open-count { display: block; margin-top: 0; }
+.open-row[data-collapsed="true"] .roster-crew > span { display: none; }
+
+/* ---------------------------------------------------------------- Captain sections
+   A captain may fly only part of a trip (split at any stop); first officers and cabin crew fly all of it.
+   Section duties carry a route icon in the grid; the inspector lists the section and the split/join tools. */
+.duty[data-section="true"] { border-style: solid; border-left-width: 1px; }
+.seat-section { margin: 0; color: var(--color-ink); }
+/* Bottom-aligned so the Split button sits level with the stop dropdown, under the "Change captain after" caption. */
+.captain-tools { display: flex; flex-wrap: wrap; align-items: flex-end; gap: .5rem; padding-top: .25rem; }
+.captain-split { flex-direction: column; align-items: flex-start; gap: .25rem; font-weight: 500; }
+/* Same 36px height as .button-sm next to it. */
+.captain-split select { height: 36px; min-height: 36px; max-width: 15rem; padding: .25rem .5rem; font-size: .75rem; }
+.captain-tools .text-button { min-height: 28px; font-size: .75rem; }
+
+/* ---------------------------------------------------------------- Plane for a trip
+   "Change plane" in the duty inspector: the plane dropdown and Save, bottom-aligned like the captain tools. */
+.plane-tools { display: flex; flex-wrap: wrap; align-items: flex-end; gap: .5rem; }
+.plane-pick { flex: 1 1 14rem; flex-direction: column; align-items: stretch; gap: .25rem; font-weight: 500; }
+.plane-pick select { height: 36px; min-height: 36px; padding: .25rem .5rem; font-size: .75rem; }

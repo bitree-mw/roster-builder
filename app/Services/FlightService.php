@@ -21,7 +21,7 @@ class FlightService
      * operating days and its legs in one transaction with an audit entry. Leg times arrive in base-local time,
      * or in GMT when time_zone is "utc" (converted here; a GMT time past midnight local wraps to the next day).
      *
-     * @param  array<string, mixed>  $data  validated FlightRequest payload (weekdays and ordered legs)
+     * @param  array<string, mixed>  $data  validated FlightRequest payload (weekdays, ordered legs and optionally aircraft_ids)
      */
     public function save(array $data, User $actor, ?Flight $flight = null): Flight
     {
@@ -35,7 +35,11 @@ class FlightService
             $this->timeline->validate($data['legs'], $rules);
             $flight ??= new Flight;
             $before = $flight->exists ? $flight->load('legs', 'days')->toArray() : null;
-            $flight->fill(Arr::except($data, ['weekdays', 'legs']))->save();
+            $flight->fill(Arr::except($data, ['weekdays', 'legs', 'aircraft_ids']))->save();
+            // The planes that may fly the plan, in the order given (first = preferred). Absent: kept as they are.
+            if (array_key_exists('aircraft_ids', $data)) {
+                $flight->aircraft()->sync(collect($data['aircraft_ids'])->values()->mapWithKeys(fn (int $id, int $index): array => [$id => ['position' => $index + 1]])->all());
+            }
             // Days and legs are fully replaced from the payload; leg sequence is assigned here, never by the client.
             $flight->days()->delete();
             $flight->days()->createMany(array_map(fn (int $day): array => ['weekday' => $day], $data['weekdays']));
@@ -46,7 +50,7 @@ class FlightService
                 $sequences[$day] = ($sequences[$day] ?? 0) + 1;
                 $flight->legs()->create([...$leg, 'sequence' => $sequences[$day]]);
             }
-            $flight->load('aircraftType', 'legs', 'days');
+            $flight->load('aircraftType', 'legs', 'days', 'aircraft');
             $this->audit->record($actor, $before ? 'updated' : 'created', $flight, $before, $flight->toArray());
 
             return $flight;

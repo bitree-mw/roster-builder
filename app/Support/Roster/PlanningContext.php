@@ -2,6 +2,7 @@
 
 namespace App\Support\Roster;
 
+use App\Models\Assignment;
 use App\Models\CrewMember;
 use App\Models\RosterPeriod;
 use App\Models\Trip;
@@ -23,11 +24,20 @@ final class PlanningContext
     /** @var array<int, array{total: int, available: int}> registered and available airframes per aircraft type id */
     public array $airframes = [];
 
+    /** @var array<int, array{registration: string, label: string, status: string, status_label: string}> every plane, keyed by aircraft id */
+    public array $planes = [];
+
+    /** @var array<int, array<int, array{trip_id: int, start: int, end: int, label: string}>> trips each plane flies around the period (epoch minutes), keyed by aircraft id */
+    public array $planeTrips = [];
+
     /** @var array<int, array{base: string|null, aircraft_type_id: int|null, aircraft_type: string|null, last_date: string}> per-trip facts, see tripFacts() */
     private array $tripFacts = [];
 
     /** @var array<int, array<string, mixed>> per-crew facts, see crewFacts() */
     private array $crewFacts = [];
+
+    /** @var array<string, Duty|null> captain section duties keyed "trip id:from-to", see seatDuty() */
+    private array $sectionDuties = [];
 
     /**
      * @param  array<string, mixed>  $rules  the period's rules_snapshot
@@ -90,6 +100,32 @@ final class PlanningContext
         }
 
         return $this->crewFacts[$crew->id];
+    }
+
+    /**
+     * The duty a seat's holder flies: the whole trip for first officers, cabin crew and unsplit captain seats,
+     * or only the captain's section (see Section::restrict()). Section duties are worked out once per range,
+     * because the legality checks ask for them for every candidate.
+     */
+    public function seatDuty(Trip $trip, Assignment $seat): ?Duty
+    {
+        $whole = $this->tripDuties[$trip->id] ?? null;
+        // Raw attribute reads: this runs for every seat × candidate during a build.
+        $raw = $seat->getAttributes();
+        $from = isset($raw['from_leg']) ? (int) $raw['from_leg'] : null;
+        $to = isset($raw['to_leg']) ? (int) $raw['to_leg'] : null;
+        if ($whole === null || $from === null || $to === null) {
+            return $whole;
+        }
+        $key = $trip->id.':'.$from.'-'.$to;
+        if (! array_key_exists($key, $this->sectionDuties)) {
+            $snapshot = $trip->schedule_snapshot;
+            $this->sectionDuties[$key] = Section::isPartial($snapshot, $from, $to)
+                ? Duty::fromSnapshot('trip:'.$trip->id, $trip->id, Section::restrict($snapshot, $from, $to))
+                : $whole;
+        }
+
+        return $this->sectionDuties[$key];
     }
 
     /** Whether a trip starts before today and so can no longer be changed. */

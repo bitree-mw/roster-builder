@@ -44,7 +44,7 @@ final readonly class Duty
     }
 
     /**
-     * Build a trip duty from a trip's schedule_snapshot (see RosterBuilderService::snapshot()). Returns null
+     * Build a trip duty from a trip's schedule_snapshot (see RosterScheduleService::snapshot()). Returns null
      * for a snapshot without duty periods, which has no times to check.
      *
      * @param  array<string, mixed>  $snapshot

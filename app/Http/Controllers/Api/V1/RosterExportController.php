@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\RosterCalendarRequest;
+use App\Http\Requests\RosterEmailRequest;
 use App\Http\Requests\RosterPdfRequest;
 use App\Models\CrewMember;
 use App\Models\EmailLog;
@@ -16,6 +17,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Roster outputs for one week: CSV and iCalendar downloads, and roster emails to crew with their delivery
@@ -68,17 +70,25 @@ class RosterExportController extends Controller
      * POST /roster-periods/{id}/email — email everyone with a seat (published rosters only). By default the emails
      * are sent straight away in this request (config roster.mail_delivery "direct", for hosts without a queue
      * worker such as cPanel); the reply says how many were sent, and 422 with the mail server's reason when none
-     * could be. With "queue" they are queued for a worker instead.
+     * could be. With "queue" they are queued for a worker instead. {"only": "changed"} emails just the crew whose
+     * duties changed when the roster was last published again (422 when there are none).
      */
-    public function email(Request $request, RosterPeriod $rosterPeriod, RosterEmailService $emails): JsonResponse
+    public function email(RosterEmailRequest $request, RosterPeriod $rosterPeriod, RosterEmailService $emails): JsonResponse
     {
-        Gate::authorize('manage-operations');
+        // "Only changed": the crew whose duties changed when the roster was last published again.
+        $only = null;
+        if ($request->validated('only') === 'changed') {
+            $only = array_column($rosterPeriod->changed_crew ?? [], 'crew_member_id');
+            if ($only === []) {
+                throw ValidationException::withMessages(['only' => 'No crew have different duties since this roster was last published.']);
+            }
+        }
         if (config('roster.mail_delivery') !== 'queue') {
             // Sending to every crew member can take longer than the usual 30 seconds on a large roster.
             if ((int) ini_get('max_execution_time') !== 0 && function_exists('set_time_limit')) {
                 set_time_limit((int) config('roster.build_time_limit'));
             }
-            $result = $emails->send($rosterPeriod, $request->user());
+            $result = $emails->send($rosterPeriod, $request->user(), $only);
             if ($result['sent'] === 0 && $result['failed'] === 0) {
                 return ApiResponse::success('email.none', [], ['data' => $result]);
             }
@@ -89,7 +99,7 @@ class RosterExportController extends Controller
 
             return ApiResponse::success($key, ['count' => $result['sent'], 'failed' => $result['failed'], 'missing' => $result['missing']], ['data' => $result]);
         }
-        $result = $emails->queue($rosterPeriod, $request->user());
+        $result = $emails->queue($rosterPeriod, $request->user(), $only);
         if ($result['queued'] === 0) {
             return ApiResponse::success('email.none', [], ['data' => $result]);
         }

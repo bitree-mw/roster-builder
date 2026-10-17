@@ -32,7 +32,10 @@ class BackupService
 
     /** Tables in foreign-key order (parents first); restore deletes in reverse order. */
     public const TABLES = ['airports', 'aircraft_types', 'aircraft', 'maintenance_records', 'rule_sets', 'crew_members', 'crew_ratings', 'crew_documents',
-        'flights', 'flight_days', 'flight_legs', 'roster_periods', 'trips', 'assignments', 'exclusions', 'crew_activities', 'email_logs'];
+        'flights', 'flight_days', 'flight_legs', 'flight_aircraft', 'roster_periods', 'trips', 'assignments', 'exclusions', 'crew_activities', 'email_logs'];
+
+    /** Tables added after version 1 backups were first made: an older backup without them restores them empty. */
+    private const LATER_TABLES = ['flight_aircraft'];
 
     /** Columns that point at user accounts, cleared when the account does not exist. */
     private const USER_COLUMNS = ['maintenance_records' => ['recorded_by'], 'roster_periods' => ['built_by', 'published_by'], 'email_logs' => ['requested_by']];
@@ -157,7 +160,9 @@ class BackupService
             throw ValidationException::withMessages(['file' => 'This backup is version '.json_encode($backup['version'] ?? null).'; this system restores version '.self::VERSION.' only.']);
         }
         foreach (self::TABLES as $table) {
-            $rows = $backup['tables'][$table] ?? null;
+            // A backup made before a later table existed simply has none of its rows.
+            $rows = $backup['tables'][$table] ?? (in_array($table, self::LATER_TABLES, true) ? [] : null);
+            $backup['tables'][$table] = $rows;
             if (! is_array($rows) || ! array_is_list($rows)) {
                 throw ValidationException::withMessages(['file' => 'The backup is missing the '.$table.' table.']);
             }
@@ -192,6 +197,7 @@ class BackupService
             'airports' => ['code'],
             'crew_ratings' => ['crew_member_id', 'aircraft_type_id'],
             'flight_days' => ['flight_id', 'weekday'],
+            'flight_aircraft' => ['flight_id', 'aircraft_id'],
             default => ['id'],
         };
     }

@@ -51,3 +51,9 @@ body { margin: 0; padding: 0; background: var(--color-canvas); color: var(--colo
     .card { width: 100% !important; border-radius: 0 !important; }
     .date { width: 70px !important; }
 }
+
+/* Republished roster: a boxed list of what changed for this crew member (removed duties, new duties). */
+.changes { margin: 0 0 18px 0; padding: 10px 12px; border-left: 3px solid var(--color-warning-accent); background: var(--color-warning-soft); }
+.changes-title { margin: 0 0 4px 0; font-weight: bold; color: var(--color-ink-strong); }
+.change-removed { color: var(--color-danger); }
+.change-added { color: var(--color-ink-strong); }

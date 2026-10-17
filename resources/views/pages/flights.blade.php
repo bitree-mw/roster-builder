@@ -46,8 +46,12 @@
     <div class="dialog-heading"><div><h2 id="flight-dialog-title" data-dialog-title>Add flight</h2><p>Enter all times in GMT, including outstation legs. Each new leg starts where the last one landed; after a leg to an outstation you are asked whether the crew night-stop there.</p></div><button type="button" class="icon-button" data-close aria-label="Close"><x-icon name="x" /></button></div>
     <div class="form-grid">
         <label>Flight code<input name="code" required maxlength="20" class="mono" placeholder="LB1"></label>
-        <label>Aircraft type<select name="aircraft_type_id" required></select></label>
+        <label>Planned aircraft type<select name="aircraft_type_id" required></select><span class="field-hint">Used when no listed plane is assigned.</span></label>
     </div>
+    {{-- Planes that can fly this plan, in order of preference (any type); flights.js fills it from /api/v1/lookups. --}}
+    <fieldset><legend>Planes that can fly it <span class="field-hint">Tick one or more. Each trip gets the first free one in this order; a trip follows its plane's type (cabin crew and ratings).</span></legend>
+        <div id="plane-list" class="plane-list"></div>
+    </fieldset>
     <fieldset><legend>Operating days</legend><div class="day-picker">
         @foreach(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as $index => $day)
         <label><input type="checkbox" name="weekdays" value="{{ $index }}"><span>{{ $day }}</span></label>

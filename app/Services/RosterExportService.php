@@ -7,6 +7,7 @@ use App\Models\CrewMember;
 use App\Models\RosterPeriod;
 use App\Models\Trip;
 use App\Support\Csv;
+use App\Support\Roster\Section;
 use Carbon\CarbonImmutable;
 
 /**
@@ -52,13 +53,14 @@ class RosterExportService
                 if ($seat === null) {
                     continue;
                 }
-                $snapshot = $trip->schedule_snapshot;
+                // A captain who flies only a section of the trip prints just that section.
+                $snapshot = Section::restrict($trip->schedule_snapshot, $seat->from_leg, $seat->to_leg);
                 $seatLabel = $seat->rank === 'CC' ? 'CC'.$seat->seat_number : $seat->rank;
                 foreach ($snapshot['duties'] ?? [] as $duty) {
                     foreach ($duty['dates'] as $date) {
                         $person['cells'][$date][] = ['kind' => 'duty', 'code' => $snapshot['code'] ?? '', 'seat' => $seatLabel, 'times' => $date === $duty['date'] ? $duty['report_local'].'–'.$duty['release_local'] : 'until '.$duty['release_local']];
                     }
-                    $person['duties'][] = ['date' => CarbonImmutable::parse($duty['date'])->format('D d M'), 'code' => $snapshot['code'] ?? '', 'aircraft' => $snapshot['aircraft_type'] ?? '', 'seat' => $seatLabel, 'route' => $snapshot['route'] ?? '',
+                    $person['duties'][] = ['date' => CarbonImmutable::parse($duty['date'])->format('D d M'), 'code' => $snapshot['code'] ?? '', 'aircraft' => $snapshot['aircraft_label'] ?? $snapshot['aircraft_type'] ?? '', 'seat' => $seatLabel, 'route' => $snapshot['route'] ?? '',
                         'report_local' => $duty['report_local'], 'release_local' => $duty['release_local'], 'utc' => $this->utc($duty['report']).' – '.substr($this->utc($duty['release']), 11).' UTC',
                         'block' => $this->hours($duty['block_minutes']), 'duty' => $this->hours($duty['duty_minutes'])];
                     $person['block'] += $duty['block_minutes'];
@@ -127,15 +129,17 @@ class RosterExportService
         $context = $this->legality->context($period);
         $rows = [];
         foreach ($context->trips as $trip) {
-            $snapshot = $trip->schedule_snapshot;
             foreach ($trip->assignments->sortBy(fn (Assignment $seat): array => [array_search($seat->rank, ['CPT', 'FO', 'CC'], true), $seat->seat_number]) as $seat) {
                 if ($crewId !== null && $seat->crew_member_id !== $crewId) {
                     continue;
                 }
+                // Each seat's own duty: a captain section has its own route and times.
+                $snapshot = Section::restrict($trip->schedule_snapshot, $seat->from_leg, $seat->to_leg);
                 $crew = $seat->crew_member_id ? $context->crews->get($seat->crew_member_id) : null;
                 foreach ($snapshot['duties'] ?? [] as $duty) {
                     $rows[] = [
-                        $duty['date'], $snapshot['code'] ?? '', $snapshot['aircraft_type'] ?? '', $snapshot['route'] ?? '', $duty['trip_day'],
+                        // Aircraft: the plane ("7Q-TBA · Boeing 737-800 (B737)") or the planned type.
+                        $duty['date'], $snapshot['code'] ?? '', $snapshot['aircraft_label'] ?? $snapshot['aircraft_type'] ?? '', $snapshot['route'] ?? '', $duty['trip_day'],
                         $duty['report_local'], $duty['release_local'], $this->utc($duty['report']), $this->utc($duty['release']),
                         $this->hours($duty['block_minutes']), $this->hours($duty['duty_minutes']),
                         $seat->rank === 'CC' ? 'CC'.$seat->seat_number : $seat->rank, $crew?->name ?? 'OPEN', $crew?->base_airport ?? '', $seat->source,
@@ -162,12 +166,14 @@ class RosterExportService
             if ($seat === null) {
                 continue;
             }
-            foreach ($trip->schedule_snapshot['duties'] ?? [] as $duty) {
+            // A captain who flies only a section gets events for that section only.
+            $snapshot = Section::restrict($trip->schedule_snapshot, $seat->from_leg, $seat->to_leg);
+            foreach ($snapshot['duties'] ?? [] as $duty) {
                 $lines = [...$lines, ...$this->event(
                     'trip-'.$trip->id.'-day'.$duty['trip_day'].'-crew'.$crew->id,
                     $stamp,
                     ['DTSTART:'.$this->icsInstant($duty['report']), 'DTEND:'.$this->icsInstant($duty['release'])],
-                    ($trip->schedule_snapshot['code'] ?? 'Trip').' '.($seat->rank === 'CC' ? 'CC'.$seat->seat_number : $seat->rank).' '.($trip->schedule_snapshot['route'] ?? ''),
+                    ($snapshot['code'] ?? 'Trip').' '.($seat->rank === 'CC' ? 'CC'.$seat->seat_number : $seat->rank).' '.($snapshot['route'] ?? ''),
                     $this->description($trip, $duty),
                     $trip->schedule_snapshot['base'] ?? '',
                 )];
@@ -207,7 +213,7 @@ class RosterExportService
     {
         $legs = array_map(fn (array $leg): string => $leg['from_airport'].'-'.$leg['to_airport'].' '.$leg['departs_local'].'-'.$leg['arrives_local'].' LT', $duty['legs']);
 
-        return 'Report '.$duty['report_local'].' LT, release '.$duty['release_local'].' LT. '.implode('; ', $legs).'. Aircraft '.($trip->schedule_snapshot['aircraft_type'] ?? '').'.';
+        return 'Report '.$duty['report_local'].' LT, release '.$duty['release_local'].' LT. '.implode('; ', $legs).'. Aircraft '.($trip->schedule_snapshot['aircraft_label'] ?? $trip->schedule_snapshot['aircraft_type'] ?? '').'.';
     }
 
     /** Escape text for iCalendar: backslash, semicolon, comma and newlines. */

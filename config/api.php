@@ -74,6 +74,14 @@ return [
             'deleted' => 'Flight :label deleted.',
             'enabled' => 'Flight :label enabled — it will be included in planning.',
             'disabled' => 'Flight :label disabled — it stays on file but will not be planned.',
+            // Used instead of the three above when built rosters that have not ended need a rebuild to follow the change.
+            'updated_rosters' => 'Flight :label updated. Rosters still on the old schedule: :rosters. Open them on the Roster page to review and confirm the changes.',
+            'enabled_rosters' => 'Flight :label enabled. Rosters that do not include it yet: :rosters. Open them on the Roster page to review and confirm the changes.',
+            'disabled_rosters' => 'Flight :label disabled. Rosters still including it: :rosters. Open them on the Roster page to review and confirm its removal.',
+        ],
+        'trip' => [
+            'aircraft_set' => ':label will be flown by :aircraft (needs :cabin cabin crew). The plane is kept on rebuilds.',
+            'aircraft_cleared' => 'Plane for :label cleared. The next build picks one from the flight plan\'s planes.',
         ],
         'rules' => [
             'updated' => 'Duty rules saved. Existing roster periods keep their original snapshot.',
@@ -85,6 +93,7 @@ return [
             'built_with_open' => 'Roster built for :label: :filled of :seats seats filled, :open left open. Most common reasons crew could not be used: :reasons.',
             'built_empty' => 'Nothing to plan for :label: no enabled flight operates on the remaining days. Trips that already operated are not re-planned; check the dates and the Flight routes page.',
             'published' => 'Roster for :label published. Crew can now see their duties.',
+            'published_changed' => 'Roster for :label published again. :count crew have different duties since it was last published.',
             'reopened' => 'Roster for :label reopened as a draft. Crew no longer see it until it is published again.',
         ],
         'account' => [
@@ -128,6 +137,9 @@ return [
             'assigned' => ':crew assigned to :label. The seat is locked for rebuilds.',
             'overridden' => ':crew assigned to :label with a recorded override.',
             'cleared' => ':label is open again. The next build can fill it.',
+            'split' => 'Captain on :label now changes at :stop: :first, then :second. The new captain section is open.',
+            'joined' => 'Captain sections on :label joined. The captain seat is open: assign a captain or rebuild.',
+            'joined_released' => 'Captain sections on :label joined and :crew released. The captain seat is open: assign a captain or rebuild.',
         ],
     ],
 

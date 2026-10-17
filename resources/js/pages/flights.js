@@ -20,6 +20,9 @@ const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const MAX_TRIP_DAYS = Number(legs.dataset.maxTripDays) || 14;
 // Page state: lookup airports, loaded flights, the selected row and the active filters.
 let airports = [];
+// Registered planes (from lookups) and the ticked ones in the form, in order of preference.
+let planes = [];
+let planeOrder = [];
 let flights = [];
 let selectedId = null;
 let stateFilter = '';
@@ -131,12 +134,42 @@ async function addLegWithPrompt() {
     addLeg().querySelector('[data-field="departs_utc"]').focus();
 }
 
+/**
+ * The planes checklist in the flight form: ticked planes first in preference order (with "Move up"), then the
+ * rest of the fleet by registration. Planes are shown as "7Q-TBA · Boeing 737-800 (B737)"; any type may be
+ * ticked, because a trip follows its own plane's type.
+ */
+function renderPlanes() {
+    const list = document.querySelector('#plane-list');
+    if (!planes.length) return list.replaceChildren(element('p', 'No planes registered yet. Add them on the Fleet page; until then this flight is planned by aircraft type only.', 'small muted'));
+    const ordered = [...planeOrder.map(id => planes.find(plane => plane.id === id)).filter(Boolean), ...planes.filter(plane => !planeOrder.includes(plane.id))];
+    list.replaceChildren(...ordered.map(plane => {
+        const row = element('div', null, 'plane-option');
+        const label = element('label', null, 'check-label');
+        const input = element('input'); input.type = 'checkbox'; input.checked = planeOrder.includes(plane.id);
+        input.addEventListener('change', () => { planeOrder = input.checked ? [...planeOrder, plane.id] : planeOrder.filter(id => id !== plane.id); renderPlanes(); });
+        label.append(input, element('span', plane.label));
+        row.append(label);
+        const index = planeOrder.indexOf(plane.id);
+        if (index >= 0) row.append(chip(index === 0 ? 'Preferred' : `Choice ${index + 1}`, index === 0 ? 'brand' : undefined));
+        if (plane.status !== 'available') row.append(chip('Not available', 'warning'));
+        if (index > 0) {
+            const up = element('button', 'Move up', 'text-button'); up.type = 'button';
+            up.addEventListener('click', () => { planeOrder.splice(index, 1); planeOrder.splice(index - 1, 0, plane.id); renderPlanes(); });
+            row.append(up);
+        }
+        return row;
+    }));
+}
+
 // Create/edit dialog. "Copy" opens it pre-filled with an empty code so a new pattern is created.
 const controller = editor({
     form, dialog: document.querySelector('#flight-dialog'), endpoint: '/api/v1/flights', label: 'Flight pattern', refresh,
     read: () => ({
         code: form.elements.code.value, aircraft_type_id: Number(form.elements.aircraft_type_id.value), active: form.elements.active.checked,
         weekdays: [...form.querySelectorAll('[name="weekdays"]:checked')].map(input => Number(input.value)),
+        // Planes in order of preference (first = preferred).
+        aircraft_ids: [...planeOrder],
         // Leg times are GMT; the field names below are the API's, with time_zone telling it to convert.
         time_zone: 'utc',
         // trip_day comes from the night stops before each leg (see renumberLegs).
@@ -147,6 +180,8 @@ const controller = editor({
     }),
     fill: (record, { copy }) => {
         legs.replaceChildren();
+        planeOrder = record?.aircraft_ids ? [...record.aircraft_ids] : [];
+        renderPlanes();
         if (!record) { addLeg(); addLeg(); return; }
         form.elements.code.value = copy ? '' : record.code;
         form.elements.aircraft_type_id.value = record.aircraft_type_id; form.elements.active.checked = record.active;
@@ -174,12 +209,22 @@ function weekStrip(weekdays) {
     DAYS.forEach((day, index) => { const box = element('span', day[0]); box.dataset.on = String(weekdays.includes(index)); box.setAttribute('aria-hidden', 'true'); strip.append(box); });
     return strip;
 }
-/** True when airframes of the type are registered but none is currently available. */
-function noAvailableAircraft(record) { return record.aircraft?.aircraft_count > 0 && record.aircraft.available_aircraft_count === 0; }
-/** Aircraft type chip plus an availability warning when needed. */
+/**
+ * True when the flight cannot get an available plane: every listed plane is unavailable, or (with no planes
+ * listed) every registered airframe of the planned type is.
+ */
+function noAvailableAircraft(record) {
+    if (record.planes?.length) return record.planes.every(plane => plane.status !== 'available');
+    return record.aircraft?.aircraft_count > 0 && record.aircraft.available_aircraft_count === 0;
+}
+/** The listed planes' registrations (or the planned type when none are listed), plus an availability warning. */
 function aircraftCell(record) {
     const wrap = element('div', null, 'aircraft-cell');
-    wrap.append(element('span', record.aircraft.code, `chip palette-${record.aircraft.palette}`));
+    if (record.planes?.length) {
+        for (const plane of record.planes) wrap.append(element('span', plane.registration, `chip mono palette-${plane.palette || 'sky'}`));
+    } else {
+        wrap.append(element('span', record.aircraft.code, `chip palette-${record.aircraft.palette}`), element('span', 'Any plane of this type', 'small muted'));
+    }
     if (noAvailableAircraft(record)) wrap.append(chip('No available airframe', 'warning', { iconName: 'alert' }));
     return wrap;
 }
@@ -215,9 +260,24 @@ function renderDetail() {
         const box = element('div'); box.append(element('span', label, 'label-caps muted'), element('strong', value)); summary.append(box);
     }
     const nodes = [head, summary];
+    // The planes that can fly it, in order of preference, with their availability.
+    nodes.push(element('span', 'Planes', 'label-caps muted leg-day'));
+    if (record.planes?.length) {
+        const list = element('ol', null, 'plane-detail-list');
+        record.planes.forEach((plane, index) => {
+            const item = element('li', null, 'plane-detail'); item.append(element('span', plane.label, 'mono'));
+            if (index === 0) item.append(chip('Preferred', 'brand'));
+            item.append(chip(plane.status === 'available' ? 'Available' : 'Not available', plane.status === 'available' ? 'success' : 'warning', { dot: true }));
+            list.append(item);
+        });
+        nodes.push(list);
+    } else {
+        nodes.push(element('p', `No planes listed: trips are planned as ${record.aircraft.name || record.aircraft.code} without a registration. Edit the pattern to choose planes.`, 'small muted'));
+    }
     if (noAvailableAircraft(record)) {
         const warning = element('div', null, 'alert-row detail-warning'); const warnIcon = icon('alert'); warnIcon.classList.add('alert-row-icon');
-        const text = element('div', null, 'alert-row-text'); text.append(element('span', 'Aircraft availability', 'alert-row-title'), element('span', `All ${record.aircraft.aircraft_count} registered ${record.aircraft.code} airframes are unavailable. Check the Fleet page before planning this flight.`));
+        const message = record.planes?.length ? 'None of the planes listed for this flight is available. Trips keep their plane and show a warning; change their status on the Fleet page or list another plane.' : `All ${record.aircraft.aircraft_count} registered ${record.aircraft.code} airframes are unavailable. Check the Fleet page before planning this flight.`;
+        const text = element('div', null, 'alert-row-text'); text.append(element('span', 'Aircraft availability', 'alert-row-title'), element('span', message));
         warning.append(warnIcon, text); nodes.push(warning);
     }
     let currentDay = 0; let list = null;
@@ -281,7 +341,7 @@ document.querySelector('#flight-search').addEventListener('input', event => { se
 document.querySelector('#add-leg').addEventListener('click', () => addLegWithPrompt().catch(showError));
 document.querySelector('#add-flight').addEventListener('click', () => controller.open());
 (async () => {
-    const { data } = await api('/api/v1/lookups'); airports = data.airports;
+    const { data } = await api('/api/v1/lookups'); airports = data.airports; planes = data.aircraft || [];
     options(form.elements.aircraft_type_id, data.aircraft_types);
     document.querySelector('#add-flight').disabled = false;
     await refresh();

@@ -20,6 +20,7 @@ use App\Http\Controllers\Api\V1\ReportController;
 use App\Http\Controllers\Api\V1\RosterExportController;
 use App\Http\Controllers\Api\V1\RosterPeriodController;
 use App\Http\Controllers\Api\V1\RuleSetController;
+use App\Http\Controllers\Api\V1\TripController;
 use App\Services\ImportService;
 use App\Services\ReportService;
 use Illuminate\Support\Facades\Route;
@@ -63,6 +64,12 @@ Route::prefix('v1')->name('api.v1.')->middleware(['auth:sanctum', 'throttle:api'
     Route::put('assignments/{assignment}', [AssignmentController::class, 'update'])->name('assignments.update');
     Route::post('assignments/{assignment}/exclude', [AssignmentController::class, 'exclude'])->name('assignments.exclude');
     Route::post('assignments/{assignment}/undo', [AssignmentController::class, 'undo'])->name('assignments.undo');
+    // The plane flying a dated trip: choices for the picker, and crew control's choice.
+    Route::get('trips/{trip}/aircraft-options', [TripController::class, 'aircraftOptions'])->name('trips.aircraft-options');
+    Route::put('trips/{trip}/aircraft', [TripController::class, 'aircraft'])->name('trips.aircraft');
+    // Captain sections: change captain after a leg, or join a section with the next one.
+    Route::post('assignments/{assignment}/split', [AssignmentController::class, 'split'])->name('assignments.split');
+    Route::post('assignments/{assignment}/join', [AssignmentController::class, 'join'])->name('assignments.join');
     Route::delete('exclusions/{exclusion}', [AssignmentController::class, 'include'])->name('exclusions.destroy');
     // Day planning: leave, day off, SIM and standby.
     Route::post('crew-activities', [CrewActivityController::class, 'store'])->name('crew-activities.store');

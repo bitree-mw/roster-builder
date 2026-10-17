@@ -6,7 +6,8 @@ use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 /**
- * Validates aircraft type create/update: unique upper-case code, cabin complement 0–20, a known palette key.
+ * Validates aircraft type create/update: unique upper-case code, optional full name, cabin complement 0–20,
+ * a known palette key.
  */
 class AircraftTypeRequest extends FormRequest
 {
@@ -35,6 +36,8 @@ class AircraftTypeRequest extends FormRequest
     {
         return [
             'code' => ['required', 'string', 'max:20', 'regex:/^[A-Z0-9-]+$/', Rule::unique('aircraft_types')->ignore($this->route('aircraft_type'))],
+            // Full name shown with registrations, e.g. "Boeing 737-800" for B737.
+            'name' => ['nullable', 'string', 'max:100'],
             'cabin_crew_required' => ['required', 'integer', 'between:0,20'],
             'palette' => ['required', Rule::in(['forest', 'gold', 'sky', 'plum', 'coral'])],
         ];

@@ -42,7 +42,10 @@ class RosterMail extends Mailable
      */
     public function envelope(): Envelope
     {
-        return new Envelope(subject: 'Your roster: '.$this->roster['label'], using: [function (Email $message): void {
+        // A roster published again with changes for this crew member says so in the subject.
+        $subject = (empty($this->roster['changes']) ? 'Your roster: ' : 'Roster changed: ').$this->roster['label'];
+
+        return new Envelope(subject: $subject, using: [function (Email $message): void {
             if ($this->logoPath() !== null) {
                 $message->embedFromPath($this->logoPath(), self::LOGO_CID, 'image/png');
             }

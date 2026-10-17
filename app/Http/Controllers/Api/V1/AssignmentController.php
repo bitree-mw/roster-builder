@@ -4,12 +4,14 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\AssignmentRequest;
+use App\Http\Requests\AssignmentSplitRequest;
 use App\Http\Resources\AssignmentResource;
 use App\Models\Assignment;
 use App\Models\Exclusion;
 use App\Services\AssignmentService;
 use App\Services\RosterLegalityService;
 use App\Support\Api\ApiResponse;
+use App\Support\Roster\Section;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -48,6 +50,31 @@ class AssignmentController extends Controller
         };
 
         return ApiResponse::resource(new AssignmentResource($seat), $key, ['label' => $label, 'crew' => $seat->crewMember?->name]);
+    }
+
+    /**
+     * POST /assignments/{id}/split {after_leg} — captain seats only: the captain changes after that leg. The
+     * seat keeps its holder up to the stop; a new open captain seat covers the rest of the trip.
+     */
+    public function split(AssignmentSplitRequest $request, Assignment $assignment): JsonResponse
+    {
+        [$seat, $section] = $this->service->split($assignment, (int) $request->validated('after_leg'), $request->user());
+        $snapshot = $seat->trip->schedule_snapshot;
+
+        return ApiResponse::resource(new AssignmentResource($seat), 'assignment.split', ['label' => $this->label($seat, false),
+            'stop' => Section::ends($snapshot, $seat->from_leg, $seat->to_leg)[1], 'first' => Section::route($snapshot, $seat->from_leg, $seat->to_leg), 'second' => Section::route($snapshot, $section->from_leg, $section->to_leg)]);
+    }
+
+    /**
+     * POST /assignments/{id}/join — join a captain section with the next one; the joined seat is open.
+     */
+    public function join(Request $request, Assignment $assignment): JsonResponse
+    {
+        Gate::authorize('manage-operations');
+        ['seat' => $seat, 'released' => $released] = $this->service->join($assignment, $request->user());
+
+        return ApiResponse::resource(new AssignmentResource($seat->load('crewMember')), $released === [] ? 'assignment.joined' : 'assignment.joined_released',
+            ['label' => $this->label($seat, false), 'crew' => implode(' and ', $released)]);
     }
 
     /**

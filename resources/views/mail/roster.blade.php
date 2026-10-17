@@ -33,6 +33,19 @@
         <p class="summary">{{ $roster['totals']['flights'] }} {{ $roster['totals']['flights'] === 1 ? 'flight' : 'flights' }} · {{ $roster['totals']['block'] }} block · {{ $roster['totals']['duty'] }} duty</p>
         <p class="intro">Your published roster is below. The attached PDF has the full detail and the calendar file adds every duty to your phone.</p>
 
+        {{-- Republished roster: what changed for this crew member since the last publication. --}}
+        @if(! empty($roster['changes']))
+        <div class="changes">
+            <p class="changes-title">Changes since your last roster</p>
+            @foreach($roster['changes']['removed'] as $line)
+            <p class="line change-removed">Removed: {{ $line }}</p>
+            @endforeach
+            @foreach($roster['changes']['added'] as $line)
+            <p class="line change-added">New: {{ $line }}</p>
+            @endforeach
+        </div>
+        @endif
+
         {{-- Only the days with something on. --}}
         <table class="days" role="presentation" cellpadding="0" cellspacing="0">
         @foreach($roster['days'] as $day)

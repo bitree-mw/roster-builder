@@ -23,6 +23,9 @@ class AssignmentResource extends JsonResource
             'trip_id' => $this->trip_id,
             'rank' => $this->rank,
             'seat_number' => $this->seat_number,
+            // Captain section as a leg range (null: the whole trip).
+            'from_leg' => $this->from_leg,
+            'to_leg' => $this->to_leg,
             'source' => $this->source,
             'crew_member_id' => $this->crew_member_id,
             'crew' => $this->whenLoaded('crewMember', fn (): ?array => $this->crewMember ? ['id' => $this->crewMember->id, 'name' => $this->crewMember->name, 'rank' => $this->crewMember->rank, 'base_airport' => $this->crewMember->base_airport] : null),

@@ -111,7 +111,7 @@ class ReportService
             ->whereHas('trip', fn ($query) => $query->whereBetween('start_date', [$from->subDays((int) config('roster.max_trip_days') - 1)->format('Y-m-d'), $end])->whereHas('rosterPeriod', fn ($query) => $query->where('status', 'published')))
             ->with('trip')->get();
         foreach ($assignments as $assignment) {
-            $duty = Duty::fromSnapshot('a', $assignment->trip_id, $assignment->trip->schedule_snapshot);
+            $duty = Duty::fromSnapshot('a', $assignment->trip_id, $assignment->scheduleSnapshot());
             $counted = false;
             foreach ($duty?->periods ?? [] as $period) {
                 if ($period['date'] < $start || $period['date'] > $end) {

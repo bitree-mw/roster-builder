@@ -3,6 +3,16 @@ Dear {{ $crew->name }},
 
 Your roster: {{ $roster['label'] }} ({{ $roster['range'] }})
 {{ $roster['totals']['flights'] }} {{ $roster['totals']['flights'] === 1 ? 'flight' : 'flights' }} · {{ $roster['totals']['block'] }} block · {{ $roster['totals']['duty'] }} duty
+@if(! empty($roster['changes']))
+
+Changes since your last roster:
+@foreach($roster['changes']['removed'] as $line)
+  Removed: {{ $line }}
+@endforeach
+@foreach($roster['changes']['added'] as $line)
+  New: {{ $line }}
+@endforeach
+@endif
 
 @foreach($roster['days'] as $day)
 @continue($day['entries'] === [])

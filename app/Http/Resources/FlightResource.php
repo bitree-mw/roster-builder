@@ -8,8 +8,8 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
- * JSON shape of a flight pattern with legs (base-local and GMT times), weekdays, block minutes and its
- * aircraft type.
+ * JSON shape of a flight pattern with legs (base-local and GMT times), weekdays, block minutes, its planned
+ * aircraft type and the planes that can fly it.
  */
 class FlightResource extends JsonResource
 {
@@ -26,6 +26,12 @@ class FlightResource extends JsonResource
             'aircraft_type_id' => $this->aircraft_type_id,
             'active' => $this->active,
             'aircraft' => new AircraftTypeResource($this->whenLoaded('aircraftType')),
+            // Planes that can fly the plan, in order of preference, shown as "7Q-TBA · Boeing 737-800 (B737)".
+            'aircraft_ids' => $this->whenLoaded('aircraft', fn (): array => $this->aircraft->pluck('id')->all()),
+            'planes' => $this->whenLoaded('aircraft', fn (): array => $this->aircraft->map(fn ($plane): array => [
+                'id' => $plane->id, 'registration' => $plane->registration, 'label' => $plane->label(),
+                'aircraft_type' => $plane->aircraftType?->code, 'palette' => $plane->aircraftType?->palette, 'status' => $plane->status,
+            ])->all()),
             'weekdays' => $this->whenLoaded('days', fn (): array => $this->days->pluck('weekday')->all()),
             'block_minutes' => $this->whenLoaded('legs', fn (): int => $this->legs->sum(fn ($leg): int => $this->blockMinutes($leg->departs_local, $leg->arrives_local))),
             'legs' => $this->whenLoaded('legs', fn (): array => $this->legs->map(fn ($leg): array => [

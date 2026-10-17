@@ -7,7 +7,9 @@ use App\Models\CrewMember;
 use App\Models\EmailLog;
 use App\Models\RosterPeriod;
 use App\Models\User;
+use App\Support\Roster\Section;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -27,19 +29,21 @@ class RosterEmailService
 
     /**
      * Create the log rows and dispatch one job per recipient once the transaction commits.
+     * $crewIds limits the recipients (e.g. crew whose duties changed); null means everyone with a seat.
      *
+     * @param  array<int, int>|null  $crewIds
      * @return array{queued: int, missing: int}
      *
      * @throws ValidationException when the week is not published
      */
-    public function queue(RosterPeriod $period, User $actor): array
+    public function queue(RosterPeriod $period, User $actor, ?array $crewIds = null): array
     {
         if ($period->status !== 'published') {
             throw ValidationException::withMessages(['period' => 'Publish this roster before emailing it to crew.']);
         }
 
-        return DB::transaction(function () use ($period, $actor): array {
-            $crews = CrewMember::query()->whereHas('assignments.trip', fn ($query) => $query->where('roster_period_id', $period->id))->orderBy('name')->get();
+        return DB::transaction(function () use ($period, $actor, $crewIds): array {
+            $crews = $this->recipients($period, $crewIds);
             $queued = 0;
             $missing = 0;
             foreach ($crews as $crew) {
@@ -62,18 +66,20 @@ class RosterEmailService
      * Send the roster emails straight away, in this request, for hosts without a queue worker (e.g. cPanel).
      * Each recipient still gets an email log row (sent, or failed with the reason). A row left "queued" by an
      * earlier queued attempt is reused, so nobody receives the same roster twice when it is finally sent.
+     * $crewIds limits the recipients as for queue().
      *
+     * @param  array<int, int>|null  $crewIds
      * @return array{sent: int, failed: int, missing: int, error: string|null} error: the first failure reason
      *
      * @throws ValidationException when the roster is not published
      */
-    public function send(RosterPeriod $period, User $actor): array
+    public function send(RosterPeriod $period, User $actor, ?array $crewIds = null): array
     {
         if ($period->status !== 'published') {
             throw ValidationException::withMessages(['period' => 'Publish this roster before emailing it to crew.']);
         }
-        [$logs, $missing] = DB::transaction(function () use ($period, $actor): array {
-            $crews = CrewMember::query()->whereHas('assignments.trip', fn ($query) => $query->where('roster_period_id', $period->id))->orderBy('name')->get();
+        [$logs, $missing] = DB::transaction(function () use ($period, $actor, $crewIds): array {
+            $crews = $this->recipients($period, $crewIds);
             $logs = [];
             $missing = 0;
             foreach ($crews as $crew) {
@@ -110,7 +116,7 @@ class RosterEmailService
      * base local and GMT, legs, and who they fly with: captain, first officer and each cabin crew seat), night
      * stops between the days of a multi-day trip, and planned leave, days off, SIM and standby; plus totals.
      *
-     * @return array{label: string, range: string, totals: array{flights: int, duties: int, block: string, duty: string, planned: int}, days: array<int, array{date: string, weekday: string, day: string, entries: array<int, array<string, mixed>>}>}
+     * @return array{label: string, range: string, totals: array{flights: int, duties: int, block: string, duty: string, planned: int}, days: array<int, array{date: string, weekday: string, day: string, entries: array<int, array<string, mixed>>}>, changes: array{crew_member_id: int, name: string, removed: array<int, string>, added: array<int, string>}|null}
      */
     public function roster(RosterPeriod $period, CrewMember $crew): array
     {
@@ -120,17 +126,20 @@ class RosterEmailService
         $trips = $period->trips()->whereHas('assignments', fn ($query) => $query->where('crew_member_id', $crew->id))
             ->with('assignments.crewMember')->orderBy('start_date')->get();
         foreach ($trips as $trip) {
-            $snapshot = $trip->schedule_snapshot;
             $own = $trip->assignments->firstWhere('crew_member_id', $crew->id);
+            // A captain who flies only a section gets just that section's duties.
+            $snapshot = Section::restrict($trip->schedule_snapshot, $own->from_leg, $own->to_leg);
             // Everyone on the trip, captain first, then first officer and cabin crew by seat; open seats say so.
+            // Captains who share the trip are labelled with their section, e.g. "Captain (LLW-NBO-LLW)".
             $team = $trip->assignments->sortBy(fn ($seat): array => [array_search($seat->rank, ['CPT', 'FO', 'CC'], true), $seat->seat_number])
-                ->map(fn ($seat): array => ['role' => $this->seatLabel($seat->rank, $seat->seat_number), 'name' => $seat->crewMember?->name ?? 'Not yet assigned', 'you' => $seat->id === $own->id, 'open' => $seat->crew_member_id === null])->values()->all();
+                ->map(fn ($seat): array => ['role' => $this->seatLabel($seat->rank, $seat->seat_number).(Section::isPartial($trip->schedule_snapshot, $seat->from_leg, $seat->to_leg) ? ' ('.Section::route($trip->schedule_snapshot, $seat->from_leg, $seat->to_leg).')' : ''),
+                    'name' => $seat->crewMember?->name ?? 'Not yet assigned', 'you' => $seat->id === $own->id, 'open' => $seat->crew_member_id === null])->values()->all();
             $duties = $snapshot['duties'] ?? [];
             $totals['flights']++;
             foreach ($duties as $index => $duty) {
                 $legs = array_map(fn (array $leg): array => ['from' => $leg['from_airport'], 'to' => $leg['to_airport'], 'departs_local' => $leg['departs_local'], 'arrives_local' => $leg['arrives_local']], $duty['legs'] ?? []);
                 $entries[$duty['date']][] = [
-                    'kind' => 'duty', 'code' => $snapshot['code'] ?? '', 'route' => $snapshot['route'] ?? '', 'aircraft' => $snapshot['aircraft_type'] ?? '',
+                    'kind' => 'duty', 'code' => $snapshot['code'] ?? '', 'route' => $snapshot['route'] ?? '', 'aircraft' => $snapshot['aircraft_label'] ?? $snapshot['aircraft_type'] ?? '',
                     'seat' => $this->seatLabel($own->rank, $own->seat_number),
                     'report_local' => $duty['report_local'], 'release_local' => $duty['release_local'],
                     'report_gmt' => CarbonImmutable::parse($duty['report'])->utc()->format('H:i'), 'release_gmt' => CarbonImmutable::parse($duty['release'])->utc()->format('H:i'),
@@ -170,7 +179,25 @@ class RosterEmailService
             'days' => array_map(fn (string $date): array => [
                 'date' => $date, 'weekday' => CarbonImmutable::parse($date)->format('D'), 'day' => CarbonImmutable::parse($date)->format('d M'), 'entries' => $entries[$date] ?? [],
             ], $dates),
+            // What changed for this crew member when the roster was last published again (null: nothing).
+            'changes' => collect($period->changed_crew ?? [])->firstWhere('crew_member_id', $crew->id),
         ];
+    }
+
+    /**
+     * Who receives the emails: the given crew (e.g. those whose duties changed, even if they no longer hold a
+     * seat) or everyone with a seat in the roster.
+     *
+     * @param  array<int, int>|null  $crewIds
+     * @return Collection<int, CrewMember>
+     */
+    private function recipients(RosterPeriod $period, ?array $crewIds): Collection
+    {
+        if ($crewIds !== null) {
+            return CrewMember::query()->whereKey($crewIds)->orderBy('name')->get();
+        }
+
+        return CrewMember::query()->whereHas('assignments.trip', fn ($query) => $query->where('roster_period_id', $period->id))->orderBy('name')->get();
     }
 
     /** "Captain", "First officer" or "Cabin crew 2". */

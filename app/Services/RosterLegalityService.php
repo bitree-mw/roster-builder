@@ -9,6 +9,7 @@ use App\Models\RosterPeriod;
 use App\Models\Trip;
 use App\Support\Roster\Duty;
 use App\Support\Roster\PlanningContext;
+use App\Support\Roster\Section;
 use Carbon\CarbonImmutable;
 
 /**
@@ -34,6 +35,7 @@ class RosterLegalityService
         'already_on_trip' => 'already on the trip', 'unavailable' => 'on leave, day off, SIM or standby', 'overlap' => 'already on duty',
         'rest' => 'not enough rest', 'duty_7d' => '7-day duty limit', 'block_month' => 'monthly block limit',
         'consecutive_days' => 'consecutive duty days', 'days_off_month' => 'monthly days off', 'weekly_hours' => 'weekly working hours',
+        'positioning' => 'would need positioning',
     ];
 
     /** Every rostered crew member needs all three documents valid for the whole duty. */
@@ -90,7 +92,8 @@ class RosterLegalityService
             ->whereHas('trip', fn ($query) => $query->where('roster_period_id', '!=', $period->id)->whereBetween('start_date', [$from->subDays((int) config('roster.max_trip_days') - 1)->format('Y-m-d'), $to->format('Y-m-d')]))
             ->with('trip')->get();
         foreach ($history as $assignment) {
-            $duty = Duty::fromSnapshot('assignment:'.$assignment->id, $assignment->trip_id, $assignment->trip->schedule_snapshot);
+            // A captain who flies only a section of the trip is on duty for that section only.
+            $duty = Duty::fromSnapshot('assignment:'.$assignment->id, $assignment->trip_id, $assignment->scheduleSnapshot());
             if ($duty !== null) {
                 $context->schedule($assignment->crew_member_id)->add($duty);
             }
@@ -98,9 +101,22 @@ class RosterLegalityService
         // Seats already filled in this week.
         foreach ($trips as $trip) {
             foreach ($trip->assignments as $assignment) {
-                if ($assignment->crew_member_id !== null && $context->tripDuties[$trip->id] !== null) {
-                    $context->schedule($assignment->crew_member_id)->add($context->tripDuties[$trip->id]->withKey('assignment:'.$assignment->id));
+                $duty = $context->seatDuty($trip, $assignment);
+                if ($assignment->crew_member_id !== null && $duty !== null) {
+                    $context->schedule($assignment->crew_member_id)->add($duty->withKey('assignment:'.$assignment->id));
                 }
+            }
+        }
+        // Planes and the trips each one flies (this roster and its neighbours), for the plane warnings.
+        foreach (Aircraft::query()->with('aircraftType')->get() as $plane) {
+            $context->planes[$plane->id] = ['registration' => $plane->registration, 'label' => $plane->label(), 'status' => $plane->status, 'status_label' => Aircraft::STATUSES[$plane->status] ?? $plane->status];
+        }
+        $flown = Trip::query()->whereNotNull('aircraft_id')->where('roster_period_id', '!=', $period->id)
+            ->whereBetween('start_date', [$from->subDays((int) config('roster.max_trip_days'))->format('Y-m-d'), $to->format('Y-m-d')])->get(['id', 'aircraft_id', 'start_date', 'schedule_snapshot']);
+        foreach ([...$trips->whereNotNull('aircraft_id')->all(), ...$flown->all()] as $trip) {
+            $snapshot = $trip->schedule_snapshot;
+            if (isset($snapshot['report'], $snapshot['release'])) {
+                $context->planeTrips[$trip->aircraft_id][] = ['trip_id' => $trip->id, 'start' => Duty::minutes($snapshot['report']), 'end' => Duty::minutes($snapshot['release']), 'label' => ($snapshot['code'] ?? 'Trip').' on '.$trip->start_date->format('d M')];
             }
         }
         $context->airframes = Aircraft::query()->toBase()->select('aircraft_type_id')->selectRaw('count(*) as total')
@@ -118,7 +134,7 @@ class RosterLegalityService
      */
     public function issues(PlanningContext $context, CrewMember $crew, Trip $trip, Assignment $seat): array
     {
-        $issues = $this->eligibility($context, $crew, $trip, $seat->rank);
+        $issues = $this->eligibility($context, $crew, $trip, $seat->rank, $seat);
         // Raw attribute reads: this runs for every seat × candidate and the seats change during a build.
         $crewId = $crew->getKey();
         $seatId = $seat->getKey();
@@ -130,7 +146,8 @@ class RosterLegalityService
                 break;
             }
         }
-        $duty = $context->tripDuties[$trip->id] ?? null;
+        // A captain section is checked as the duty the captain actually flies, not the whole trip.
+        $duty = $context->seatDuty($trip, $seat);
         if ($duty === null) {
             return $issues;
         }
@@ -176,11 +193,13 @@ class RosterLegalityService
 
     /**
      * Checks that do not depend on other duties: active, position, base, aircraft rating, valid documents and
-     * manual exclusions. Also used to find the hardest seats (fewest eligible crew) first.
+     * manual exclusions. Also used to find the hardest seats (fewest eligible crew) first. A captain section may
+     * start or end away from the trip's base, so its base is not checked here; positioning() warns instead.
      *
+     * @param  Assignment|null  $seat  the seat being filled, when known (needed to recognise a captain section)
      * @return array<int, array{code: string, message: string}>
      */
-    public function eligibility(PlanningContext $context, CrewMember $crew, Trip $trip, string $rank): array
+    public function eligibility(PlanningContext $context, CrewMember $crew, Trip $trip, string $rank, ?Assignment $seat = null): array
     {
         // Trip and crew facts are read once per build (see PlanningContext): this runs for every seat × candidate.
         $facts = $context->tripFacts($trip);
@@ -192,7 +211,7 @@ class RosterLegalityService
         if ($crewFacts['rank'] !== $rank) {
             $issues[] = ['code' => 'rank', 'message' => 'Holds '.$crewFacts['rank'].'; this is a '.self::RANKS[$rank].' seat.'];
         }
-        if ($facts['base'] !== null && $crewFacts['base'] !== $facts['base']) {
+        if ($facts['base'] !== null && $crewFacts['base'] !== $facts['base'] && ! $this->isSection($trip, $seat)) {
             $issues[] = ['code' => 'base', 'message' => 'Based at '.$crewFacts['base'].'; this trip starts at '.$facts['base'].'.'];
         }
         $typeId = $facts['aircraft_type_id'];
@@ -217,6 +236,34 @@ class RosterLegalityService
         }
 
         return $issues;
+    }
+
+    /**
+     * Positioning a captain needs for a section: joining it at, or leaving it at, an airport other than their
+     * home base. Crew control may accept this (they arrange the travel; it is not planned or counted as duty),
+     * so it is a warning, never a rule break; the generator does not create positioning on its own.
+     */
+    public function positioning(CrewMember $crew, Trip $trip, Assignment $seat): ?string
+    {
+        if (! $this->isSection($trip, $seat)) {
+            return null;
+        }
+        [$start, $end] = Section::ends($trip->schedule_snapshot, $seat->from_leg, $seat->to_leg);
+        $away = array_values(array_unique(array_filter([$start !== $crew->base_airport ? 'join at '.$start : null, $end !== $crew->base_airport ? 'finish at '.$end : null])));
+        if ($away === []) {
+            return null;
+        }
+
+        return 'Based at '.$crew->base_airport.' but would '.implode(' and ', $away).': positioning needed.';
+    }
+
+    /** Whether the seat is a captain section (covers only part of the trip). */
+    private function isSection(Trip $trip, ?Assignment $seat): bool
+    {
+        // Raw attribute reads: eligibility() runs for every seat × candidate during a build.
+        $raw = $seat?->getAttributes() ?? [];
+
+        return isset($raw['from_leg'], $raw['to_leg']) && Section::isPartial($trip->schedule_snapshot, (int) $raw['from_leg'], (int) $raw['to_leg']);
     }
 
     /**
@@ -245,7 +292,7 @@ class RosterLegalityService
      */
     public function score(PlanningContext $context, CrewMember $crew, Trip $trip, Assignment $seat): array
     {
-        $duty = $context->tripDuties[$trip->id];
+        $duty = $context->seatDuty($trip, $seat);
         $schedule = $context->schedule($crew->id);
         $monday = Duty::weekOf($duty->firstDate());
         $month = substr($duty->firstDate(), 0, 7);

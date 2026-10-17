@@ -30,7 +30,7 @@ const REASONS = {
     inactive: 'inactive', rank: 'other position', base: 'other base', rating: 'not rated', document_missing: 'document missing',
     document_expired: 'document expires', excluded: 'excluded', already_on_trip: 'already on this trip', unavailable: 'leave, day off, SIM or standby',
     overlap: 'already on duty', rest: 'not enough rest', duty_7d: '7-day duty limit', block_month: 'monthly block limit',
-    consecutive_days: 'consecutive duty days', days_off_month: 'monthly days off', weekly_hours: 'weekly working hours',
+    consecutive_days: 'consecutive duty days', days_off_month: 'monthly days off', weekly_hours: 'weekly working hours', positioning: 'would need positioning',
 };
 
 // Page state. "slot" is the selected timeline entry (a roster or a gap without one); "week" is the full
@@ -50,7 +50,21 @@ const state = {
     dutiesOnly: false,
     tripId: Number(query.get('trip')) || null,
     index: null,
+    openCollapsed: openTimeCollapsed(),
 };
+
+/**
+ * Whether this viewer collapsed the grid's Open time row last time. Only this layout preference is kept in the
+ * browser (never roster data); storage can be blocked, so it falls back to expanded.
+ */
+function openTimeCollapsed() {
+    try { return window.localStorage.getItem('roster.openTimeCollapsed') === 'true'; } catch { return false; }
+}
+
+/** Remember the Open time row's collapsed state for the next visit (ignored when storage is unavailable). */
+function rememberOpenTime(collapsed) {
+    try { window.localStorage.setItem('roster.openTimeCollapsed', String(collapsed)); } catch { /* preference only */ }
+}
 
 const view = document.querySelector('#roster-view');
 const strip = document.querySelector('#week-strip');
@@ -86,23 +100,33 @@ function viewerState(period) {
 function ended(slot) { return Boolean(slot) && slot.end < today; }
 /** Whether seats on a trip can still be changed by the scheduler. */
 function changeable(trip) { return staff && state.week?.editable && !trip.operated; }
-/** The duty periods of a trip that touch a date (a night stop has one per day). */
-function dutiesOn(trip, date) { return trip.duties.filter(duty => duty.dates.includes(date)); }
+/**
+ * The duty periods a seat's holder flies: a captain section's own periods (worked out by the server), or the
+ * whole trip's for every other seat.
+ */
+function seatDuties(trip, seat = null) { return seat?.section?.duties ?? trip.duties; }
+/** The duty periods of a trip (or of a captain's section of it) that touch a date (a night stop has one per day). */
+function dutiesOn(trip, date, seat = null) { return seatDuties(trip, seat).filter(duty => duty.dates.includes(date)); }
 /**
  * Where a trip's crew are staying on a day without flying between two of its duty periods (a multi-night
- * layover), or null. The crew are away from base, so the day is not free to plan.
+ * layover), or null. The crew are away from base, so the day is not free to plan. For a captain section only
+ * the layovers inside that section count.
  */
-function layoverOn(trip, date) {
-    if (dutiesOn(trip, date).length || !trip.duties.some(duty => duty.dates[0] > date)) return null;
-    const before = trip.duties.filter(duty => duty.dates[duty.dates.length - 1] < date);
+function layoverOn(trip, date, seat = null) {
+    const duties = seatDuties(trip, seat);
+    if (dutiesOn(trip, date, seat).length || !duties.some(duty => duty.dates[0] > date) || !duties.some(duty => duty.dates[duty.dates.length - 1] < date)) return null;
+    const before = duties.filter(duty => duty.dates[duty.dates.length - 1] < date);
     const legs = before[before.length - 1]?.legs ?? [];
     return legs[legs.length - 1]?.to_airport ?? null;
 }
 /** "Night stop · MZU" tag for a layover day; selecting it opens the trip like a duty does. */
 function layoverTag(trip, airport) {
     const tag = element('button', null, 'activity layover'); tag.type = 'button';
+    tag.dataset.tripId = trip.id;
     tag.append(element('strong', 'Night stop'), element('span', `${trip.code} · ${airport}`, 'mono'));
     tag.title = `Away at ${airport} with ${trip.code}; the crew stay with the trip until it is back at base`;
+    // A night stop of a disabled flight carries the same warning as its duties.
+    if (!trip.flight_active) { tag.dataset.flight = 'disabled'; tag.append(element('span', 'Flight disabled', 'duty-disabled')); tag.title = `${trip.code} is disabled on Flight routes. Review the route changes and rebuild to remove this trip.`; }
     tag.addEventListener('click', () => selectTrip(trip.id));
     return tag;
 }
@@ -174,6 +198,8 @@ function renderTimeline() {
         button.append(top, element('span', slot.period?.length === 'month' ? slot.period.label : `${slotRange(slot)} ${slot.end.slice(0, 4)}`, 'week-chip-range mono'));
         const chips = element('span', null, 'chip-list'); chips.append(chip(status.label, status.tone, { dot: true }));
         if (staff && slot.period?.open_seats_count) chips.append(chip(`${slot.period.open_seats_count} open`, 'warning'));
+        // Flights were disabled, enabled or edited after this roster was built: it needs a review and rebuild.
+        if (staff && slot.period?.route_changes_count) chips.append(chip('Routes changed', 'warning', { iconName: 'route' }));
         button.append(chips);
         button.addEventListener('click', () => selectSlot(slot.key).catch(showError));
         item.append(button); return item;
@@ -216,7 +242,8 @@ async function loadWeek() {
 function applyWeek(week) {
     state.week = week;
     const index = state.periods.findIndex(period => period.id === week.id);
-    const summary = { ...week, open_seats_count: week.summary.open };
+    // Keep the timeline chip in step with the window (route changes clear after a confirmed rebuild).
+    const summary = { ...week, open_seats_count: week.summary.open, route_changes_count: week.route_changes?.count ?? 0 };
     if (index >= 0) state.periods[index] = { ...state.periods[index], ...summary }; else state.periods.push(summary);
     state.periods.sort((a, b) => a.starts_on.localeCompare(b.starts_on));
     state.slots = buildSlots();
@@ -226,9 +253,16 @@ function applyWeek(week) {
     renderTimeline(); renderHeader(); renderNotice(); renderKpis(); renderActions(); renderView(); renderInspector();
 }
 
-/** Lookups used by every view: seats per crew member, conflicts per seat and per trip. */
+/**
+ * Lookups used by every view: seats per crew member, conflicts per seat and per trip, and the pending route
+ * change ("removed" or "changed") of each trip so cards and the inspector can say what a rebuild will do.
+ */
 function buildIndex(week) {
     const seatsByCrew = new Map(); const seatConflicts = new Map(); const tripConflicts = new Map();
+    const routeChanges = new Map([
+        ...(week.route_changes?.removed || []).map(trip => [trip.trip_id, 'removed']),
+        ...(week.route_changes?.changed || []).map(trip => [trip.trip_id, 'changed']),
+    ]);
     for (const trip of week.trips) {
         for (const seat of trip.assignments) {
             if (seat.crew_member_id) seatsByCrew.set(seat.crew_member_id, [...(seatsByCrew.get(seat.crew_member_id) || []), { trip, seat }]);
@@ -238,7 +272,7 @@ function buildIndex(week) {
         if (conflict.assignment_id && conflict.code !== 'open_seat') seatConflicts.set(conflict.assignment_id, [...(seatConflicts.get(conflict.assignment_id) || []), conflict]);
         if (!conflict.assignment_id) tripConflicts.set(conflict.trip_id, [...(tripConflicts.get(conflict.trip_id) || []), conflict]);
     }
-    return { seatsByCrew, seatConflicts, tripConflicts };
+    return { seatsByCrew, seatConflicts, tripConflicts, routeChanges };
 }
 
 /** Roster title and status chip. */
@@ -250,17 +284,34 @@ function renderHeader() {
     if (status.tone) target.dataset.tone = status.tone; else delete target.dataset.tone;
 }
 
-/** One-line explanation of what can be done with the selected roster. */
+/**
+ * One-line explanation of what can be done with the selected roster. Pending route changes (flights disabled,
+ * enabled or edited since the build) come first for staff, with a button to review them.
+ */
 function renderNotice() {
     const week = state.week;
-    let message = null; let tone = 'info';
+    let message = null; let tone = 'info'; let action = null;
+    const routeChanges = staff && !ended(state.slot) ? week?.route_changes : null;
     if (week && ended(state.slot)) message = 'This roster has ended. It is kept as read-only history.';
+    else if (routeChanges?.count) {
+        tone = 'warning';
+        message = `Flight routes changed since this roster was built: ${routeChangeSummary(routeChanges)}. ${week.status === 'published' ? 'Reopen it as a draft, then review and confirm the changes to rebuild.' : 'Review and confirm the changes to rebuild.'}`;
+        action = element('button', 'Review changes', 'button button-sm button-secondary'); action.type = 'button';
+        action.addEventListener('click', openChanges);
+    }
+    else if (week?.status === 'published' && staff && week.changed_crew?.length) {
+        // Republished with changes: name how many crew are affected and offer to email just them.
+        message = `Published again: ${plural(week.changed_crew.length, 'crew member')} ${week.changed_crew.length === 1 ? 'has' : 'have'} different duties since the last publication.`;
+        action = element('button', 'Email changed crew', 'button button-sm button-secondary'); action.type = 'button';
+        action.addEventListener('click', event => busy(event.currentTarget, emailChangedCrew));
+    }
     else if (week?.status === 'published') message = staff ? 'Published to crew. Reopen it as a draft to rebuild or change seats.' : null;
     else if (week && staff && !week.built_at) { message = 'This draft has not been built yet. Build it to fill every seat automatically from crew working hours and the duty rules. Click an empty day in the grid to plan leave, a day off, standby or SIM first.'; tone = 'warning'; }
     else if (week && staff && !week.trips.length) { message = 'No trips in this roster: no enabled flight operates on its remaining days. Check Flight routes, then rebuild.'; tone = 'warning'; }
     else if (week && staff && week.summary.blocking) { message = `${plural(week.summary.blocking, 'rule conflict')} must be changed or accepted with an override reason before this roster can be published.`; tone = 'danger'; }
     notice.hidden = !message;
     if (message) { notice.dataset.tone = tone; notice.replaceChildren(icon(tone === 'danger' ? 'shield' : tone === 'warning' ? 'alert' : 'clipboard'), element('span', message)); }
+    if (message && action) notice.append(action);
 }
 
 /** KPI strip: coverage and conflicts for staff, own totals for crew. */
@@ -302,7 +353,8 @@ function renderActions() {
     buttons.email.hidden = week?.status !== 'published';
     document.querySelector('#email-log').hidden = week?.status !== 'published';
     buttons.build.hidden = !week?.editable;
-    buttons.build.querySelector('[data-label]').textContent = week?.built_at ? 'Rebuild roster' : 'Build roster';
+    // With pending route changes the rebuild goes through the review dialog first, so say so on the button.
+    buttons.build.querySelector('[data-label]').textContent = !week?.built_at ? 'Build roster' : week.route_changes?.count ? 'Review changes & rebuild' : 'Rebuild roster';
     buttons.publish.hidden = !(week?.editable && week.built_at);
     buttons.publish.disabled = Boolean(week?.summary.blocking);
     buttons.publish.title = week?.summary.blocking ? 'Resolve the rule conflicts first' : '';
@@ -434,8 +486,20 @@ async function createPeriod(startsOn, length) {
 
 /* ---------------------------------------------------------------- Views */
 
-/** Draw the active view: crew grid, trips, conflicts or one person's roster (crew accounts see their own). */
+/**
+ * Draw the active view and keep the crew grid where it was scrolled. Redraws happen after a seat change, a
+ * filter or a build; without this the grid's own scroll box would jump back to the first row and day.
+ */
 function renderView() {
+    const before = view.querySelector('.roster-grid-wrap');
+    const scroll = before ? { top: before.scrollTop, left: before.scrollLeft } : null;
+    drawView();
+    const after = view.querySelector('.roster-grid-wrap');
+    if (scroll && after) { after.scrollTop = scroll.top; after.scrollLeft = scroll.left; }
+}
+
+/** Draw the active view: crew grid, trips, conflicts or one person's roster (crew accounts see their own). */
+function drawView() {
     view.setAttribute('aria-busy', 'false');
     const counter = document.querySelector('#conflict-tab-count');
     if (counter) counter.textContent = state.week.summary.conflicts ? `(${state.week.summary.blocking}/${state.week.summary.conflicts})` : '';
@@ -483,24 +547,46 @@ function gridView() {
     const thead = element('thead'); thead.append(head);
     const body = element('tbody');
 
-    // Open time: unfilled seats per day (filtered by position too).
-    const openRow = element('tr', null, 'open-row');
+    // Open time: unfilled seats per day (filtered by position too). It collapses to a count per day so a long
+    // list of open seats does not push the crew rows down; the choice is remembered (openTimeCollapsed).
+    const openRow = element('tr', null, 'open-row'); openRow.dataset.collapsed = String(state.openCollapsed);
     const openHead = element('th', null, 'roster-crew'); openHead.scope = 'row';
-    openHead.append(element('strong', 'Open time'), element('span', 'Seats with no legal crew', 'small muted'));
+    const toggle = element('button', null, 'open-toggle'); toggle.type = 'button';
+    toggle.setAttribute('aria-expanded', String(!state.openCollapsed));
+    toggle.title = 'Show or hide the open seats';
+    // A labelled "Hide" / "Show" pill so the control is obvious, not just a small arrow.
+    const action = element('span', state.openCollapsed ? 'Show' : 'Hide', 'open-toggle-action');
+    toggle.append(icon('chevron-right', 'icon-sm open-toggle-icon'), element('strong', 'Open time'), action);
+    toggle.addEventListener('click', () => {
+        state.openCollapsed = !state.openCollapsed;
+        openRow.dataset.collapsed = String(state.openCollapsed);
+        toggle.setAttribute('aria-expanded', String(!state.openCollapsed));
+        action.textContent = state.openCollapsed ? 'Show' : 'Hide';
+        rememberOpenTime(state.openCollapsed);
+    });
+    openHead.append(toggle, element('span', 'Seats with no legal crew', 'small muted'));
     openRow.append(openHead);
     let openTotal = 0;
     for (const day of days) {
         const td = element('td', null, 'roster-cell');
+        const seats = element('div', null, 'open-seats');
         for (const trip of state.week.trips.filter(item => item.start_date === day.date)) {
             for (const seat of trip.assignments.filter(item => !item.crew_member_id && (!state.rank || item.rank === state.rank))) {
-                openTotal++;
                 const button = element('button', null, 'open-seat'); button.type = 'button';
+                button.dataset.tripId = trip.id;
                 button.append(element('span', trip.code, 'mono'), element('span', seat.rank === 'CC' ? `CC${seat.seat_number}` : seat.rank));
-                button.setAttribute('aria-label', `Open ${seatName(seat)} seat on ${trip.code}, ${formatDate(trip.start_date)}`);
+                // Open seats on a disabled flight do not need filling: they go when the route changes are confirmed.
+                if (!trip.flight_active) { button.dataset.flight = 'disabled'; button.prepend(icon('ban', 'icon-sm')); button.title = `${trip.code} is disabled on Flight routes`; }
+                // An open captain section names its own route.
+                if (seat.section && trip.flight_active) button.title = `Captain section ${seat.section.route}`;
+                button.setAttribute('aria-label', `Open ${seatName(seat)} seat${seat.section ? ` (section ${seat.section.route})` : ''} on ${trip.code}, ${formatDate(trip.start_date)}${trip.flight_active ? '' : ', flight disabled'}`);
                 button.addEventListener('click', () => (changeable(trip) ? openSeat(trip, seat) : selectTrip(trip.id)));
-                td.append(button);
+                seats.append(button);
             }
         }
+        openTotal += seats.childElementCount;
+        // Collapsed view: just the number of open seats that day.
+        td.append(seats, element('span', seats.childElementCount ? `${seats.childElementCount} open` : '', 'open-count mono'));
         openRow.append(td);
     }
     openRow.append(element('td', openTotal ? plural(openTotal, 'open seat') : 'None', 'roster-total small'));
@@ -522,8 +608,8 @@ function gridView() {
         for (const day of days) {
             const td = element('td', null, 'roster-cell');
             for (const { trip, seat } of seats) {
-                for (const duty of dutiesOn(trip, day.date)) td.append(dutyButton(trip, seat, duty, day.date));
-                const away = layoverOn(trip, day.date);
+                for (const duty of dutiesOn(trip, day.date, seat)) td.append(dutyButton(trip, seat, duty, day.date));
+                const away = layoverOn(trip, day.date, seat);
                 if (away) td.append(layoverTag(trip, away));
             }
             for (const activity of crew.activities.filter(item => item.date === day.date)) td.append(activityTag(activity, crew));
@@ -553,20 +639,36 @@ function planButton(crew, date) {
     return button;
 }
 
-/** A duty in the grid: flight code, local times, lock for manual seats and a conflict marker. */
+/**
+ * A duty in the grid: flight code, local times, lock for manual seats and a conflict marker. A duty whose
+ * flight was disabled on Flight routes is hatched with a "Flight disabled" line until a confirmed rebuild
+ * removes it, so it is never mistaken for a flight that still operates.
+ */
 function dutyButton(trip, seat, duty, date) {
     const conflicts = state.index.seatConflicts.get(seat.id) || [];
+    const disabled = !trip.flight_active;
     const button = element('button', null, `duty accent-${trip.palette || 'sky'}`); button.type = 'button';
+    button.dataset.tripId = trip.id;
     if (trip.id === state.tripId) button.dataset.selected = 'true';
     if (conflicts.some(conflict => !conflict.acknowledged && conflict.severity === 'danger')) button.dataset.conflict = 'danger';
     else if (conflicts.length) button.dataset.conflict = 'accepted';
     if (seat.source === 'manual') button.dataset.manual = 'true';
+    if (disabled) button.dataset.flight = 'disabled';
     const top = element('span', null, 'duty-top'); top.append(element('span', trip.code, 'duty-code'));
     if (seat.source === 'manual') top.append(icon('lock', 'icon-sm'));
     if (conflicts.length) top.append(icon('alert', 'icon-sm'));
+    // Red warning badge in the top-right corner of the card for a disabled flight.
+    if (disabled) { const badge = element('span', null, 'duty-flag'); badge.append(icon('alert', 'icon-sm')); top.append(badge); }
     const times = duty.date === date ? `${duty.report_local}–${duty.release_local}` : `→ ${duty.release_local}`;
-    button.append(top, element('span', times, 'duty-times mono'), element('span', trip.duties.length > 1 && duty.date === date && duty.trip_day > 1 ? 'Return' : trip.route || '', 'duty-route'));
-    button.setAttribute('aria-label', `${trip.code} ${formatDate(trip.start_date)}, ${seatName(seat)}, ${times} local${seat.source === 'manual' ? ', locked' : ''}${conflicts.length ? `, ${plural(conflicts.length, 'conflict')}` : ''}`);
+    // A captain who flies only a section shows that section's route (marked with the section icon).
+    const duties = seatDuties(trip, seat);
+    const routeText = duties.length > 1 && duty.date === date && duty !== duties[0] ? 'Return' : seat.section?.route ?? trip.route ?? '';
+    const route = disabled ? element('span', 'Flight disabled', 'duty-route duty-disabled') : element('span', routeText, 'duty-route');
+    // Kept before the disabled-flight badge so that badge stays in the top-right corner.
+    if (seat.section) { button.dataset.section = 'true'; top.insertBefore(icon('route', 'icon-sm'), top.querySelector('.duty-flag')); }
+    button.append(top, element('span', times, 'duty-times mono'), route);
+    if (disabled) button.title = `${trip.code} is disabled on Flight routes. Review the route changes and rebuild to remove this trip.`;
+    button.setAttribute('aria-label', `${trip.code} ${formatDate(trip.start_date)}, ${seatName(seat)}${seat.section ? `, section ${seat.section.route}` : ''}, ${times} local${seat.source === 'manual' ? ', locked' : ''}${conflicts.length ? `, ${plural(conflicts.length, 'conflict')}` : ''}${disabled ? ', flight disabled' : ''}`);
     button.addEventListener('click', () => selectTrip(trip.id));
     return button;
 }
@@ -646,13 +748,13 @@ function individualView() {
         item.append(element('span', `${WEEKDAYS[(parseDay(date).getUTCDay() + 6) % 7]} ${shortDate(date)}`, 'individual-date mono'));
         const entries = element('div', null, 'individual-entries');
         for (const { trip, seat } of seats) {
-            for (const duty of dutiesOn(trip, date)) {
+            for (const duty of dutiesOn(trip, date, seat)) {
                 const entry = dutyButton(trip, seat, duty, date); entry.classList.add('individual-duty');
                 const first = duty.legs[0]; const last = duty.legs[duty.legs.length - 1];
                 entry.append(element('span', `${seatName(seat)} · ${trip.aircraft_type || ''} · GMT ${first ? utcClock(first.departs) : ''}–${last ? utcClock(last.arrives) : ''}`, 'duty-route'));
                 entries.append(entry);
             }
-            const away = layoverOn(trip, date);
+            const away = layoverOn(trip, date, seat);
             if (away) entries.append(layoverTag(trip, away));
         }
         for (const activity of crew.activities.filter(activity => activity.date === date)) entries.append(activityTag(activity, crew));
@@ -696,13 +798,16 @@ function tripsView() {
 /** A trip strip: code, route, local times, seat holders and open/conflict chips. */
 function tripCard(trip) {
     const card = element('button', null, `strip trip-card accent-${trip.palette || 'sky'}`); card.type = 'button';
+    card.dataset.tripId = trip.id;
     if (trip.id === state.tripId) card.dataset.selected = 'true';
-    const head = element('span', null, 'trip-strip-head'); head.append(element('span', trip.code, 'code-tag'), element('span', trip.aircraft_type || '', 'small muted mono'));
+    // Registration when a plane is assigned, otherwise the planned type.
+    const head = element('span', null, 'trip-strip-head'); head.append(element('span', trip.code, 'code-tag'), element('span', trip.registration ? `${trip.registration} · ${trip.aircraft_type || ''}` : trip.aircraft_type || '', 'small muted mono'));
     card.append(head, element('span', `${trip.route || ''} · ${tripTimes(trip)}`, 'small mono'));
     const seats = element('span', null, 'trip-seats');
     for (const seat of trip.assignments.filter(item => !state.rank || item.rank === state.rank)) {
         const line = element('span', null, 'trip-seat'); if (!seat.crew) line.dataset.open = 'true';
-        line.append(element('span', seat.rank === 'CC' ? `CC${seat.seat_number}` : seat.rank, 'mono'), element('span', seat.crew?.name || 'Open'));
+        // Captains sharing a trip show their section after the name, e.g. "Open · LLW-NBO-LLW".
+        line.append(element('span', seat.rank === 'CC' ? `CC${seat.seat_number}` : seat.rank, 'mono'), element('span', `${seat.crew?.name || 'Open'}${seat.section ? ` · ${seat.section.route}` : ''}`));
         if (seat.source === 'manual') line.append(icon('lock', 'icon-sm'));
         if ((state.index.seatConflicts.get(seat.id) || []).some(conflict => !conflict.acknowledged)) line.append(icon('alert', 'icon-sm'));
         seats.append(line);
@@ -713,6 +818,7 @@ function tripCard(trip) {
     if (open) chips.append(chip(`${open} open`, 'warning'));
     if (trip.operated) chips.append(chip('Operated', undefined));
     if (!trip.flight_active) chips.append(chip('Flight disabled', 'danger'));
+    const pending = routeChangeChip(trip); if (pending) chips.append(pending);
     for (const conflict of state.index.tripConflicts.get(trip.id) || []) if (conflict.code === 'no_aircraft') chips.append(chip('No airframe', 'danger'));
     if (chips.childElementCount) card.append(chips);
     card.addEventListener('click', () => selectTrip(trip.id));
@@ -738,12 +844,16 @@ function conflictsView() {
 
 /* ---------------------------------------------------------------- Duty inspector */
 
-/** Select a trip for the inspector and highlight it in the current view. */
+/**
+ * Select a trip for the inspector and highlight it in the current view. The highlight is moved in place
+ * (elements carry data-trip-id) rather than redrawing the view, so the grid stays exactly where it was.
+ */
 function selectTrip(tripId) {
     state.tripId = tripId;
     const url = new URL(window.location.href); url.searchParams.set('trip', tripId); window.history.replaceState(null, '', url);
     for (const node of view.querySelectorAll('[data-selected]')) delete node.dataset.selected;
-    renderView(); renderInspector();
+    for (const node of view.querySelectorAll(`[data-trip-id="${tripId}"]`)) node.dataset.selected = 'true';
+    renderInspector();
     if (window.matchMedia('(max-width: 1100px)').matches) document.querySelector('.inspector').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
@@ -756,11 +866,12 @@ function renderInspector() {
     }
     const nodes = [];
     const head = element('div', null, `strip inspector-strip accent-${trip.palette || 'sky'}`);
-    const title = element('div', null, 'trip-strip-head'); title.append(element('span', trip.code, 'code-tag'), chip(trip.aircraft_type || 'Aircraft', 'brand'));
+    const title = element('div', null, 'trip-strip-head'); title.append(element('span', trip.code, 'code-tag'), chip(trip.registration ? `${trip.registration} · ${trip.aircraft_type || ''}` : trip.aircraft_type || 'Aircraft', 'brand'));
     head.append(title, element('span', `${formatDate(trip.start_date)} · ${trip.route || ''}`, 'small mono'));
     const chips = element('div', null, 'chip-list');
     if (trip.operated) chips.append(chip('Operated · read-only', undefined, { iconName: 'lock' }));
     if (!trip.flight_active) chips.append(chip('Flight disabled', 'danger'));
+    const pending = routeChangeChip(trip); if (pending) chips.append(pending);
     if (chips.childElementCount) head.append(chips);
     nodes.push(head);
 
@@ -770,7 +881,10 @@ function renderInspector() {
     if (trip.report) add('Duty (UTC)', utcRange(trip.report, trip.release));
     add('Block', formatMinutes(trip.block_minutes));
     add('Duty time', formatMinutes(trip.duty_minutes));
+    // The plane flying the trip ("7Q-TBA · Boeing 737-800 (B737)"), and whether crew control chose it.
+    add('Aircraft', `${trip.aircraft_label || '—'}${staff && trip.aircraft_source === 'manual' ? ' · set by hand' : ''}`);
     nodes.push(details);
+    if (changeable(trip)) nodes.push(planeTools(trip));
 
     const legs = element('ol', null, 'leg-list');
     for (const duty of trip.duties) {
@@ -817,6 +931,12 @@ function seatRow(trip, seat) {
         top.append(change);
     }
     row.append(top);
+    // A captain who flies only part of the trip: which legs and their own report/release times.
+    if (seat.section) {
+        const periods = seat.section.duties;
+        row.append(element('p', `Section ${seat.section.route} · ${periods[0]?.report_local}–${periods[periods.length - 1]?.release_local} LT · legs ${seat.section.from_leg}–${seat.section.to_leg} of ${trip.legs.length}`, 'seat-section small mono'));
+    }
+    if (seat.rank === 'CPT' && changeable(trip) && trip.legs?.length > 1) row.append(captainTools(trip, seat));
     // Seat tools: exclude the holder from this trip, or undo the last manual change.
     if (changeable(trip) && (seat.crew || seat.can_undo)) {
         const tools = element('div', null, 'seat-tools');
@@ -833,7 +953,8 @@ function seatRow(trip, seat) {
         row.append(tools);
     }
     for (const conflict of state.index.seatConflicts.get(seat.id) || []) {
-        const line = element('div', null, 'seat-issue'); if (!conflict.acknowledged) line.dataset.tone = 'danger';
+        // Rule breaks are red; warnings (positioning, missing document records) keep the amber warning colour.
+        const line = element('div', null, 'seat-issue'); if (!conflict.acknowledged && conflict.severity === 'danger') line.dataset.tone = 'danger';
         line.append(icon(conflict.acknowledged ? 'lock' : 'alert', 'icon-sm'), element('span', `${conflict.message}${conflict.acknowledged ? ' (override recorded)' : ''}`));
         row.append(line);
     }
@@ -842,12 +963,86 @@ function seatRow(trip, seat) {
     return row;
 }
 
+/**
+ * "Change plane" for a trip that can still change: loads the planes from the server (the flight plan's own
+ * first, each with its status and any other trip it is already flying then), and saves crew control's choice,
+ * or hands the choice back to the roster build. The trip then follows the plane's type; the roster reloads to
+ * show added or removed cabin seats and any rating conflicts.
+ */
+function planeTools(trip) {
+    const tools = element('div', null, 'plane-tools');
+    const open = element('button', 'Change plane', 'button button-sm button-secondary'); open.type = 'button';
+    open.addEventListener('click', event => busy(event.currentTarget, async () => {
+        let choices;
+        try { choices = (await api(`/api/v1/trips/${trip.id}/aircraft-options`)).data; } catch (error) { showError(error); return; }
+        const label = element('label', null, 'plane-pick'); label.append(element('span', 'Plane for this trip', 'small'));
+        const select = element('select'); select.name = 'aircraft_id';
+        const auto = element('option', 'Let the roster choose (from the flight plan\'s planes)'); auto.value = ''; select.append(auto);
+        for (const choice of choices) {
+            const notes = [choice.listed ? null : 'not on this flight plan', choice.status === 'available' ? null : choice.status_label.charAt(0).toLowerCase() + choice.status_label.slice(1), choice.busy_with ? `also on ${choice.busy_with}` : null].filter(Boolean);
+            const option = element('option', `${choice.label}${notes.length ? ` — ${notes.join(', ')}` : ''}`); option.value = String(choice.id);
+            option.selected = choice.current && trip.aircraft_source === 'manual';
+            select.append(option);
+        }
+        label.append(select);
+        const save = element('button', 'Save plane', 'button button-sm'); save.type = 'button';
+        save.addEventListener('click', ev => busy(ev.currentTarget, () => seatAction(`/api/v1/trips/${trip.id}/aircraft`, 'PUT', { aircraft_id: select.value ? Number(select.value) : null })));
+        tools.replaceChildren(label, save);
+        select.focus();
+    }));
+    tools.append(open);
+    return tools;
+}
+
+/**
+ * Captain section tools for a captain seat: change captain after a chosen stop (any stop inside the seat's
+ * section, base or outstation), and join the section with the next captain section. First officers and cabin
+ * crew always fly the whole trip, so they never get these tools. The server checks every choice.
+ */
+function captainTools(trip, seat) {
+    const tools = element('div', null, 'captain-tools');
+    const from = seat.from_leg ?? 1; const to = seat.to_leg ?? trip.legs.length;
+    if (to > from) {
+        const label = element('label', null, 'captain-split');
+        label.append(element('span', 'Change captain after', 'small'));
+        const select = element('select'); select.name = 'after_leg';
+        // Each stop inside the section: after leg n the aircraft is at that leg's destination.
+        for (const leg of trip.legs.filter(item => item.number >= from && item.number < to)) {
+            const option = element('option', `${leg.from_airport}→${leg.to_airport}, at ${leg.to_airport} ${leg.arrives_local} LT`); option.value = String(leg.number);
+            select.append(option);
+        }
+        label.append(select);
+        const split = element('button', 'Split', 'button button-sm button-secondary'); split.type = 'button';
+        split.addEventListener('click', event => busy(event.currentTarget, () => seatAction(`/api/v1/assignments/${seat.id}/split`, 'POST', { after_leg: Number(select.value) })));
+        tools.append(label, split);
+    }
+    const next = trip.assignments.find(item => item.rank === 'CPT' && item.seat_number === seat.seat_number + 1);
+    if (next) {
+        const join = element('button', 'Join with next section', 'text-button'); join.type = 'button';
+        join.addEventListener('click', async () => {
+            const holders = [seat.crew?.name, next.crew?.name].filter(Boolean);
+            if (holders.length) {
+                const confirmed = await confirmAction({ title: 'Join these captain sections?', message: `${holders.join(' and ')} ${holders.length === 1 ? 'is' : 'are'} released and the joined captain seat is open until you assign a captain or rebuild.`, confirmLabel: 'Join sections' });
+                if (!confirmed) return;
+            }
+            await seatAction(`/api/v1/assignments/${seat.id}/join`, 'POST');
+        });
+        tools.append(join);
+    }
+    return tools;
+}
+
 /** Plain-language explanation from the seat's decision log (staff only). */
 function rationale(seat) {
     const log = seat.decision_log;
     if (!staff || !log) return null;
+    // The flight pattern's legs changed, so the generator joined the captain sections back into one seat.
+    if (log.action === 'sections_reset') return log.reason;
     if (log.by === 'manual') {
         if (log.action === 'cleared') return `Cleared by ${log.user}; the next build can fill it.`;
+        if (log.action === 'split') return `${log.reason} Set by ${log.user}; assign a captain or rebuild to fill this section.`;
+        if (log.action === 'joined') return `Captain sections joined by ${log.user}${log.released?.length ? `, releasing ${log.released.join(' and ')}` : ''}; assign a captain or rebuild.`;
+        if (log.positioning) return `Set by ${log.user}${log.reason ? ` — “${log.reason}”` : ''}. Kept on rebuild. ${log.positioning}`;
         if (log.action === 'excluded') return `Opened by ${log.user}, who excluded the previous crew member from this trip.`;
         const standby = log.cleared_standby?.length ? ` Standby on ${log.cleared_standby.map(shortDate).join(', ')} was cleared.` : '';
         return `Set by ${log.user}${log.reason ? ` — “${log.reason}”` : ''}. Kept on rebuild.${standby}`;
@@ -861,9 +1056,9 @@ function rationale(seat) {
     return `Chosen by the generator from ${log.legal} legal of ${plural(log.considered, 'candidate')}: lowest fairness score ${log.score} (week ${formatMinutes(log.week_minutes)} of ${formatMinutes(log.capacity_minutes)}).${alternatives ? ` Next best: ${alternatives}.` : ''}`;
 }
 
-/** Run a seat action (undo, allow again) and reload the week; the server message pops up. */
-async function seatAction(path, method) {
-    try { await api(path, { method }); await Promise.all([loadTimeline(), loadWeek()]); }
+/** Run a seat action (undo, allow again, split, join) and reload the week; the server message pops up. */
+async function seatAction(path, method, body = undefined) {
+    try { await api(path, { method, body }); await Promise.all([loadTimeline(), loadWeek()]); }
     catch (error) { showError(error); }
 }
 
@@ -917,6 +1112,8 @@ function renderCandidates() {
             for (const issue of candidate.issues) issues.append(element('li', issue.message));
             body.append(issues);
         }
+        // Positioning for a captain section: allowed without a reason, crew control arranges the travel.
+        for (const warning of candidate.warnings || []) body.append(chip(warning.message, 'warning', { iconName: 'alert' }));
         label.append(input, body);
         return label;
     }));
@@ -1067,6 +1264,21 @@ async function loadEmailLog() {
         return row;
     }));
 }
+/**
+ * Email only the crew whose duties changed when this roster was published again (for example after flights
+ * were disabled or edited). Lists who and what changed, asks first, then the server sends; its message pops up.
+ */
+async function emailChangedCrew() {
+    const changed = state.week?.changed_crew || [];
+    if (!changed.length) return;
+    const names = changed.map(item => item.name);
+    const confirmed = await confirmAction({ title: `Email ${plural(changed.length, 'crew member')} about the changes?`,
+        message: `${names.slice(0, 8).join(', ')}${names.length > 8 ? ` and ${names.length - 8} more` : ''} get their updated roster with a list of what changed since the last publication.`, confirmLabel: 'Send emails', tone: 'info' });
+    if (!confirmed) return;
+    try { await api(`/api/v1/roster-periods/${state.week.id}/email`, { method: 'POST', body: { only: 'changed' } }); }
+    catch (error) { showError(error); }
+}
+
 if (staff) {
     buttons.email.addEventListener('click', event => busy(event.currentTarget, async () => {
         const confirmed = await confirmAction({ title: `Email ${state.week.label} to crew?`, message: 'Each crew member with a seat in this roster is emailed their roster (with the crew they fly with) and a calendar file at the address on their crew profile. Sending can take a minute for a large roster.', confirmLabel: 'Send emails', tone: 'info' });
@@ -1100,21 +1312,145 @@ async function loadMyHours() {
 
 /* ---------------------------------------------------------------- Week actions */
 
-/** Run the generator; the server message reports filled and open seats, and skipped patterns are listed. */
-async function build() {
+/**
+ * Run the generator. A first build runs straight away. A rebuild asks for confirmation, or, when flight routes
+ * changed since the last build, opens the route-changes review instead; its confirm button calls back here with
+ * the reviewed set's fingerprint so the server applies exactly what was shown. The server message reports
+ * filled and open seats; skipped patterns, applied route changes and balancing are listed as pop-ups.
+ *
+ * @param {string|null} routeChanges fingerprint of the route changes the scheduler confirmed
+ */
+async function build(routeChanges = null) {
     const week = state.week;
-    if (week.built_at) {
+    if (week.built_at && !routeChanges) {
+        if (week.route_changes?.count) { openChanges(); return; }
         const confirmed = await confirmAction({ title: `Rebuild ${week.label}?`, message: 'Automatic seats from today onwards are planned again from current crew data. Locked (manually set) seats and trips that have already operated stay as they are.', confirmLabel: 'Rebuild', tone: 'info' });
         if (!confirmed) return;
     }
-    const { data } = await api(`/api/v1/roster-periods/${week.id}/build`, { method: 'POST' });
+    let data;
+    try {
+        ({ data } = await api(`/api/v1/roster-periods/${week.id}/build`, { method: 'POST', body: routeChanges ? { route_changes: routeChanges } : {} }));
+    } catch (error) {
+        // Routes changed again after the review (the server's message has popped up): show the new list.
+        if (!error.errors?.route_changes) throw error;
+        await loadWeek();
+        if (state.week?.route_changes?.count) openChanges();
+        return;
+    }
     applyWeek(data);
     for (const skipped of data.summary.build?.skipped || []) toast(skipped, { type: 'warning', title: 'Flight skipped' });
+    const applied = data.summary.build?.route_changes;
+    if (applied) toast(`${routeChangeSummary(applied, { done: true })}${applied.released_seats ? `; ${plural(applied.released_seats, 'crew seat')} released` : ''}.`, { type: 'info', title: 'Route changes applied' });
     const extra = [data.summary.build?.rebalanced ? `${plural(data.summary.build.rebalanced, 'seat')} moved to even out working hours` : null, data.summary.build?.standby ? `${plural(data.summary.build.standby, 'standby day')} planned to fill workload gaps` : null].filter(Boolean);
     if (extra.length) toast(`${extra.join('; ')}.`, { type: 'info', title: 'Balancing' });
 }
 
+/* ---------------------------------------------------------------- Route changes */
+
+// Review of what a rebuild would change after flights were disabled, enabled or edited (staff only).
+const changesDialog = document.querySelector('#changes-dialog');
+
+/** "Mon 05 Oct" for a base-local calendar date, without the browser timezone. */
+function dayLabel(date) { return `${WEEKDAYS[(parseDay(date).getUTCDay() + 6) % 7]} ${shortDate(date)}`; }
+
+/**
+ * "2 trips to remove, 1 trip to add" (pending) or "2 trips removed, 1 trip added" (applied). Accepts the
+ * window's route_changes (lists) or a build summary's route_changes (counts).
+ */
+function routeChangeSummary(changes, { done = false } = {}) {
+    const count = value => (Array.isArray(value) ? value.length : value || 0);
+    return [
+        count(changes.removed) && `${plural(count(changes.removed), 'trip')} ${done ? 'removed' : 'to remove'}`,
+        count(changes.added) && `${plural(count(changes.added), 'trip')} ${done ? 'added' : 'to add'}`,
+        count(changes.changed) && `${plural(count(changes.changed), 'trip')} ${done ? 'updated' : 'with a new schedule'}`,
+    ].filter(Boolean).join(', ');
+}
+
+/** Chip for a trip card or the inspector when the next rebuild will remove or reschedule the trip. */
+function routeChangeChip(trip) {
+    const pending = staff ? state.index?.routeChanges.get(trip.id) : null;
+    if (pending === 'removed') return chip('Removed on rebuild', 'danger', { iconName: 'route' });
+    if (pending === 'changed') return chip('New schedule on rebuild', 'warning', { iconName: 'route' });
+    return null;
+}
+
+/** Group change rows that share a key (flight and reason) so each flight reads as one line with its dates. */
+function groupBy(rows, keyOf) {
+    const groups = new Map();
+    for (const row of rows) groups.set(keyOf(row), [...(groups.get(keyOf(row)) || []), row]);
+    return [...groups.values()];
+}
+
+/** One section of the review: a titled list of rows. */
+function changeSection(title, rows) {
+    const section = element('section', null, 'change-section');
+    const list = element('ul', null, 'change-list'); list.append(...rows);
+    section.append(element('h3', title, 'change-section-title label-caps'), list);
+    return section;
+}
+
+/** One row of the review: flight number, a text chip for the kind of change, then detail lines. */
+function changeRow(kind, code, label, tone, lines) {
+    const row = element('li', null, 'change-row'); row.dataset.kind = kind;
+    const head = element('div', null, 'change-row-head'); head.append(element('span', code, 'code-tag'), chip(label, tone));
+    row.append(head, ...lines);
+    return row;
+}
+
+/**
+ * Open the route-changes review for the selected roster: trips to remove (with everyone released, locked seats
+ * marked), trips to add and trips whose schedule changed, plus patterns the roster's rules reject. A draft can
+ * be rebuilt from here with exactly this set; a published roster explains it must be reopened first.
+ */
+function openChanges() {
+    const week = state.week; const changes = week?.route_changes;
+    if (!changesDialog || !changes) return;
+    const draft = week.editable;
+    document.querySelector('#changes-dialog-subtitle').textContent = `${week.label}: ${routeChangeSummary(changes) || 'nothing to change'}. `
+        + (draft ? 'Nothing changes until you confirm. The rebuild then plans the open seats again; other locked seats and trips that have operated are kept.' : 'This roster is published: reopen it as a draft to apply these changes.');
+    const sections = [];
+    if (changes.locked_seats) {
+        const alert = element('div', null, 'alert-row'); alert.dataset.tone = 'danger';
+        const text = element('div', null, 'alert-row-text');
+        text.append(element('span', `${plural(changes.locked_seats, 'locked seat')} will be released`, 'alert-row-title'), element('span', 'These crew were placed by hand on trips that are being removed. They lose that duty when you confirm.', 'alert-row-meta'));
+        alert.append(icon('lock', 'alert-row-icon'), text);
+        sections.push(alert);
+    }
+    if (changes.removed.length) {
+        sections.push(changeSection('Trips to remove', groupBy(changes.removed, trip => `${trip.code}|${trip.reason}`).map(trips => {
+            const lines = [element('span', `${trips.map(trip => dayLabel(trip.date)).join(', ')}${trips[0].route ? ` · ${trips[0].route}` : ''}`, 'small mono')];
+            for (const trip of trips.filter(item => item.seats.length)) {
+                const released = element('span', null, 'change-released'); released.append(element('span', `${dayLabel(trip.date)} releases:`));
+                for (const seat of trip.seats) released.append(chip(`${seatName(seat)} ${seat.name}${seat.section ? ` (${seat.section})` : ''}${seat.locked ? ' (locked)' : ''}`, seat.locked ? 'warning' : undefined, seat.locked ? { iconName: 'lock' } : {}));
+                lines.push(released);
+            }
+            return changeRow('removed', trips[0].code, trips[0].reason_label, 'danger', lines);
+        })));
+    }
+    if (changes.added.length) {
+        sections.push(changeSection('Trips to add', groupBy(changes.added, trip => trip.code).map(trips => changeRow('added', trips[0].code, 'New trips', 'success',
+            [element('span', `${trips.map(trip => dayLabel(trip.date)).join(', ')} · ${trips[0].route}`, 'small mono')]))));
+    }
+    if (changes.changed.length) {
+        sections.push(changeSection('New schedule', changes.changed.map(trip => changeRow('changed', trip.code, 'Schedule changed', 'warning',
+            [element('span', `${dayLabel(trip.date)} · ${trip.route}`, 'small mono'), ...trip.details.map(detail => element('span', detail, 'small'))]))));
+    }
+    if (changes.skipped.length) {
+        sections.push(changeSection('Not planned (fails this roster\'s duty rules)', changes.skipped.map(message => element('li', message, 'change-row small'))));
+    }
+    if (!sections.length) sections.push(emptyState('No route changes', 'This roster already matches Flight routes.', 'route'));
+    document.querySelector('#changes-body').replaceChildren(...sections);
+    document.querySelector('#changes-confirm').hidden = !draft || !changes.count;
+    changesDialog.showModal();
+}
+
 if (staff) {
+    // Confirming the review rebuilds with exactly the reviewed set (the server refuses a stale one).
+    document.querySelector('#changes-confirm').addEventListener('click', event => busy(event.currentTarget, async () => {
+        const fingerprint = state.week?.route_changes?.fingerprint;
+        changesDialog.close();
+        await build(fingerprint).catch(showError);
+    }));
     // "New roster": 1 week, 2 weeks or a calendar month, created and built from the dialog.
     document.querySelector('#new-roster').addEventListener('click', openCreateDialog);
     document.querySelector('#create-dialog [data-close]').addEventListener('click', () => document.querySelector('#create-dialog').close());
@@ -1122,7 +1458,9 @@ if (staff) {
     buttons.publish.addEventListener('click', event => busy(event.currentTarget, async () => {
         const confirmed = await confirmAction({ title: `Publish ${state.week.label}?`, message: `Crew will see their duties for ${state.week.label}.${state.week.summary.open ? ` ${plural(state.week.summary.open, 'seat')} will show as open time.` : ''} To change it later, reopen it as a draft.`, confirmLabel: 'Publish', tone: 'info' });
         if (!confirmed) return;
-        try { applyWeek((await api(`/api/v1/roster-periods/${state.week.id}/publish`, { method: 'POST' })).data); } catch (error) { showError(error); }
+        try { applyWeek((await api(`/api/v1/roster-periods/${state.week.id}/publish`, { method: 'POST' })).data); } catch (error) { showError(error); return; }
+        // Published again with changes: offer to tell the crew whose duties changed.
+        if (state.week.changed_crew?.length) await emailChangedCrew();
     }));
     buttons.reopen.addEventListener('click', event => busy(event.currentTarget, async () => {
         const confirmed = await confirmAction({ title: `Reopen ${state.week.label} as a draft?`, message: 'Crew stop seeing this week until you publish it again.', confirmLabel: 'Reopen', tone: 'info' });

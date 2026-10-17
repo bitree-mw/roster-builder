@@ -40,8 +40,8 @@ const aircraftEditor = editor({
 // Create/edit dialog for aircraft types.
 const typeEditor = editor({
     form: typeForm, dialog: document.querySelector('#type-dialog'), endpoint: '/api/v1/aircraft-types', label: 'Aircraft type', refresh,
-    read: () => ({ code: typeForm.elements.code.value, cabin_crew_required: Number(typeForm.elements.cabin_crew_required.value), palette: typeForm.elements.palette.value }),
-    fill: record => { if (record) for (const key of ['code', 'cabin_crew_required', 'palette']) typeForm.elements[key].value = record[key]; },
+    read: () => ({ code: typeForm.elements.code.value, name: typeForm.elements.name.value.trim() || null, cabin_crew_required: Number(typeForm.elements.cabin_crew_required.value), palette: typeForm.elements.palette.value }),
+    fill: record => { if (record) for (const key of ['code', 'name', 'cabin_crew_required', 'palette']) typeForm.elements[key].value = record[key] ?? ''; },
 });
 
 /** Open the status dialog pre-selected with the airframe's current status and reason. */
@@ -85,7 +85,10 @@ function airframeCard(record) {
     const card = element('article', null, 'airframe-card'); card.dataset.status = record.status;
     const head = element('header', null, 'airframe-head');
     const identity = element('div'); identity.append(element('span', record.registration, 'airframe-reg'));
-    const type = element('div', null, 'airframe-type'); type.append(element('span', record.aircraft_type?.code ?? 'Unknown type', `chip palette-${record.aircraft_type?.palette ?? 'sky'}`)); identity.append(type);
+    const type = element('div', null, 'airframe-type'); type.append(element('span', record.aircraft_type?.code ?? 'Unknown type', `chip palette-${record.aircraft_type?.palette ?? 'sky'}`));
+    // The type's full name next to the code, e.g. "Boeing 737-800".
+    if (record.aircraft_type?.name) type.append(element('span', record.aircraft_type.name, 'small muted'));
+    identity.append(type);
     head.append(identity, chip(record.status_label, aircraftStatusTone[record.status], { dot: true }));
     card.append(head);
     if (record.status_reason) card.append(element('p', record.status_reason, 'airframe-reason'));
@@ -118,7 +121,10 @@ function renderTypes() {
     document.querySelector('#type-count').textContent = plural(types.length, 'type');
     if (!types.length) return emptyRow(typeRows, 5, 'No aircraft types yet. Add a type before registering aircraft or flight patterns.', 'grid');
     typeRows.replaceChildren(...types.map(record => {
-        const row = element('tr'); cell(row, record.code); cell(row, plural(record.cabin_crew_required, 'seat'), 'mono');
+        // Type code with its full name underneath ("B737" / "Boeing 737-800").
+        const row = element('tr'); const typeCell = cell(row, record.code);
+        if (record.name) typeCell.append(element('span', record.name, 'type-name small muted'));
+        cell(row, plural(record.cabin_crew_required, 'seat'), 'mono');
         cell(row).append(element('span', record.palette, `chip palette-${record.palette}`));
         const availability = cell(row);
         if (!record.aircraft_count) availability.append(element('span', 'No airframes registered', 'small muted'));

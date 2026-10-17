@@ -9,10 +9,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
- * A fleet type such as Q400 or B737. Defines the cabin crew complement every flight of the type needs
- * and the semantic roster palette (a token name, never a colour value).
+ * A fleet type such as Q400 or B737, with an optional full name (e.g. "Boeing 737-800") shown with airframe
+ * registrations. Defines the cabin crew complement every flight of the type needs and the semantic roster
+ * palette (a token name, never a colour value).
  */
-#[Fillable(['code', 'cabin_crew_required', 'palette'])]
+#[Fillable(['code', 'name', 'cabin_crew_required', 'palette'])]
 class AircraftType extends Model
 {
     use HasFactory;

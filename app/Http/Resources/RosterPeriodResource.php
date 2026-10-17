@@ -9,7 +9,8 @@ use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
  * JSON shape of a roster week for the week timeline: dates, status, build/publication times and, when the
- * controller counted them, seat totals. editable is false once the week is published or has ended.
+ * controller counted them, seat totals and pending route changes. editable is false once the week is
+ * published or has ended.
  *
  * @mixin RosterPeriod
  */
@@ -35,6 +36,8 @@ class RosterPeriodResource extends JsonResource
             'trips_count' => $this->whenCounted('trips'),
             'seats_count' => $this->whenHas('seats_count', fn (): int => (int) $this->seats_count),
             'open_seats_count' => $this->whenHas('open_seats_count', fn (): int => (int) $this->open_seats_count),
+            // Staff timeline only: trips a rebuild would add, remove or change to follow the current flight routes.
+            'route_changes_count' => $this->whenHas('route_changes_count', fn (): int => (int) $this->route_changes_count),
         ];
     }
 }

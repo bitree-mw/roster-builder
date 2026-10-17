@@ -40,6 +40,9 @@ class FlightRequest extends FormRequest
             'code' => ['required', 'string', 'max:20', 'regex:/^[A-Z0-9-]+$/', Rule::unique('flights')->ignore($this->route('flight'))],
             'aircraft_type_id' => ['required', 'integer', 'exists:aircraft_types,id'],
             'active' => ['required', 'boolean'],
+            // Planes that can fly this plan, in order of preference (any type). Left out: the list is unchanged.
+            'aircraft_ids' => ['sometimes', 'array', 'max:20'],
+            'aircraft_ids.*' => ['integer', 'distinct', 'exists:aircraft,id'],
             // Zone of the leg times in this payload: "utc" (GMT, as the Flight routes page sends) or "local" (base time).
             'time_zone' => ['sometimes', 'in:local,utc'],
             'weekdays' => ['required', 'array', 'min:1', 'max:7'],

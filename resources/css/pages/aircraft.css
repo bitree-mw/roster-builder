@@ -24,3 +24,7 @@
 #type-rows td:first-child { font-family: var(--font-mono); font-weight: 700; }
 #status-dialog { width: min(100% - 2rem, 40rem); }
 #type-dialog, #aircraft-dialog { width: min(100% - 2rem, 38rem); }
+
+/* Aircraft type full name ("Boeing 737-800") under the type code, and beside the code on airframe cards. */
+.type-name { display: block; font-weight: 400; }
+.airframe-type { display: flex; flex-wrap: wrap; align-items: center; gap: .375rem; }

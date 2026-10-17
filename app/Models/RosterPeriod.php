@@ -15,11 +15,16 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * weeks from a Monday) or a calendar month. Periods never overlap. rules_snapshot freezes the duty rules in
  * force when the period was created so later rule changes never reinterpret it. Status, build and
  * publication fields are set by RosterPeriodService and RosterBuilderService only, never mass-assigned.
+ * published_duties records each crew member's duties at the last publication and changed_crew the crew whose
+ * duties differed from the publication before it, so only they need to be told about a republished roster.
  */
 #[Fillable(['starts_on', 'ends_on', 'length', 'rules_snapshot'])]
 class RosterPeriod extends Model
 {
     use HasFactory;
+
+    /** Every crew member's published duty lines are bulky; audit rows (toArray) keep only changed_crew. */
+    protected $hidden = ['published_duties'];
 
     /** Period lengths and their labels. */
     public const LENGTHS = ['week' => '1 week', 'fortnight' => '2 weeks', 'month' => 'Month'];
@@ -29,7 +34,8 @@ class RosterPeriod extends Model
      */
     protected function casts(): array
     {
-        return ['starts_on' => LocalDate::class, 'ends_on' => LocalDate::class, 'rules_snapshot' => 'array', 'built_at' => 'immutable_datetime', 'published_at' => 'immutable_datetime'];
+        return ['starts_on' => LocalDate::class, 'ends_on' => LocalDate::class, 'rules_snapshot' => 'array', 'built_at' => 'immutable_datetime', 'published_at' => 'immutable_datetime',
+            'published_duties' => 'array', 'changed_crew' => 'array'];
     }
 
     /**

@@ -68,7 +68,9 @@
 <dialog id="type-dialog" class="dialog" aria-labelledby="type-dialog-title"><form id="type-form" novalidate>
     <div class="dialog-heading"><div><h2 id="type-dialog-title" data-dialog-title>Add aircraft type</h2><p>Cabin complement is used when crewing every flight of this type.</p></div><button type="button" class="icon-button" data-close aria-label="Close"><x-icon name="x" /></button></div>
     <div class="form-grid">
-        <label>Type code<input name="code" required maxlength="20" placeholder="Q400" class="mono"></label>
+        <label>Type code<input name="code" required maxlength="20" placeholder="B737" class="mono"></label>
+        {{-- Full name shown with each plane's registration, e.g. "7Q-TBA · Boeing 737-800 (B737)". --}}
+        <label>Full name<input name="name" maxlength="100" placeholder="Boeing 737-800" autocomplete="off"><span class="field-hint">Optional. Shown with each plane's registration.</span></label>
         <label>Cabin crew required<input name="cabin_crew_required" type="number" required min="0" max="20" value="2"></label>
         <label>Roster palette<select name="palette"><option value="forest">Forest</option><option value="gold">Gold</option><option value="sky">Sky</option><option value="plum">Plum</option><option value="coral">Coral</option></select></label>
     </div>

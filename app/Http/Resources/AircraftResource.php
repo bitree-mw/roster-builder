@@ -20,6 +20,8 @@ class AircraftResource extends JsonResource
             'registration' => $this->registration,
             'aircraft_type_id' => $this->aircraft_type_id,
             'aircraft_type' => new AircraftTypeResource($this->whenLoaded('aircraftType')),
+            // "7Q-TBA · Boeing 737-800 (B737)", as on flight plans and rosters.
+            'label' => $this->whenLoaded('aircraftType', fn (): string => $this->resource->label()),
             'status' => $this->status,
             'status_label' => Aircraft::STATUSES[$this->status] ?? $this->status,
             'status_reason' => $this->status_reason,

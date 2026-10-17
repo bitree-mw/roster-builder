@@ -6,9 +6,13 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-/** An individual airframe (tail) of an aircraft type. Status is changed only through AircraftService::changeStatus. */
+/**
+ * An individual airframe (tail) of an aircraft type. Status is changed only through AircraftService::changeStatus.
+ * Flight plans list the airframes that may fly them; each dated trip is flown by one of them.
+ */
 #[Fillable(['registration', 'aircraft_type_id', 'airframe_hours', 'notes'])]
 class Aircraft extends Model
 {
@@ -49,5 +53,24 @@ class Aircraft extends Model
     public function maintenanceRecords(): HasMany
     {
         return $this->hasMany(MaintenanceRecord::class);
+    }
+
+    /**
+     * Flight plans this airframe may fly (flight_aircraft, with its position in each plan's preference order).
+     */
+    public function flights(): BelongsToMany
+    {
+        return $this->belongsToMany(Flight::class, 'flight_aircraft')->withPivot('position');
+    }
+
+    /**
+     * How the plane is shown everywhere: "7Q-TBA · Boeing 737-800 (B737)", or "7Q-TBA · B737" when the type has
+     * no full name. Needs aircraftType loaded.
+     */
+    public function label(): string
+    {
+        $type = $this->aircraftType;
+
+        return $this->registration.' · '.($type?->name ? $type->name.' ('.$type->code.')' : ($type?->code ?? 'Aircraft'));
     }
 }

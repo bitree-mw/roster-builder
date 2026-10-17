@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\RosterBuildRequest;
 use App\Http\Requests\RosterPeriodRequest;
 use App\Http\Requests\RosterQueryRequest;
 use App\Http\Resources\RosterPeriodResource;
@@ -14,6 +15,7 @@ use App\Services\RosterBuilderService;
 use App\Services\RosterConflictService;
 use App\Services\RosterLegalityService;
 use App\Services\RosterPeriodService;
+use App\Services\RosterScheduleService;
 use App\Support\Api\ApiResponse;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
@@ -26,11 +28,12 @@ use Illuminate\Support\Facades\Gate;
  */
 class RosterPeriodController extends Controller
 {
-    public function __construct(private RosterPeriodService $periods, private RosterLegalityService $legality, private RosterConflictService $conflicts) {}
+    public function __construct(private RosterPeriodService $periods, private RosterLegalityService $legality, private RosterConflictService $conflicts, private RosterScheduleService $schedule) {}
 
     /**
      * GET /roster-periods?from=YYYY-MM-DD&to=YYYY-MM-DD — periods (weeks, fortnights, months) overlapping the
-     * range (default: eight weeks back to twelve ahead), oldest first. Staff also get trip and seat counts;
+     * range (default: eight weeks back to twelve ahead), oldest first. Staff also get trip and seat counts and,
+     * for built rosters that have not ended, how many trips the current flight routes would change;
      * crew only see published periods.
      */
     public function index(RosterQueryRequest $request): JsonResponse
@@ -45,6 +48,12 @@ class RosterPeriodController extends Controller
             ->when(! $staff, fn ($query) => $query->where('status', 'published'))
             ->when($staff, fn ($query) => $query->select('roster_periods.*')->withCount('trips')->addSelect(['seats_count' => $seats(false), 'open_seats_count' => $seats(true)]))
             ->orderBy('starts_on')->get();
+        if ($staff) {
+            // Flags rosters left behind by disabled, enabled or edited flights on the timeline (never stored).
+            foreach ($periods as $period) {
+                $period->route_changes_count = $this->schedule->changes($period)['count'] ?? 0;
+            }
+        }
 
         return ApiResponse::resource(RosterPeriodResource::collection($periods));
     }
@@ -76,18 +85,19 @@ class RosterPeriodController extends Controller
     }
 
     /**
-     * POST /roster-periods/{id}/build — run the roster generator for a draft roster (1 week, 2 weeks or a month)
-     * and return the new roster. A monthly build checks every crew member for hundreds of seats, so the request
-     * asks PHP for more than the usual 30 seconds (config roster.build_time_limit) where the host allows it.
+     * POST /roster-periods/{id}/build {route_changes?} — run the roster generator for a draft roster (1 week,
+     * 2 weeks or a month) and return the new roster. When flight routes changed since the last build, the body
+     * must carry the fingerprint of the route changes the scheduler reviewed (422 on route_changes otherwise).
+     * A monthly build checks every crew member for hundreds of seats, so the request asks PHP for more than the
+     * usual 30 seconds (config roster.build_time_limit) where the host allows it.
      */
-    public function build(Request $request, RosterPeriod $rosterPeriod, RosterBuilderService $builder): JsonResponse
+    public function build(RosterBuildRequest $request, RosterPeriod $rosterPeriod, RosterBuilderService $builder): JsonResponse
     {
-        Gate::authorize('manage-operations');
         // Only raise an existing limit (0 means none, as on the command line); hosts may disable set_time_limit.
         if ((int) ini_get('max_execution_time') !== 0 && function_exists('set_time_limit')) {
             set_time_limit((int) config('roster.build_time_limit'));
         }
-        $result = $builder->build($rosterPeriod, $request->user());
+        $result = $builder->build($rosterPeriod, $request->user(), $request->validated('route_changes'));
         // Explain the outcome: nothing to plan, open seats with their main reasons, or everything filled.
         $key = match (true) {
             $result['planned_trips'] === 0 => 'roster_period.built_empty',
@@ -102,14 +112,17 @@ class RosterPeriodController extends Controller
     }
 
     /**
-     * POST /roster-periods/{id}/publish — release a built week to crew (422 while rule conflicts remain).
+     * POST /roster-periods/{id}/publish — release a built week to crew (422 while rule conflicts remain). When
+     * it was published before, the response lists the crew whose duties changed (changed_crew).
      */
     public function publish(Request $request, RosterPeriod $rosterPeriod): JsonResponse
     {
         Gate::authorize('manage-operations');
         $period = $this->periods->publish($rosterPeriod, $request->user());
+        // Published again after changes: say how many crew have different duties (they can be emailed next).
+        $changed = count($period->changed_crew ?? []);
 
-        return ApiResponse::resource($this->week($period, $request->user()), 'roster_period.published', ['label' => $period->label()]);
+        return ApiResponse::resource($this->week($period, $request->user()), $changed > 0 ? 'roster_period.published_changed' : 'roster_period.published', ['label' => $period->label(), 'count' => $changed]);
     }
 
     /**
@@ -124,7 +137,8 @@ class RosterPeriodController extends Controller
     }
 
     /**
-     * The roster window payload. Staff get every seat, conflicts and seat totals; a crew account gets only
+     * The roster window payload. Staff get every seat, conflicts, seat totals and the pending route changes
+     * (what a rebuild would change after flights were disabled, enabled or edited); a crew account gets only
      * their own seats with their own duty totals.
      *
      * @param  array<string, mixed>|null  $build  generator result to pass back after a build
@@ -135,7 +149,8 @@ class RosterPeriodController extends Controller
         if ($user->isStaff()) {
             $conflicts = $this->conflicts->forPeriod($period, $context);
 
-            return new RosterWeekResource(['context' => $context, 'conflicts' => $conflicts, 'summary' => [...$this->conflicts->summary($context, $conflicts), 'build' => $build], 'crew_member_id' => null]);
+            return new RosterWeekResource(['context' => $context, 'conflicts' => $conflicts, 'summary' => [...$this->conflicts->summary($context, $conflicts), 'build' => $build], 'crew_member_id' => null,
+                'route_changes' => $this->schedule->changes($period)]);
         }
         $own = (int) $user->crew_member_id;
         [$from, $to] = [$period->starts_on->format('Y-m-d'), $period->ends_on->format('Y-m-d')];

@@ -93,7 +93,7 @@
                 @if($staff)<button id="email-log" class="text-button" type="button" hidden>Email status</button>@endif
             </span>
             <span id="time-note">Duty times are base local (LT); UTC instants are shown in the inspector.</span>
-            <span class="roster-legend" aria-label="Legend"><span class="legend-item" data-kind="duty">Duty</span>@if($staff)<span class="legend-item" data-kind="manual">Locked seat</span><span class="legend-item" data-kind="conflict">Conflict</span>@endif<span class="legend-item" data-kind="leave">Leave / off</span><span class="legend-item" data-kind="sim">SIM</span><span class="legend-item" data-kind="standby">Standby</span></span>
+            <span class="roster-legend" aria-label="Legend"><span class="legend-item" data-kind="duty">Duty</span>@if($staff)<span class="legend-item" data-kind="manual">Locked seat</span><span class="legend-item" data-kind="conflict">Conflict</span><span class="legend-item" data-kind="disabled">Flight disabled</span>@endif<span class="legend-item" data-kind="leave">Leave / off</span><span class="legend-item" data-kind="sim">SIM</span><span class="legend-item" data-kind="standby">Standby</span></span>
         </div>
     </section>
 
@@ -157,6 +157,20 @@
     <div class="dialog-heading"><div><h2 id="email-dialog-title">Roster email status</h2><p>Delivery of each crew member's roster email. Emails are sent when you click "Email crew"; failed ones show the mail server's reason.</p></div><button type="submit" class="icon-button" aria-label="Close"><x-icon name="x" /></button></div>
     <div class="table-wrap"><table><thead><tr><th scope="col">Crew member</th><th scope="col">Address</th><th scope="col">Status</th><th scope="col">Sent</th></tr></thead><tbody id="email-rows"></tbody></table></div>
     <div class="form-actions"><button id="email-refresh" class="button button-secondary" type="button">Refresh</button><button class="button" type="submit">Close</button></div>
+</form></dialog>
+
+{{--
+    Route changes review: what a rebuild would remove, add or change after flights were disabled, enabled or
+    edited on Flight routes, and which crew (locked seats included) lose a duty. roster.js fills the body and
+    sends the reviewed set's fingerprint with the rebuild; the confirm button is hidden for published rosters.
+--}}
+<dialog id="changes-dialog" class="dialog" aria-labelledby="changes-dialog-title"><form method="dialog">
+    <div class="dialog-heading"><div><h2 id="changes-dialog-title">Route changes</h2><p id="changes-dialog-subtitle"></p></div><button type="submit" class="icon-button" aria-label="Close"><x-icon name="x" /></button></div>
+    <div id="changes-body" class="changes-body"></div>
+    <div class="form-actions">
+        <button class="button button-secondary" type="submit">Cancel</button>
+        <button id="changes-confirm" class="button" type="button"><x-icon name="zap" class="icon-sm" />Rebuild with these changes</button>
+    </div>
 </form></dialog>
 @endif
 @endsection

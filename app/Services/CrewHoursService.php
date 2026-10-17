@@ -49,7 +49,7 @@ class CrewHoursService
                 ->whereHas('rosterPeriod', fn ($query) => $query->where('status', 'published')))
             ->with('trip')->get();
         foreach ($assignments as $assignment) {
-            $duty = Duty::fromSnapshot('assignment:'.$assignment->id, $assignment->trip_id, $assignment->trip->schedule_snapshot);
+            $duty = Duty::fromSnapshot('assignment:'.$assignment->id, $assignment->trip_id, $assignment->scheduleSnapshot());
             if ($duty === null) {
                 continue;
             }

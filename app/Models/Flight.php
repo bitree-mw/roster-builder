@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
@@ -34,11 +35,20 @@ class Flight extends Model
     }
 
     /**
-     * The aircraft type that operates the pattern.
+     * The planned aircraft type, used for trips that have no listed airframe (a trip follows its plane's type).
      */
     public function aircraftType(): BelongsTo
     {
         return $this->belongsTo(AircraftType::class);
+    }
+
+    /**
+     * Airframes that may fly this plan, in order of preference (they may be of different types). The roster
+     * build gives each dated trip the first one that is available and not already flying at that time.
+     */
+    public function aircraft(): BelongsToMany
+    {
+        return $this->belongsToMany(Aircraft::class, 'flight_aircraft')->withPivot('position')->orderByPivot('position');
     }
 
     /**

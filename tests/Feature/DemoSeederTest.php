@@ -27,7 +27,7 @@ class DemoSeederTest extends TestCase
         $this->assertDatabaseCount('aircraft_types', 2);
         $this->assertDatabaseCount('crew_members', 48);
         $this->assertDatabaseCount('flights', 9);
-        $this->assertDatabaseCount('aircraft', 4);
+        $this->assertDatabaseCount('aircraft', 10);
         $this->assertDatabaseCount('maintenance_records', 5);
         $this->assertDatabaseCount('users', 0);
         $this->assertSame(12, CrewMember::where('rank', 'CPT')->count());

@@ -12,8 +12,9 @@ use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
 /**
- * Fictional demonstration data for local development and tests: 2 aircraft types, 48 crew, 9 flight patterns,
- * 4 airframes with maintenance history, and an optional demo scheduler from DEMO_EMAIL / DEMO_PASSWORD.
+ * Fictional demonstration data for local development and tests: 2 aircraft types with full names, 48 crew,
+ * 9 flight patterns each listing the planes that can fly them, 10 airframes (4 with maintenance history), and
+ * an optional demo scheduler from DEMO_EMAIL / DEMO_PASSWORD.
  * Repeatable: existing records are left as they are. Refuses to run outside local/testing.
  */
 class DemoSeeder extends Seeder
@@ -28,8 +29,13 @@ class DemoSeeder extends Seeder
         }
         $this->call(DatabaseSeeder::class);
         DB::transaction(function (): void {
-            $q400 = AircraftType::firstOrCreate(['code' => 'Q400'], ['cabin_crew_required' => 2, 'palette' => 'forest']);
-            $b737 = AircraftType::firstOrCreate(['code' => 'B737'], ['cabin_crew_required' => 3, 'palette' => 'gold']);
+            $q400 = AircraftType::firstOrCreate(['code' => 'Q400'], ['name' => 'De Havilland Dash 8-400', 'cabin_crew_required' => 2, 'palette' => 'forest']);
+            $b737 = AircraftType::firstOrCreate(['code' => 'B737'], ['name' => 'Boeing 737-800', 'cabin_crew_required' => 3, 'palette' => 'gold']);
+            // Demo types from before full names existed get them, so planes read "7Q-DMC · Boeing 737-800 (B737)".
+            $q400->name ??= 'De Havilland Dash 8-400';
+            $b737->name ??= 'Boeing 737-800';
+            $q400->save();
+            $b737->save();
             // Crew: every 4th person is based at BLZ; pilots alternate Q400/B737 ratings; cabin crew are all-aircraft.
             // Contracted working hours: 40 a week for pilots, 38 for cabin crew (the generator never exceeds them).
             // Crew #1 of each rank has a medical expiring mid-month, #2 leave, #3 a simulator session, #4 a standby.
@@ -88,6 +94,13 @@ class DemoSeeder extends Seeder
                 ['7Q-DMB', $q400->id, 'maintenance', 'Scheduled A-check in progress at LLW hangar', 21310.0],
                 ['7Q-DMC', $b737->id, 'available', null, 40112.3],
                 ['7Q-DMD', $b737->id, 'grounded', 'Demo AOG: awaiting replacement starter generator', 38770.8],
+                // Enough available planes for the flights that leave at the same time (four of each type at 08:00).
+                ['7Q-DME', $q400->id, 'available', null, 15420.0],
+                ['7Q-DMF', $q400->id, 'available', null, 12980.4],
+                ['7Q-DMG', $q400->id, 'available', null, 9875.2],
+                ['7Q-DMH', $b737->id, 'available', null, 35210.6],
+                ['7Q-DMJ', $b737->id, 'available', null, 29640.1],
+                ['7Q-DMK', $b737->id, 'available', null, 22305.9],
             ];
             foreach ($airframes as [$registration, $typeId, $status, $reason, $hours]) {
                 $aircraft = Aircraft::firstOrNew(['registration' => $registration]);
@@ -107,8 +120,22 @@ class DemoSeeder extends Seeder
                     ],
                     '7Q-DMB' => [['kind' => 'a_check', 'title' => 'A-check 5A', 'performed_on' => $base->copy()->subMonths(4), 'airframe_hours_at' => $hours - 600, 'next_due_on' => $base->copy()->subDays(2)]],
                     '7Q-DMC' => [['kind' => 'c_check', 'title' => 'C-check 2C', 'performed_on' => $base->copy()->subYear(), 'airframe_hours_at' => $hours - 5900, 'next_due_hours' => $hours + 35]],
-                    default => [['kind' => 'inspection', 'title' => 'Landing gear inspection', 'performed_on' => $base->copy()->subMonths(6), 'next_due_on' => $base->copy()->addMonths(6)]],
+                    '7Q-DMD' => [['kind' => 'inspection', 'title' => 'Landing gear inspection', 'performed_on' => $base->copy()->subMonths(6), 'next_due_on' => $base->copy()->addMonths(6)]],
+                    default => [],
                 });
+            }
+            // Planes on each demo flight plan: every airframe of its type, by registration. LB2 also lists a B737 as
+            // its last choice, to show a plan flown by mixed types (its crew needs then follow the plane).
+            // Plans that already list planes are left as they are.
+            foreach (Flight::query()->whereIn('code', array_column($routes, 0))->with('aircraft')->get() as $flight) {
+                if ($flight->aircraft->isNotEmpty()) {
+                    continue;
+                }
+                $ids = Aircraft::query()->where('aircraft_type_id', $flight->aircraft_type_id)->orderBy('registration')->pluck('id')->all();
+                if ($flight->code === 'LB2') {
+                    $ids[] = Aircraft::query()->where('registration', '7Q-DMK')->value('id');
+                }
+                $flight->aircraft()->sync(collect($ids)->filter()->values()->mapWithKeys(fn (int $id, int $index): array => [$id => ['position' => $index + 1]])->all());
             }
             // Optional demo account, only when both values are set locally; never a default credential.
             if (config('roster.demo_email') && config('roster.demo_password')) {

@@ -3,7 +3,9 @@
 namespace App\Services;
 
 use App\Models\RosterPeriod;
+use App\Support\Roster\Duty;
 use App\Support\Roster\PlanningContext;
+use App\Support\Roster\Section;
 
 /**
  * Finds everything wrong with a roster week as it stands now, re-checking every filled seat against the
@@ -12,7 +14,8 @@ use App\Support\Roster\PlanningContext;
  *
  * Severity "danger" is a broken rule on a filled seat; it blocks publishing unless a scheduler accepted
  * exactly that problem with a recorded override. Severity "warning" (open seat, disabled flight, no
- * serviceable airframe) is shown but does not block publishing.
+ * serviceable airframe, the trip's plane unavailable or double-booked, a captain section needing
+ * positioning) is shown but does not block publishing.
  */
 class RosterConflictService
 {
@@ -34,14 +37,30 @@ class RosterConflictService
             if (! $trip->flight->active) {
                 $conflicts[] = $warning('flight_disabled', 'Flight '.$base['flight_code'].' is disabled but this trip is still on the roster.');
             }
-            $fleet = $context->airframes[$snapshot['aircraft_type_id'] ?? 0] ?? null;
+            // The trip's own plane: not available, or flying another trip at the same time.
+            $plane = $trip->aircraft_id !== null ? ($context->planes[$trip->aircraft_id] ?? null) : null;
+            if ($plane !== null && $plane['status'] !== 'available') {
+                $conflicts[] = $warning('aircraft_unavailable', $plane['registration'].' is '.lcfirst($plane['status_label']).'. Choose another plane, or rebuild to swap it for a free one.');
+            }
+            if ($plane !== null) {
+                [$start, $end] = [Duty::minutes($snapshot['report']), Duty::minutes($snapshot['release'])];
+                foreach ($context->planeTrips[$trip->aircraft_id] ?? [] as $other) {
+                    if ($other['trip_id'] !== $trip->id && $other['start'] < $end && $start < $other['end']) {
+                        $conflicts[] = $warning('aircraft_double_booked', $plane['registration'].' is also flying '.$other['label'].' at the same time.');
+                    }
+                }
+            }
+            // Without a plane, the type-level check: every airframe of the trip's type unavailable.
+            $fleet = $plane === null ? ($context->airframes[$snapshot['aircraft_type_id'] ?? 0] ?? null) : null;
             if ($fleet !== null && $fleet['total'] > 0 && $fleet['available'] === 0) {
                 $conflicts[] = $warning('no_aircraft', 'No serviceable '.($snapshot['aircraft_type'] ?? 'aircraft').' airframe: all '.$fleet['total'].' are unavailable.');
             }
             foreach ($trip->assignments->sortBy(fn ($seat): array => [array_search($seat->rank, ['CPT', 'FO', 'CC'], true), $seat->seat_number]) as $seat) {
                 $seatBase = ['assignment_id' => $seat->id, 'rank' => $seat->rank];
+                // A captain section names its own route, e.g. "Open captain seat (LLW-NBO-LLW)."
+                $section = Section::isPartial($snapshot, $seat->from_leg, $seat->to_leg) ? ' ('.Section::route($snapshot, $seat->from_leg, $seat->to_leg).')' : '';
                 if ($seat->crew_member_id === null) {
-                    $conflicts[] = $warning('open_seat', 'Open '.RosterLegalityService::RANKS[$seat->rank].' seat.', $seatBase);
+                    $conflicts[] = $warning('open_seat', 'Open '.RosterLegalityService::RANKS[$seat->rank].' seat'.$section.'.', $seatBase);
 
                     continue;
                 }
@@ -53,6 +72,11 @@ class RosterConflictService
                 // Missing document records under the "warn" policy: shown, never blocking.
                 foreach ($this->legality->documentWarnings($context, $crew) as $message) {
                     $conflicts[] = $warning('document_missing', $message, [...$seatBase, 'crew_member_id' => $crew->id, 'crew_name' => $crew->name]);
+                }
+                // A captain section starting or ending away from the captain's base: allowed, travel to arrange.
+                $positioning = $this->legality->positioning($crew, $trip, $seat);
+                if ($positioning !== null) {
+                    $conflicts[] = $warning('positioning', $positioning, [...$seatBase, 'crew_member_id' => $crew->id, 'crew_name' => $crew->name]);
                 }
             }
         }

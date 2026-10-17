@@ -7,13 +7,14 @@ use App\Models\CrewActivity;
 use App\Models\CrewMember;
 use App\Models\Flight;
 use App\Models\RosterPeriod;
-use App\Models\RuleSet;
 use App\Models\Trip;
 use App\Models\User;
 use App\Support\Roster\CrewSchedule;
 use App\Support\Roster\Duty;
 use App\Support\Roster\PlanningContext;
+use App\Support\Roster\Section;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -21,8 +22,9 @@ use Illuminate\Validation\ValidationException;
 /**
  * The roster generator. For one draft period (a week, two weeks or a month) it:
  *
- *  1. expands every enabled flight pattern into dated trips for its operating days (with a UTC schedule
- *     snapshot) and makes sure each trip has its CPT, FO and cabin seats;
+ *  1. expands every enabled flight pattern into dated trips for its operating days (RosterScheduleService,
+ *     with a UTC schedule snapshot), removes trips the routes no longer call for, and makes sure each trip
+ *     has its CPT, FO and cabin seats;
  *  2. releases the automatic seats from earlier builds, keeping every manual (locked) seat;
  *  3. fills the hardest seats first (fewest eligible crew), giving each to the legal crew member with the
  *     lowest fairness score, mostly the smallest share of their weekly working hours already used;
@@ -34,13 +36,17 @@ use Illuminate\Validation\ValidationException;
  *
  * Trips that started before today are left exactly as they are. The run is one transaction under a row
  * lock on the week, and is deterministic: the same data always gives the same roster.
+ *
+ * A rebuild after flights were disabled, enabled or edited (RosterScheduleService::changes()) only runs when
+ * the caller confirms the exact route changes it reviewed, because it can remove trips and release crew,
+ * locked seats included.
  */
 class RosterBuilderService
 {
     public function __construct(
         private AuditService $audit,
         private ExpiryService $expiry,
-        private FlightTimelineService $timeline,
+        private RosterScheduleService $schedule,
         private RosterLegalityService $legality,
         private RosterPeriodService $periods,
         private CrewActivityService $activities,
@@ -49,17 +55,26 @@ class RosterBuilderService
     /**
      * Build (or rebuild) a draft week and return what happened.
      *
-     * @return array{trips: int, planned_trips: int, seats: int, filled: int, open: int, kept: int, rebalanced: int, standby: int, skipped: array<int, string>, reasons: array<string, int>}
+     * @param  string|null  $confirmedChanges  fingerprint of the route changes the scheduler reviewed and accepted
+     *                                         (RosterScheduleService::changes()); not needed for a first build or
+     *                                         when the routes have not changed since the last one
+     * @return array{trips: int, planned_trips: int, seats: int, filled: int, open: int, kept: int, rebalanced: int, standby: int, skipped: array<int, string>, reasons: array<string, int>, route_changes: array{added: int, removed: int, changed: int, released_seats: int}|null}
      *
-     * @throws ValidationException when the week is published or has ended
+     * @throws ValidationException when the week is published or has ended, or route changes were not confirmed
      */
-    public function build(RosterPeriod $period, User $actor): array
+    public function build(RosterPeriod $period, User $actor, ?string $confirmedChanges = null): array
     {
-        return DB::transaction(function () use ($period, $actor): array {
+        return DB::transaction(function () use ($period, $actor, $confirmedChanges): array {
             $period = RosterPeriod::query()->lockForUpdate()->findOrFail($period->id);
             $this->periods->assertEditable($period);
             $today = $this->expiry->today();
-            $skipped = $this->expand($period, $today);
+            $plan = $this->schedule->plan($period, $today);
+            // Removing trips releases crew (locked seats too), so the scheduler must have seen exactly this list.
+            $changes = $this->schedule->changes($period, $today, $plan);
+            if ($changes !== null && $changes['count'] > 0 && ! hash_equals($changes['fingerprint'], (string) $confirmedChanges)) {
+                throw ValidationException::withMessages(['route_changes' => 'Flight routes have changed since this roster was built. Review the route changes and confirm them to rebuild.']);
+            }
+            $skipped = $this->expand($period, $today, $plan);
             // Standby planned by an earlier build is replaced; standby entered by people is never touched.
             CrewActivity::query()->where('roster_period_id', $period->id)->where('date', '>=', $today->format('Y-m-d'))->delete();
 
@@ -118,138 +133,78 @@ class RosterBuilderService
             }
             arsort($reasons);
             $summary = ['trips' => $context->trips->count(), 'planned_trips' => $context->trips->reject(fn (Trip $trip): bool => $context->operated($trip))->count(), 'seats' => $seats, 'filled' => $filled, 'open' => $seats - $filled,
-                'kept' => $kept, 'rebalanced' => $rebalanced, 'standby' => $standby, 'skipped' => $skipped, 'reasons' => array_slice($reasons, 0, 3, true)];
+                'kept' => $kept, 'rebalanced' => $rebalanced, 'standby' => $standby, 'skipped' => $skipped, 'reasons' => array_slice($reasons, 0, 3, true),
+                'route_changes' => $changes !== null && $changes['count'] > 0 ? ['added' => count($changes['added']), 'removed' => count($changes['removed']), 'changed' => count($changes['changed']), 'released_seats' => $changes['released_seats']] : null];
             $before = $period->toArray();
             $period->built_at = now();
             $period->built_by = $actor->id;
             $period->save();
-            $this->audit->record($actor, 'built', $period, $before, [...$period->toArray(), 'summary' => $summary]);
+            // The audit keeps the full list of applied route changes, including every crew member released.
+            $applied = $summary['route_changes'] !== null ? ['route_changes' => Arr::except($changes, ['count', 'fingerprint'])] : [];
+            $this->audit->record($actor, 'built', $period, $before, [...$period->toArray(), 'summary' => $summary, ...$applied]);
 
             return $summary;
         });
     }
 
     /**
-     * Turn a validated flight pattern into a dated schedule snapshot: each duty period's report and release,
-     * and each leg's times, as UTC instants plus their base-local clock times and dates. The offset comes
-     * from the week's rules snapshot, never from the server or browser timezone.
+     * Create, refresh or remove the roster's trips from today onwards so they match the enabled patterns
+     * (RosterScheduleService::plan()), and give every trip its required seats. Trips the routes no longer call
+     * for (flight disabled, not operating that day, or failing the roster's frozen rules) are removed with
+     * their seats, locked ones included: build() only gets here once the scheduler has confirmed that list.
      *
-     * @param  array{base: string, periods: array<int, array<string, mixed>>, warnings: array<int, string>}  $timeline  FlightTimelineService::validate() result
-     * @return array<string, mixed>
-     */
-    public function snapshot(Flight $flight, array $timeline, CarbonImmutable $date, int $offset): array
-    {
-        $day = $date->format('Y-m-d');
-        $instant = fn (int $minutes): string => $this->timeline->instant($day, $minutes, $offset);
-        $localDate = fn (int $minutes): string => $date->addDays((int) floor($minutes / 1440))->format('Y-m-d');
-        $clock = fn (int $minutes): string => sprintf('%02d:%02d', intdiv((($minutes % 1440) + 1440) % 1440, 60), (($minutes % 60) + 60) % 60);
-        $duties = [];
-        $route = [$timeline['base']];
-        foreach ($timeline['periods'] as $period) {
-            $dates = [];
-            for ($at = $date->addDays((int) floor($period['report_min'] / 1440)); $at->format('Y-m-d') <= $localDate($period['release_min'] - 1); $at = $at->addDay()) {
-                $dates[] = $at->format('Y-m-d');
-            }
-            $legs = [];
-            foreach ($period['legs'] as $leg) {
-                $route[] = $leg['to_airport'];
-                $legs[] = [
-                    'from_airport' => $leg['from_airport'], 'to_airport' => $leg['to_airport'],
-                    'departs' => $instant($leg['departure_min']), 'arrives' => $instant($leg['arrival_min']),
-                    'departs_local' => $clock($leg['departure_min']), 'arrives_local' => $clock($leg['arrival_min']),
-                    'block_minutes' => $leg['arrival_min'] - $leg['departure_min'],
-                ];
-            }
-            $duties[] = [
-                'trip_day' => $period['trip_day'],
-                'date' => $localDate($period['report_min']),
-                'dates' => $dates,
-                'report' => $instant($period['report_min']), 'release' => $instant($period['release_min']),
-                'report_local' => $clock($period['report_min']), 'release_local' => $clock($period['release_min']),
-                'block_minutes' => $period['block_min'],
-                'duty_minutes' => $period['release_min'] - $period['report_min'],
-                'legs' => $legs,
-            ];
-        }
-
-        return [
-            'code' => $flight->code,
-            'flight_id' => $flight->id,
-            'aircraft_type_id' => $flight->aircraft_type_id,
-            'aircraft_type' => $flight->aircraftType->code,
-            'palette' => $flight->aircraftType->palette,
-            'cabin_crew_required' => $flight->aircraftType->cabin_crew_required,
-            'base' => $timeline['base'],
-            'route' => implode('-', $route),
-            'utc_offset_minutes' => $offset,
-            'report' => $duties[0]['report'],
-            'release' => $duties[array_key_last($duties)]['release'],
-            'block_minutes' => array_sum(array_column($duties, 'block_minutes')),
-            'duty_minutes' => array_sum(array_column($duties, 'duty_minutes')),
-            'duties' => $duties,
-            'warnings' => $timeline['warnings'],
-        ];
-    }
-
-    /**
-     * Create, refresh or remove the week's trips from today onwards so they match the enabled patterns, and
-     * give every trip its required seats. Trips holding manual seats are kept even if their pattern was
-     * disabled (the conflict check reports them). Patterns that no longer pass the week's frozen rules are
-     * skipped and reported.
-     *
+     * @param  array{trips: array<string, array{flight: Flight, date: string, snapshot: array<string, mixed>, aircraft_id: ?int, aircraft_source: string}>, skipped: array<int, string>, invalid: array<int, string>}  $plan
      * @return array<int, string> messages for skipped patterns
      */
-    private function expand(RosterPeriod $period, CarbonImmutable $today): array
+    private function expand(RosterPeriod $period, CarbonImmutable $today, array $plan): array
     {
-        $rules = new RuleSet($period->rules_snapshot);
-        $offset = (int) $period->rules_snapshot['utc_offset_minutes'];
-        $existing = $period->trips()->with('assignments')->get()->keyBy(fn (Trip $trip): string => $trip->flight_id.'|'.$trip->start_date->format('Y-m-d'));
-        $wanted = [];
-        $skipped = [];
-        foreach (Flight::query()->where('active', true)->with(['legs', 'days', 'aircraftType'])->orderBy('code')->get() as $flight) {
-            if ($flight->legs->isEmpty()) {
-                continue;
-            }
-            try {
-                $timeline = $this->timeline->validate($flight->legs->map(fn ($leg): array => $leg->only(['trip_day', 'from_airport', 'to_airport', 'departs_local', 'arrives_local']))->all(), $rules);
-            } catch (ValidationException $exception) {
-                $skipped[] = $flight->code.': '.collect($exception->errors())->flatten()->first();
-
-                continue;
-            }
-            // Every date of the period (a week, two weeks or a month) on which the pattern operates (Monday = 0).
-            $weekdays = $flight->days->pluck('weekday')->all();
-            foreach ($period->dates() as $day) {
-                $date = CarbonImmutable::parse($day, 'UTC');
-                if ($date->lt($today) || ! in_array($date->dayOfWeekIso - 1, $weekdays, true)) {
-                    continue;
-                }
-                $key = $flight->id.'|'.$date->format('Y-m-d');
-                $wanted[$key] = true;
-                $trip = $existing->get($key) ?? new Trip(['roster_period_id' => $period->id, 'flight_id' => $flight->id, 'start_date' => $date->format('Y-m-d')]);
-                $trip->schedule_snapshot = $this->snapshot($flight, $timeline, $date, $offset);
-                $trip->save();
-                $this->ensureSeats($trip, $flight->aircraftType->cabin_crew_required);
-            }
+        $existing = $period->trips()->get()->keyBy(fn (Trip $trip): string => $trip->flight_id.'|'.$trip->start_date->format('Y-m-d'));
+        foreach ($plan['trips'] as $key => $wanted) {
+            $trip = $existing->get($key) ?? new Trip(['roster_period_id' => $period->id, 'flight_id' => $wanted['flight']->id, 'start_date' => $wanted['date']]);
+            // Captain sections are leg ranges, so they only survive while the trip keeps the same legs.
+            $legsChanged = $trip->exists && Section::signature($trip->schedule_snapshot ?? []) !== Section::signature($wanted['snapshot']);
+            $trip->schedule_snapshot = $wanted['snapshot'];
+            // The airframe the plan chose (or crew control's own choice, which the plan keeps).
+            $trip->forceFill(['aircraft_id' => $wanted['aircraft_id'] ?? null, 'aircraft_source' => $wanted['aircraft_source'] ?? 'auto']);
+            $trip->save();
+            $this->ensureSeats($trip, (int) $wanted['snapshot']['cabin_crew_required'], $legsChanged);
         }
         foreach ($existing as $key => $trip) {
-            $locked = $trip->assignments->contains(fn (Assignment $seat): bool => $seat->source === 'manual' && $seat->crew_member_id !== null);
-            if (! isset($wanted[$key]) && $trip->start_date->gte($today) && ! $locked) {
+            if (! isset($plan['trips'][$key]) && $trip->start_date->gte($today)) {
                 $trip->delete();
             }
         }
 
-        return $skipped;
+        return $plan['skipped'];
     }
 
     /**
-     * One CPT seat, one FO seat and one numbered cabin seat per required cabin crew member. Surplus seats
-     * (after the cabin requirement went down) are removed unless a manual assignment holds them.
+     * One FO seat and one numbered cabin seat per required cabin crew member, plus the captain seat(s): one for
+     * the whole trip, or the sections crew control split it into. Surplus cabin seats (after the cabin
+     * requirement went down) are removed unless a manual assignment holds them.
+     *
+     * Captain sections are kept while they still cover the trip's legs in order. When the flight pattern's
+     * legs changed ($legsChanged) or the sections no longer fit, the trip goes back to one captain for the whole
+     * trip and the section captains are released (the route-change review listed them before the rebuild).
      */
-    private function ensureSeats(Trip $trip, int $cabin): void
+    private function ensureSeats(Trip $trip, int $cabin, bool $legsChanged = false): void
     {
         $wanted = ['CPT' => 1, 'FO' => 1, 'CC' => $cabin];
         $current = $trip->exists ? $trip->assignments()->get() : collect();
+        $captains = $current->where('rank', 'CPT')->sortBy('seat_number')->values();
+        $split = $captains->count() > 1 || $captains->contains(fn (Assignment $seat): bool => $seat->from_leg !== null);
+        if ($split && ($legsChanged || ! $this->sectionsFit($captains, Section::count($trip->schedule_snapshot)))) {
+            foreach ($captains as $seat) {
+                if ($seat->seat_number > 1) {
+                    $seat->delete();
+
+                    continue;
+                }
+                $seat->forceFill(['from_leg' => null, 'to_leg' => null, 'crew_member_id' => null, 'source' => 'auto', 'flag_reasons' => null,
+                    'decision_log' => ['by' => 'generator', 'at' => now()->toIso8601String(), 'action' => 'sections_reset', 'reason' => 'The flight pattern\'s legs changed, so the captain sections were joined back into one seat.']])->save();
+            }
+            $current = $trip->assignments()->get();
+        }
         foreach ($wanted as $rank => $count) {
             for ($number = 1; $number <= $count; $number++) {
                 if (! $current->contains(fn (Assignment $seat): bool => $seat->rank === $rank && $seat->seat_number === $number)) {
@@ -258,16 +213,48 @@ class RosterBuilderService
             }
         }
         foreach ($current as $seat) {
-            if ($seat->seat_number > $wanted[$seat->rank] && ! ($seat->source === 'manual' && $seat->crew_member_id !== null)) {
+            // Captain sections are numbered seats too; only cabin seats follow the aircraft's requirement.
+            if ($seat->rank !== 'CPT' && $seat->seat_number > $wanted[$seat->rank] && ! ($seat->source === 'manual' && $seat->crew_member_id !== null)) {
                 $seat->delete();
             }
         }
     }
 
-    /** How many crew could hold the seat ignoring other duties (used to fill the hardest seats first). */
+    /**
+     * Bring a trip's seats in line with its snapshot after a manual change of plane: cabin seats follow the new
+     * plane's type (extra open seats, or surplus unlocked ones removed); captain sections are kept.
+     */
+    public function syncSeats(Trip $trip): void
+    {
+        $this->ensureSeats($trip, (int) ($trip->schedule_snapshot['cabin_crew_required'] ?? 0));
+    }
+
+    /**
+     * Whether captain seats, in seat order, cover legs 1…$legs one after another without gaps or overlaps.
+     *
+     * @param  Collection<int, Assignment>  $captains  sorted by seat_number
+     */
+    private function sectionsFit(Collection $captains, int $legs): bool
+    {
+        $next = 1;
+        foreach ($captains as $seat) {
+            if ($seat->from_leg !== $next || $seat->to_leg === null || $seat->to_leg < $seat->from_leg) {
+                return false;
+            }
+            $next = $seat->to_leg + 1;
+        }
+
+        return $next === $legs + 1;
+    }
+
+    /**
+     * How many crew could hold the seat ignoring other duties (used to fill the hardest seats first). The
+     * generator never plans positioning, so for a captain section only captains based at both ends count.
+     */
     private function eligibleCount(PlanningContext $context, Trip $trip, Assignment $seat): int
     {
-        return $context->crews->filter(fn ($crew): bool => $crew->rank === $seat->rank && $crew->active && $this->legality->eligibility($context, $crew, $trip, $seat->rank) === [])->count();
+        return $context->crews->filter(fn ($crew): bool => $crew->rank === $seat->rank && $crew->active && $this->legality->eligibility($context, $crew, $trip, $seat->rank, $seat) === []
+            && $this->legality->positioning($crew, $trip, $seat) === null)->count();
     }
 
     /**
@@ -277,7 +264,8 @@ class RosterBuilderService
      */
     private function fill(PlanningContext $context, Trip $trip, Assignment $seat): void
     {
-        $duty = $context->tripDuties[$trip->id] ?? null;
+        // A captain section is filled as the duty of that section only.
+        $duty = $context->seatDuty($trip, $seat);
         if ($duty === null) {
             return;
         }
@@ -289,6 +277,11 @@ class RosterBuilderService
                 continue;
             }
             $issues = $this->legality->issues($context, $crew, $trip, $seat);
+            // Positioning is crew control's call (a warning when they choose it), never the generator's.
+            $positioning = $this->legality->positioning($crew, $trip, $seat);
+            if ($positioning !== null) {
+                $issues[] = ['code' => 'positioning', 'message' => $positioning];
+            }
             if ($issues === []) {
                 $legal[] = ['crew' => $crew, ...$this->legality->score($context, $crew, $trip, $seat)];
 
@@ -341,6 +334,7 @@ class RosterBuilderService
             $seats = [];
             foreach ($context->trips as $trip) {
                 if ($context->operated($trip) || ($context->tripDuties[$trip->id] ?? null) === null) {
+                    // Trips without a usable schedule have nothing to rebalance.
                     continue;
                 }
                 foreach ($trip->assignments as $seat) {
@@ -354,7 +348,7 @@ class RosterBuilderService
             $movedThisPass = 0;
             foreach ($seats as [$trip, $seat]) {
                 $holder = $context->crews->get($seat->crew_member_id);
-                $duty = $context->tripDuties[$trip->id];
+                $duty = $context->seatDuty($trip, $seat);
                 $minutes = $duty->dutyMinutes();
                 $holderShare = $share($holder);
                 $holderAfter = $share($holder, -$minutes);
@@ -364,7 +358,7 @@ class RosterBuilderService
                     if ($share($crew) >= $holderShare || max($holderAfter, $share($crew, $minutes)) >= $holderShare - 0.0001) {
                         continue;
                     }
-                    if ($this->legality->issues($context, $crew, $trip, $seat) !== []) {
+                    if ($this->legality->issues($context, $crew, $trip, $seat) !== [] || $this->legality->positioning($crew, $trip, $seat) !== null) {
                         continue;
                     }
                     $context->schedule($holder->id)->remove('assignment:'.$seat->id);

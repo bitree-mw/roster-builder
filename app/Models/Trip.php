@@ -11,7 +11,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * A dated instance of a flight pattern inside a roster period. schedule_snapshot keeps the legs (as UTC
- * instants) exactly as planned, so editing the pattern later does not change history.
+ * instants) and the aircraft exactly as planned, so editing the pattern later does not change history.
+ *
+ * aircraft_id is the airframe flying the trip: picked by the roster build from the flight plan's list
+ * (aircraft_source "auto") or set by crew control ("manual", kept on rebuild). Both are set by services only.
  */
 #[Fillable(['roster_period_id', 'flight_id', 'start_date', 'schedule_snapshot'])]
 class Trip extends Model
@@ -40,6 +43,14 @@ class Trip extends Model
     public function flight(): BelongsTo
     {
         return $this->belongsTo(Flight::class);
+    }
+
+    /**
+     * The airframe flying this trip, if one is assigned.
+     */
+    public function aircraft(): BelongsTo
+    {
+        return $this->belongsTo(Aircraft::class);
     }
 
     /**
